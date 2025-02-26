@@ -45,7 +45,7 @@ export interface Payment {
   id: string;
   vehicleId: string;
   amount: number;
-  date: Date;
+  date: string;
   concept: string;
   status: "pending" | "completed" | "cancelled";
   paymentMethod: "cash" | "transfer";
