@@ -1,11 +1,5 @@
 
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,11 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Car, DollarSign } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Car, DollarSign } from "lucide-react";
-import { format } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
 import { Vehicle } from "@/types";
 
 interface NewPaymentDialogProps {
@@ -30,54 +30,50 @@ interface NewPaymentDialogProps {
   onSubmit: (paymentData: any) => void;
 }
 
-export const NewPaymentDialog = ({
-  open,
-  onOpenChange,
-  vehicles,
-  onSubmit,
-}: NewPaymentDialogProps) => {
+export const NewPaymentDialog = ({ open, onOpenChange, vehicles, onSubmit }: NewPaymentDialogProps) => {
   const { toast } = useToast();
-  const [selectedVehicle, setSelectedVehicle] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [amount, setAmount] = useState("");
-  const [concept, setConcept] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
-  const [bankName, setBankName] = useState("Ganadero");
-  const [transferNumber, setTransferNumber] = useState("");
-  const [customBank, setCustomBank] = useState("");
-  const [showCustomBank, setShowCustomBank] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = React.useState<string>("");
+  const [selectedDate, setSelectedDate] = React.useState<Date>(new Date());
+  const [amount, setAmount] = React.useState("");
+  const [concept, setConcept] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<"cash" | "transfer">("cash");
+  const [bankName, setBankName] = React.useState("Ganadero");
+  const [transferNumber, setTransferNumber] = React.useState("");
+  const [customBank, setCustomBank] = React.useState("");
+  const [showCustomBank, setShowCustomBank] = React.useState(false);
 
-  const handleSubmit = () => {
-    if (!selectedVehicle || !amount || !concept) {
+  const generateReceiptNumber = () => {
+    return `REC-${Date.now()}`;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVehicle || !selectedDate || !amount || !concept) {
       toast({
-        title: "Campos incompletos",
-        description: "Por favor completa todos los campos",
+        title: "Error",
+        description: "Por favor complete todos los campos requeridos",
         variant: "destructive",
       });
       return;
     }
 
-    if (paymentMethod === "transfer" && !transferNumber) {
-      toast({
-        title: "Número de transferencia requerido",
-        description: "Por favor ingresa el número de transferencia",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    onSubmit({
+    const paymentData = {
       vehicleId: selectedVehicle,
-      date: selectedDate,
       amount: parseFloat(amount),
+      date: selectedDate.toISOString().split('T')[0],
       concept,
+      status: "completed" as const,
       paymentMethod,
-      bankName: showCustomBank ? customBank : bankName,
-      transferNumber: paymentMethod === "transfer" ? transferNumber : undefined,
-    });
+      receiptNumber: generateReceiptNumber(),
+      ...(paymentMethod === "transfer" && {
+        bankName: customBank || bankName,
+        transferNumber,
+      }),
+    };
 
-    resetForm();
+    onSubmit(paymentData);
     onOpenChange(false);
+    resetForm();
   };
 
   const resetForm = () => {
@@ -98,7 +94,7 @@ export const NewPaymentDialog = ({
         <DialogHeader>
           <DialogTitle>Registrar Nuevo Pago</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Vehículo</Label>
             <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
@@ -110,9 +106,7 @@ export const NewPaymentDialog = ({
                   <SelectItem key={vehicle.id} value={vehicle.id}>
                     <div className="flex items-center gap-2">
                       <Car className="h-4 w-4" />
-                      <span>
-                        {vehicle.plate} - {vehicle.model}
-                      </span>
+                      <span>{vehicle.plate} - {vehicle.model}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -124,14 +118,9 @@ export const NewPaymentDialog = ({
             <Label>Fecha</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
+                <Button variant="outline" className="w-full justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate
-                    ? format(selectedDate, "dd/MM/yyyy")
-                    : "Selecciona una fecha"}
+                  {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Selecciona una fecha"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -147,12 +136,7 @@ export const NewPaymentDialog = ({
 
           <div className="space-y-2">
             <Label>Método de Pago</Label>
-            <Select
-              value={paymentMethod}
-              onValueChange={(value: "cash" | "transfer") =>
-                setPaymentMethod(value)
-              }
-            >
+            <Select value={paymentMethod} onValueChange={(value: "cash" | "transfer") => setPaymentMethod(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -237,9 +221,11 @@ export const NewPaymentDialog = ({
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSubmit}>Registrar Pago</Button>
+            <Button type="submit">
+              Registrar Pago
+            </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
