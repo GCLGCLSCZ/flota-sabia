@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -108,31 +108,47 @@ const Payments = () => {
     return `REC-${String(lastReceipt + 1).padStart(3, '0')}`;
   };
 
-  const handleNewPayment = () => {
-    if (!selectedVehicle || !amount || !concept) {
-      toast({
-        title: "Campos incompletos",
-        description: "Por favor completa todos los campos",
-        variant: "destructive",
-      });
-      return;
-    }
+const handleNewPayment = () => {
+  if (!selectedVehicle || !amount || !concept) {
+    toast({
+      title: "Campos incompletos",
+      description: "Por favor completa todos los campos",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    if (paymentMethod === "transfer" && !transferNumber) {
-      toast({
-        title: "Número de transferencia requerido",
-        description: "Por favor ingresa el número de transferencia",
-        variant: "destructive",
-      });
-      return;
-    }
+  if (paymentMethod === "transfer" && !transferNumber) {
+    toast({
+      title: "Número de transferencia requerido",
+      description: "Por favor ingresa el número de transferencia",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    const receiptNumber = generateReceiptNumber();
+  // Convertir la fecha a string en formato YYYY-MM-DD
+  const formattedDate = selectedDate.toISOString().split('T')[0];
+
+  const paymentData = {
+    vehicleId: selectedVehicle,
+    amount: parseFloat(amount),
+    date: formattedDate,
+    concept,
+    status: "completed" as const,
+    paymentMethod,
+    receiptNumber: generateReceiptNumber(),
+    ...(paymentMethod === "transfer" && {
+      bankName: customBank || bankName,
+      transferNumber,
+    }),
+  };
+
     toast({
       title: "Pago registrado",
       description: `Se ha registrado un pago de $${amount} para el vehículo ${
         vehicles.find((v) => v.id === selectedVehicle)?.plate
-      }. Recibo #${receiptNumber}`,
+      }. Recibo #${generateReceiptNumber()}`,
     });
 
     setShowNewPaymentDialog(false);
