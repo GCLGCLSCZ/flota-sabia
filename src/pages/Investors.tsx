@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,8 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,16 +20,18 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Search, Car, CalendarClock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Vehicle, Payment, Investor } from "@/types";
+import { Investor } from "@/types";
+import { useApp } from "@/context/AppContext";
 
 const Investors = () => {
   const { toast } = useToast();
-  const [investors, setInvestors] = useState<Investor[]>([]);
+  const { investors, addInvestor, updateInvestor } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [newInvestor, setNewInvestor] = useState({
     name: "",
     contact: "",
@@ -40,52 +41,30 @@ const Investors = () => {
 
   const handleAddInvestor = (e: React.FormEvent) => {
     e.preventDefault();
-    const investor: Investor = {
-      id: Date.now().toString(),
+    const success = addInvestor({
       ...newInvestor,
       vehicleCount: 0,
       status: "active",
-      lastPayment: "-",
-      vehicles: [],
-      payments: [],
-    };
-    setInvestors([...investors, investor]);
-    setNewInvestor({
-      name: "",
-      contact: "",
-      documentId: "",
-      bankAccount: "",
+      lastPayment: new Date().toISOString(),
     });
-    toast({
-      title: "Inversor agregado",
-      description: "El inversor ha sido registrado exitosamente.",
-    });
+
+    if (success) {
+      setShowAddDialog(false);
+      setNewInvestor({
+        name: "",
+        contact: "",
+        documentId: "",
+        bankAccount: "",
+      });
+    }
   };
 
   const handleEditInvestor = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInvestor) return;
 
-    setInvestors(
-      investors.map((inv) =>
-        inv.id === editingInvestor.id ? editingInvestor : inv
-      )
-    );
+    updateInvestor(editingInvestor.id, editingInvestor);
     setEditingInvestor(null);
-    toast({
-      title: "Inversor actualizado",
-      description: "Los datos del inversor han sido actualizados exitosamente.",
-    });
-  };
-
-  const handleDeleteInvestor = (investorId: string) => {
-    setInvestors(investors.filter((inv) => inv.id !== investorId));
-    setShowDeleteDialog(false);
-    toast({
-      title: "Inversor eliminado",
-      description: "El inversor ha sido eliminado exitosamente.",
-      variant: "destructive",
-    });
   };
 
   const filteredInvestors = investors.filter(
@@ -133,74 +112,10 @@ const Investors = () => {
             Administra los inversores y sus vehículos asociados
           </p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Inversor
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Inversor</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddInvestor} className="space-y-4">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre Completo</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ej: Juan Pérez"
-                    value={newInvestor.name}
-                    onChange={(e) =>
-                      setNewInvestor({ ...newInvestor, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact">Teléfono de Contacto</Label>
-                  <Input
-                    id="contact"
-                    placeholder="Ej: +591 77712345"
-                    value={newInvestor.contact}
-                    onChange={(e) =>
-                      setNewInvestor({ ...newInvestor, contact: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="documentId">CUIT/RUT</Label>
-                  <Input
-                    id="documentId"
-                    placeholder="Ej: 1234567890"
-                    value={newInvestor.documentId}
-                    onChange={(e) =>
-                      setNewInvestor({ ...newInvestor, documentId: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bankAccount">Cuenta Bancaria</Label>
-                  <Input
-                    id="bankAccount"
-                    placeholder="Ej: 1234-5678-9012-3456"
-                    value={newInvestor.bankAccount}
-                    onChange={(e) =>
-                      setNewInvestor({ ...newInvestor, bankAccount: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-4">
-                <Button type="submit">Guardar Inversor</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowAddDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Agregar Inversor
+        </Button>
       </div>
 
       <div className="flex gap-4 mb-6">
@@ -282,80 +197,67 @@ const Investors = () => {
         </Table>
       </Card>
 
-      {/* Diálogo de Detalles */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-4xl">
+      {/* Diálogo para agregar inversor */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Detalles del Inversor</DialogTitle>
+            <DialogTitle>Agregar Nuevo Inversor</DialogTitle>
           </DialogHeader>
-          {selectedInvestor && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Vehículos Asociados */}
-                <Card className="p-4">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Car className="h-5 w-5" />
-                    Vehículos Asociados
-                  </h3>
-                  <div className="space-y-4">
-                    {selectedInvestor.vehicles?.map((vehicle) => (
-                      <div
-                        key={vehicle.id}
-                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{vehicle.plate}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {vehicle.model} ({vehicle.year})
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            statusColors[vehicle.status]
-                          }`}
-                        >
-                          {statusLabels[vehicle.status]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-
-                {/* Historial de Pagos */}
-                <Card className="p-4">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <CalendarClock className="h-5 w-5" />
-                    Historial de Pagos
-                  </h3>
-                  <div className="space-y-4">
-                    {selectedInvestor.payments?.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{payment.concept}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(payment.date)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">Bs {payment.amount}</p>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              statusColors[payment.status]
-                            }`}
-                          >
-                            {statusLabels[payment.status]}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+          <form onSubmit={handleAddInvestor} className="space-y-4">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre Completo</Label>
+                <Input
+                  id="name"
+                  placeholder="Ej: Juan Pérez"
+                  value={newInvestor.name}
+                  onChange={(e) =>
+                    setNewInvestor({ ...newInvestor, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact">Teléfono de Contacto</Label>
+                <Input
+                  id="contact"
+                  placeholder="Ej: +591 77712345"
+                  value={newInvestor.contact}
+                  onChange={(e) =>
+                    setNewInvestor({ ...newInvestor, contact: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="documentId">CUIT/RUT</Label>
+                <Input
+                  id="documentId"
+                  placeholder="Ej: 1234567890"
+                  value={newInvestor.documentId}
+                  onChange={(e) =>
+                    setNewInvestor({ ...newInvestor, documentId: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankAccount">Cuenta Bancaria</Label>
+                <Input
+                  id="bankAccount"
+                  placeholder="Ej: 1234-5678-9012-3456"
+                  value={newInvestor.bankAccount}
+                  onChange={(e) =>
+                    setNewInvestor({ ...newInvestor, bankAccount: e.target.value })
+                  }
+                  required
+                />
               </div>
             </div>
-          )}
+            <div className="flex justify-end gap-4">
+              <Button type="submit">Guardar Inversor</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -438,29 +340,47 @@ const Investors = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de Confirmación de Eliminación */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+      {/* Diálogo de Detalles */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Confirmar Eliminación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que deseas eliminar al inversor{" "}
-              {selectedInvestor?.name}? Esta acción no se puede deshacer.
-            </DialogDescription>
+            <DialogTitle>Detalles del Inversor</DialogTitle>
           </DialogHeader>
-          <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                selectedInvestor && handleDeleteInvestor(selectedInvestor.id)
-              }
-            >
-              Eliminar
-            </Button>
-          </div>
+          {selectedInvestor && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Vehículos Asociados */}
+                <Card className="p-4">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Car className="h-5 w-5" />
+                    Vehículos Asociados
+                  </h3>
+                  <div className="space-y-4">
+                    {selectedInvestor.vehicles?.map((vehicle) => (
+                      <div
+                        key={vehicle.id}
+                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">{vehicle.plate}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {vehicle.model} ({vehicle.year})
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            statusColors[vehicle.status]
+                          }`}
+                        >
+                          {statusLabels[vehicle.status]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
