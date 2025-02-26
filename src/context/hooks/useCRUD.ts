@@ -18,9 +18,9 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     setStoredData(options.storageKey, items);
   }, [items, options.storageKey]);
 
-  const add = (itemData: Omit<T, "id">): boolean => {
+  const add = (itemData: Omit<T, "id">) => {
     if (options.validator) {
-      const validation = options.validator(itemData);
+      const validation = options.validator(itemData as Partial<T>);
       if (!validation.isValid) {
         toast({
           title: "Error de validación",
@@ -32,8 +32,8 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     }
 
     const newItem = {
-      id: Date.now().toString(),
       ...itemData,
+      id: Date.now().toString(),
     } as T;
 
     setItems(prev => [...prev, newItem]);
