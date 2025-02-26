@@ -1,31 +1,18 @@
 
 import { useState } from "react";
+import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, Car, CalendarClock, AlertCircle } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { Vehicle, Payment, Investor } from "@/types";
+import { Vehicle, Maintenance } from "@/types";
+import { useApp } from "@/context/AppContext";
+import VehicleCard from "./components/VehicleCard";
+import AddVehicleDialog from "./components/AddVehicleDialog";
+import EditVehicleDialog from "./components/EditVehicleDialog";
+import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
+import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
 
 const Vehicles = () => {
-  const { vehicles, setVehicles } = useState<Vehicle[]>([]);
+  const { vehicles, setVehicles } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -62,8 +49,8 @@ const Vehicles = () => {
     setShowDetails(false);
   };
 
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString();
   };
 
   const filteredVehicles = vehicles.filter(
