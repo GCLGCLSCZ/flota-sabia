@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Car, DollarSign, Printer, WhatsApp } from "lucide-react";
+import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -57,7 +57,6 @@ const Payments = () => {
   const [customBank, setCustomBank] = useState("");
   const [showCustomBank, setShowCustomBank] = useState(false);
 
-  // Datos de ejemplo actualizados con información del conductor
   const vehicles: Vehicle[] = [
     {
       id: "1",
@@ -153,7 +152,6 @@ const Payments = () => {
   };
 
   const handlePrintReceipt = (payment: Payment) => {
-    // Aquí iría la lógica de impresión
     toast({
       title: "Imprimiendo recibo",
       description: `Recibo #${payment.receiptNumber}`,
@@ -309,7 +307,7 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                           size="sm"
                           onClick={() => vehicle && handleWhatsAppReceipt(payment, vehicle)}
                         >
-                          <WhatsApp className="h-4 w-4" />
+                          <MessageSquare className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
