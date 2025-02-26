@@ -66,3 +66,46 @@ export interface Investor {
   vehicles?: Vehicle[];
   payments?: Payment[];
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "assistant";
+  company?: string;
+  status: "active" | "inactive";
+  lastLogin?: string;
+}
+
+export type UserRole = "admin" | "assistant";
+
+export interface UserPermissions {
+  payments: {
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+    view: boolean;
+  };
+  vehicles: {
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+    view: boolean;
+  };
+  drivers: {
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+    view: boolean;
+  };
+  investors: {
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+    view: boolean;
+  };
+  settings: {
+    view: boolean;
+    edit: boolean;
+  };
+}

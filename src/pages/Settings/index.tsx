@@ -3,8 +3,11 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { NotificationSettings } from "./components/NotificationSettings";
 import { SystemSettings } from "./components/SystemSettings";
+import { useAuth } from "@/context/AuthContext";
 
 const Settings = () => {
+  const { hasPermission } = useAuth();
+
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +23,7 @@ const Settings = () => {
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-6">
           <ProfileSettings />
-          <SystemSettings />
+          {hasPermission("edit", "settings") && <SystemSettings />}
         </div>
         <div>
           <NotificationSettings />
