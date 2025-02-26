@@ -53,6 +53,7 @@ const Calendar = () => {
   const [selectedDates, setSelectedDates] = useState<DateRange | undefined>();
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
   const [showNonWorkingDayDialog, setShowNonWorkingDayDialog] = useState(false);
+  const [applyToAllVehicles, setApplyToAllVehicles] = useState(false);
   const [newNonWorkingDay, setNewNonWorkingDay] = useState({
     type: "holiday",
     reason: "",
@@ -115,10 +116,10 @@ const Calendar = () => {
   ];
 
   const handleDateSelect = (range: DateRange | undefined) => {
-    if (!selectedVehicle) {
+    if (!selectedVehicle && !applyToAllVehicles) {
       toast({
         title: "Selecciona un vehículo",
-        description: "Debes seleccionar un vehículo antes de marcar días.",
+        description: "Debes seleccionar un vehículo o marcar la opción 'Aplicar a todos los vehículos'",
         variant: "destructive",
       });
       return;
@@ -130,11 +131,12 @@ const Calendar = () => {
   };
 
   const handleAddNonWorkingDays = () => {
-    if (!selectedDates?.from || !selectedDates?.to || !selectedVehicle) return;
+    if (!selectedDates?.from || !selectedDates?.to) return;
+    if (!selectedVehicle && !applyToAllVehicles) return;
 
     toast({
       title: "Días no laborables registrados",
-      description: `Se han registrado los días del ${format(selectedDates.from, "dd/MM/yyyy")} al ${format(selectedDates.to, "dd/MM/yyyy")} como no laborables por ${newNonWorkingDay.reason}`,
+      description: `Se han registrado los días del ${format(selectedDates.from, "dd/MM/yyyy")} al ${format(selectedDates.to, "dd/MM/yyyy")} como no laborables por ${newNonWorkingDay.reason} ${applyToAllVehicles ? "para todos los vehículos" : ""}`,
     });
 
     setShowNonWorkingDayDialog(false);
@@ -144,11 +146,26 @@ const Calendar = () => {
       reason: "",
       description: "",
     });
+    setApplyToAllVehicles(false);
   };
 
   const getHighlightedDays = () => {
     const selectedVehicleData = vehicles.find((v) => v.id === selectedVehicle);
-    return selectedVehicleData?.daysOff.map(d => d.date) || [];
+    const vehicleDaysOff = selectedVehicleData?.daysOff.map(d => d.date) || [];
+    
+    // Añadir todos los domingos del año actual
+    const currentYear = new Date().getFullYear();
+    const sundays: Date[] = [];
+    for (let month = 0; month < 12; month++) {
+      for (let day = 1; day <= new Date(currentYear, month + 1, 0).getDate(); day++) {
+        const date = new Date(currentYear, month, day);
+        if (date.getDay() === 0) { // 0 es domingo
+          sundays.push(date);
+        }
+      }
+    }
+    
+    return [...vehicleDaysOff, ...sundays];
   };
 
   const getMaintenanceDays = () => {
@@ -200,6 +217,7 @@ const Calendar = () => {
             <Select
               value={selectedVehicle}
               onValueChange={setSelectedVehicle}
+              disabled={applyToAllVehicles}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un vehículo" />
@@ -296,6 +314,22 @@ const Calendar = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="applyToAll"
+                checked={applyToAllVehicles}
+                onChange={(e) => {
+                  setApplyToAllVehicles(e.target.checked);
+                  if (e.target.checked) {
+                    setSelectedVehicle("");
+                  }
+                }}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="applyToAll">Aplicar a todos los vehículos</Label>
+            </div>
+
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Select
@@ -316,6 +350,7 @@ const Calendar = () => {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>Motivo</Label>
               <Input
