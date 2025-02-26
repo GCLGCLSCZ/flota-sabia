@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, Car, CalendarClock, AlertCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Car, CalendarClock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Vehicle, Payment, Investor } from "@/types";
 

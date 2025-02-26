@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
+import { Vehicle } from "@/types";
 
 interface AddVehicleDialogProps {
   isOpen: boolean;
@@ -14,12 +15,12 @@ interface AddVehicleDialogProps {
 
 const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
   const { addVehicle } = useApp();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<Vehicle, "id">>({
     plate: "",
     brand: "",
     model: "",
     year: "",
-    status: "active",
+    status: "active" as const,
     investor: "",
     dailyRate: 0,
     driverName: "",
@@ -77,6 +78,24 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: "active" | "maintenance" | "inactive") =>
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="maintenance">En Mantenimiento</SelectItem>
+                  <SelectItem value="inactive">Inactivo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="investor">Inversor</Label>
