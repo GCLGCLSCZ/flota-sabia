@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,121 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Car,
-  CalendarClock,
-  AlertCircle,
-} from "lucide-react";
+import { Plus, Edit, Trash2, Search, Car, CalendarClock, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-
-interface Vehicle {
-  id: string;
-  plate: string;
-  model: string;
-  year: string;
-  status: "active" | "maintenance" | "inactive";
-}
-
-interface Payment {
-  id: string;
-  date: string;
-  amount: number;
-  concept: string;
-  status: "completed" | "pending" | "late";
-}
-
-interface Investor {
-  id: string;
-  name: string;
-  contact: string;
-  documentId: string;
-  bankAccount: string;
-  vehicleCount: number;
-  status: "active" | "inactive";
-  lastPayment: string;
-  vehicles?: Vehicle[];
-  payments?: Payment[];
-}
+import { Vehicle, Payment, Investor } from "@/types";
 
 const Investors = () => {
   const { toast } = useToast();
-  const [investors, setInvestors] = useState<Investor[]>([
-    {
-      id: "1",
-      name: "Juan Pérez",
-      contact: "+591 77712345",
-      documentId: "1234567890",
-      bankAccount: "1234-5678-9012-3456",
-      vehicleCount: 2,
-      status: "active",
-      lastPayment: "2024-03-15",
-      vehicles: [
-        {
-          id: "v1",
-          plate: "ABC-123",
-          model: "Toyota Corolla",
-          year: "2020",
-          status: "active",
-        },
-        {
-          id: "v2",
-          plate: "DEF-456",
-          model: "Nissan Sentra",
-          year: "2021",
-          status: "maintenance",
-        },
-      ],
-      payments: [
-        {
-          id: "p1",
-          date: "2024-03-15",
-          amount: 1500,
-          concept: "Cuota Marzo",
-          status: "completed",
-        },
-        {
-          id: "p2",
-          date: "2024-02-15",
-          amount: 1500,
-          concept: "Cuota Febrero",
-          status: "completed",
-        },
-      ],
-    },
-    {
-      id: "2",
-      name: "María García",
-      contact: "+591 77798765",
-      documentId: "0987654321",
-      bankAccount: "9876-5432-1098-7654",
-      vehicleCount: 1,
-      status: "active",
-      lastPayment: "2024-03-10",
-      vehicles: [
-        {
-          id: "v3",
-          plate: "GHI-789",
-          model: "Honda Civic",
-          year: "2022",
-          status: "active",
-        },
-      ],
-      payments: [
-        {
-          id: "p3",
-          date: "2024-03-10",
-          amount: 1200,
-          concept: "Cuota Marzo",
-          status: "completed",
-        },
-      ],
-    },
-  ]);
-
+  const [investors, setInvestors] = useState<Investor[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
