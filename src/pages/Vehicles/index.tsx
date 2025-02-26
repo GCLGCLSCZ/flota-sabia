@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Vehicle, Maintenance } from "@/types";
 import { useApp } from "@/context/AppContext";
