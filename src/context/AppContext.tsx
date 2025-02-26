@@ -179,7 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const investor = investors.find(i => i.name === vehicle.investor);
     if (investor) {
       updateInvestor(investor.id, {
-        lastPayment: paymentData.date.toISOString().split('T')[0],
+        lastPayment: typeof paymentData.date === 'string' ? paymentData.date : paymentData.date.toISOString().split('T')[0],
       });
     }
 
