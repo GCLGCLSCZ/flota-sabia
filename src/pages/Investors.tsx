@@ -113,11 +113,14 @@ const Investors = () => {
     late: "Atrasado",
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (date: Date | string): string => {
+    if (date instanceof Date) {
+      return date.toLocaleDateString();
+    }
     try {
-      return new Date(dateStr).toLocaleDateString();
+      return new Date(date).toLocaleDateString();
     } catch (error) {
-      return dateStr;
+      return date;
     }
   };
 
@@ -333,7 +336,7 @@ const Investors = () => {
                         <div>
                           <p className="font-medium">{payment.concept}</p>
                           <p className="text-sm text-muted-foreground">
-                            {typeof payment.date === 'string' ? formatDate(payment.date) : payment.date}
+                            {formatDate(payment.date)}
                           </p>
                         </div>
                         <div className="text-right">
