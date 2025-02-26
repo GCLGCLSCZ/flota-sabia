@@ -19,19 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { UserPlus, Edit, Trash2, User, Car } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Driver } from "@/types";
+import { useApp } from "@/context/AppContext";
 
 const DriversPage = () => {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const { drivers, addDriver, updateDriver } = useApp();
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const { toast } = useToast();
 
@@ -48,27 +42,30 @@ const DriversPage = () => {
 
   const handleAddDriver = (e: React.FormEvent) => {
     e.preventDefault();
-    const driver: Driver = {
-      id: Date.now().toString(),
-      ...newDriver,
-      status: "active",
-    };
-    setDrivers([...drivers, driver]);
-    toast({
-      title: "Chofer agregado",
-      description: "El chofer ha sido registrado exitosamente.",
-    });
+    const success = addDriver(newDriver);
+    if (success) {
+      setNewDriver({
+        name: "",
+        phone: "",
+        documentId: "",
+        licenseNumber: "",
+        licenseExpiry: "",
+        address: "",
+        emergencyContact: "",
+        emergencyPhone: "",
+      });
+      toast({
+        title: "Chofer agregado",
+        description: "El chofer ha sido registrado exitosamente.",
+      });
+    }
   };
 
   const handleEditDriver = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDriver) return;
 
-    setDrivers(
-      drivers.map((d) =>
-        d.id === editingDriver.id ? editingDriver : d
-      )
-    );
+    updateDriver(editingDriver.id, editingDriver);
     setEditingDriver(null);
     toast({
       title: "Chofer actualizado",
@@ -77,7 +74,7 @@ const DriversPage = () => {
   };
 
   const handleDeleteDriver = (driverId: string) => {
-    setDrivers(drivers.filter((d) => d.id !== driverId));
+    updateDriver(driverId, { status: "inactive" });
     toast({
       title: "Chofer eliminado",
       description: "El chofer ha sido eliminado exitosamente.",
