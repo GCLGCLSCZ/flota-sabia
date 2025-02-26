@@ -25,6 +25,8 @@ export const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => 
     year: "",
     investor: "",
     dailyRate: 21,
+    driverName: "",
+    driverPhone: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -35,6 +37,8 @@ export const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => 
       monthlyEarnings: newVehicle.dailyRate * 30,
       maintenanceHistory: [],
       daysNotWorked: [],
+      driverName: newVehicle.driverName,
+      driverPhone: newVehicle.driverPhone,
     });
 
     if (success) {
@@ -45,6 +49,8 @@ export const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => 
         year: "",
         investor: "",
         dailyRate: 21,
+        driverName: "",
+        driverPhone: "",
       });
       onClose();
     }
@@ -123,6 +129,34 @@ export const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => 
                   setNewVehicle({
                     ...newVehicle,
                     dailyRate: Number(e.target.value),
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="driverName">Nombre del Conductor</Label>
+              <Input
+                id="driverName"
+                value={newVehicle.driverName}
+                onChange={(e) =>
+                  setNewVehicle({
+                    ...newVehicle,
+                    driverName: e.target.value,
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="driverPhone">Teléfono del Conductor</Label>
+              <Input
+                id="driverPhone"
+                value={newVehicle.driverPhone}
+                onChange={(e) =>
+                  setNewVehicle({
+                    ...newVehicle,
+                    driverPhone: e.target.value,
                   })
                 }
                 required
