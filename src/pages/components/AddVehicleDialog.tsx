@@ -14,7 +14,7 @@ interface AddVehicleDialogProps {
 }
 
 const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
-  const { addVehicle, investors } = useApp();
+  const { addVehicle, investors, drivers } = useApp();
   const [formData, setFormData] = useState<Omit<Vehicle, "id">>({
     plate: "",
     brand: "",
@@ -25,6 +25,7 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
     dailyRate: 0,
     driverName: "",
     driverPhone: "",
+    driverId: undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -35,6 +36,18 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
     const success = addVehicle(formData);
     if (success) {
       onClose();
+    }
+  };
+
+  const handleDriverSelect = (driverId: string) => {
+    const selectedDriver = drivers.find(d => d.id === driverId);
+    if (selectedDriver) {
+      setFormData({
+        ...formData,
+        driverId: selectedDriver.id,
+        driverName: selectedDriver.name,
+        driverPhone: selectedDriver.phone,
+      });
     }
   };
 
@@ -116,23 +129,28 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="driverName">Nombre del Conductor</Label>
-              <Input
-                id="driverName"
-                value={formData.driverName}
-                onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="driverPhone">Teléfono del Conductor</Label>
-              <Input
-                id="driverPhone"
-                value={formData.driverPhone}
-                onChange={(e) => setFormData({ ...formData, driverPhone: e.target.value })}
-                required
-              />
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="driver">Conductor (Opcional)</Label>
+              <Select 
+                value={formData.driverId || ""} 
+                onValueChange={handleDriverSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un conductor (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      {driver.name} - {driver.phone}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {drivers.length === 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  No hay conductores registrados. Puedes asignar uno más tarde.
+                </p>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-4">
