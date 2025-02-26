@@ -29,7 +29,7 @@ const DriversPage = () => {
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const { toast } = useToast();
 
-  const [newDriver, setNewDriver] = useState({
+  const [newDriver, setNewDriver] = useState<Omit<Driver, "id">>({
     name: "",
     phone: "",
     documentId: "",
@@ -38,6 +38,7 @@ const DriversPage = () => {
     address: "",
     emergencyContact: "",
     emergencyPhone: "",
+    status: "active",
   });
 
   const handleAddDriver = (e: React.FormEvent) => {
@@ -53,6 +54,7 @@ const DriversPage = () => {
         address: "",
         emergencyContact: "",
         emergencyPhone: "",
+        status: "active",
       });
       toast({
         title: "Chofer agregado",
