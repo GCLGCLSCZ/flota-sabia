@@ -114,6 +114,10 @@ const Investors = () => {
     late: "Atrasado",
   };
 
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -326,7 +330,7 @@ const Investors = () => {
                         <div>
                           <p className="font-medium">{payment.concept}</p>
                           <p className="text-sm text-muted-foreground">
-                            {payment.date}
+                            {formatDate(payment.date)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -439,10 +443,7 @@ const Investors = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancelar
             </Button>
             <Button
