@@ -84,7 +84,10 @@ export const RegisterVehicleDialog = ({
   const handleNewDriver = (
     driver: Omit<Driver, "id" | "status" | "vehicleId">
   ) => {
-    addDriver(driver);
+    addDriver({
+      ...driver,
+      status: "active",
+    });
   };
 
   const handleFinish = () => {
