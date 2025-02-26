@@ -14,7 +14,7 @@ interface AddVehicleDialogProps {
 }
 
 const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
-  const { addVehicle } = useApp();
+  const { addVehicle, investors } = useApp();
   const [formData, setFormData] = useState<Omit<Vehicle, "id">>({
     plate: "",
     brand: "",
@@ -29,6 +29,9 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.investor) {
+      return; // No permitir enviar si no hay inversor seleccionado
+    }
     const success = addVehicle(formData);
     if (success) {
       onClose();
@@ -79,32 +82,29 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: "active" | "maintenance" | "inactive") =>
-                  setFormData({ ...formData, status: value })
-                }
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="investor">Inversor</Label>
+              <Select 
+                value={formData.investor} 
+                onValueChange={(value) => setFormData({ ...formData, investor: value })}
+                required
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona un inversor" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="maintenance">En Mantenimiento</SelectItem>
-                  <SelectItem value="inactive">Inactivo</SelectItem>
+                  {investors.map((investor) => (
+                    <SelectItem key={investor.id} value={investor.name}>
+                      {investor.name} - {investor.documentId}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="investor">Inversor</Label>
-              <Input
-                id="investor"
-                value={formData.investor}
-                onChange={(e) => setFormData({ ...formData, investor: e.target.value })}
-                required
-              />
+              {investors.length === 0 && (
+                <p className="text-sm text-red-500 mt-1">
+                  Debes agregar inversores antes de poder registrar un vehículo
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="dailyRate">Tarifa Diaria</Label>
@@ -136,7 +136,12 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
             </div>
           </div>
           <div className="flex justify-end gap-4">
-            <Button type="submit">Guardar Vehículo</Button>
+            <Button 
+              type="submit"
+              disabled={!formData.investor || investors.length === 0}
+            >
+              Guardar Vehículo
+            </Button>
           </div>
         </form>
       </DialogContent>
