@@ -1,8 +1,10 @@
+
 import { useState } from "react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { useApp } from "@/context/AppContext";
 import {
   Select,
   SelectContent,
@@ -23,22 +25,7 @@ import { Car, Calendar as CalendarIcon, AlertCircle, Ban } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-
-interface Vehicle {
-  id: string;
-  plate: string;
-  model: string;
-  daysOff: NonWorkingDay[];
-  nextMaintenance?: Date;
-}
-
-interface MaintenanceEvent {
-  id: string;
-  vehicleId: string;
-  date: Date;
-  type: string;
-  description: string;
-}
+import { Vehicle } from "@/types";
 
 interface NonWorkingDay {
   date: Date;
@@ -48,72 +35,19 @@ interface NonWorkingDay {
 }
 
 const Calendar = () => {
+  const { vehicles, updateVehicle } = useApp();
   const { toast } = useToast();
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [selectedDates, setSelectedDates] = useState<DateRange | undefined>();
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
   const [showNonWorkingDayDialog, setShowNonWorkingDayDialog] = useState(false);
   const [applyToAllVehicles, setApplyToAllVehicles] = useState(false);
-  const [newNonWorkingDay, setNewNonWorkingDay] = useState({
+  const [newNonWorkingDay, setNewNonWorkingDay] = useState<NonWorkingDay>({
+    date: new Date(),
     type: "holiday",
     reason: "",
     description: "",
   });
-
-  // Datos de ejemplo
-  const vehicles: Vehicle[] = [
-    {
-      id: "1",
-      plate: "ABC-123",
-      model: "Toyota Corolla",
-      daysOff: [
-        {
-          date: new Date(2024, 2, 15),
-          reason: "Feriado Nacional",
-          description: "Carnaval",
-          type: "holiday",
-        },
-        {
-          date: new Date(2024, 2, 16),
-          reason: "Mantenimiento",
-          description: "Cambio de aceite",
-          type: "maintenance",
-        },
-      ],
-      nextMaintenance: new Date(2024, 3, 1),
-    },
-    {
-      id: "2",
-      plate: "DEF-456",
-      model: "Nissan Sentra",
-      daysOff: [
-        {
-          date: new Date(2024, 2, 20),
-          reason: "Paro Cívico",
-          description: "Paro departamental",
-          type: "civic_strike",
-        },
-      ],
-      nextMaintenance: new Date(2024, 3, 15),
-    },
-  ];
-
-  const maintenanceEvents: MaintenanceEvent[] = [
-    {
-      id: "m1",
-      vehicleId: "1",
-      date: new Date(2024, 3, 1),
-      type: "Preventivo",
-      description: "Cambio de aceite y filtros",
-    },
-    {
-      id: "m2",
-      vehicleId: "2",
-      date: new Date(2024, 3, 15),
-      type: "Preventivo",
-      description: "Revisión general",
-    },
-  ];
 
   const handleDateSelect = (range: DateRange | undefined) => {
     if (!selectedVehicle && !applyToAllVehicles) {
@@ -131,8 +65,29 @@ const Calendar = () => {
   };
 
   const handleAddNonWorkingDays = () => {
-    if (!selectedDates?.from || !selectedDates?.to) return;
-    if (!selectedVehicle && !applyToAllVehicles) return;
+    if (!selectedDates?.from || !selectedDates?.to || (!selectedVehicle && !applyToAllVehicles)) return;
+
+    const daysToAdd = {
+      date: selectedDates.from,
+      ...newNonWorkingDay,
+    };
+
+    if (applyToAllVehicles) {
+      vehicles.forEach((vehicle) => {
+        const currentDaysOff = vehicle.daysNotWorked || [];
+        updateVehicle(vehicle.id, {
+          daysNotWorked: [...currentDaysOff, selectedDates.from.toISOString()]
+        });
+      });
+    } else {
+      const vehicle = vehicles.find(v => v.id === selectedVehicle);
+      if (vehicle) {
+        const currentDaysOff = vehicle.daysNotWorked || [];
+        updateVehicle(vehicle.id, {
+          daysNotWorked: [...currentDaysOff, selectedDates.from.toISOString()]
+        });
+      }
+    }
 
     toast({
       title: "Días no laborables registrados",
@@ -142,6 +97,7 @@ const Calendar = () => {
     setShowNonWorkingDayDialog(false);
     setSelectedDates(undefined);
     setNewNonWorkingDay({
+      date: new Date(),
       type: "holiday",
       reason: "",
       description: "",
@@ -151,7 +107,7 @@ const Calendar = () => {
 
   const getHighlightedDays = () => {
     const selectedVehicleData = vehicles.find((v) => v.id === selectedVehicle);
-    const vehicleDaysOff = selectedVehicleData?.daysOff.map(d => d.date) || [];
+    const vehicleDaysOff = selectedVehicleData?.daysNotWorked?.map(d => new Date(d)) || [];
     
     // Añadir todos los domingos del año actual
     const currentYear = new Date().getFullYear();
@@ -165,20 +121,15 @@ const Calendar = () => {
       }
     }
     
-    return [...vehicleDaysOff, ...sundays];
+    // Añadir fechas de mantenimiento
+    const maintenanceDays = selectedVehicleData?.maintenanceHistory?.map(m => new Date(m.date)) || [];
+    
+    return [...vehicleDaysOff, ...sundays, ...maintenanceDays];
   };
 
   const getMaintenanceDays = () => {
-    return maintenanceEvents
-      .filter((event) => event.vehicleId === selectedVehicle)
-      .map((event) => event.date);
-  };
-
-  const getNonWorkingDayInfo = (date: Date) => {
     const selectedVehicleData = vehicles.find((v) => v.id === selectedVehicle);
-    return selectedVehicleData?.daysOff.find(
-      (d) => d.date.toDateString() === date.toDateString()
-    );
+    return selectedVehicleData?.maintenanceHistory?.map(m => new Date(m.date)) || [];
   };
 
   const typeLabels = {
@@ -241,38 +192,34 @@ const Calendar = () => {
                 <h3 className="font-medium">Días No Laborables</h3>
                 {vehicles
                   .find((v) => v.id === selectedVehicle)
-                  ?.daysOff.map((day, index) => (
+                  ?.daysNotWorked?.map((day, index) => (
                     <div
                       key={index}
                       className="p-3 bg-muted rounded-lg space-y-1"
                     >
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <Ban className="h-4 w-4 text-destructive" />
-                        {format(day.date, "dd/MM/yyyy")}
+                        {format(new Date(day), "dd/MM/yyyy")}
                       </div>
-                      <p className="text-sm font-medium">{day.reason}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {day.description}
-                      </p>
                     </div>
                   ))}
               </div>
 
               <div className="space-y-2">
                 <h3 className="font-medium">Próximos Mantenimientos</h3>
-                {maintenanceEvents
-                  .filter((event) => event.vehicleId === selectedVehicle)
-                  .map((event) => (
+                {vehicles
+                  .find((v) => v.id === selectedVehicle)
+                  ?.maintenanceHistory?.map((maintenance, index) => (
                     <div
-                      key={event.id}
+                      key={index}
                       className="p-3 bg-muted rounded-lg space-y-1"
                     >
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <AlertCircle className="h-4 w-4 text-warning" />
-                        {format(event.date, "dd/MM/yyyy")}
+                        {format(new Date(maintenance.date), "dd/MM/yyyy")}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {event.type}: {event.description}
+                        {maintenance.description}
                       </p>
                     </div>
                   ))}
@@ -386,6 +333,7 @@ const Calendar = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo de Mantenimiento */}
       <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
         <DialogContent>
           <DialogHeader>
@@ -394,7 +342,6 @@ const Calendar = () => {
               Selecciona un vehículo y la fecha para programar el mantenimiento
             </DialogDescription>
           </DialogHeader>
-          {/* Aquí iría el formulario para programar mantenimiento */}
           <div className="space-y-4">
             <Select>
               <SelectTrigger>
