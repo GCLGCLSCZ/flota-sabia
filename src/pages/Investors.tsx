@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -114,8 +113,12 @@ const Investors = () => {
     late: "Atrasado",
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString();
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString();
+    } catch (error) {
+      return dateStr;
+    }
   };
 
   return (
@@ -330,7 +333,7 @@ const Investors = () => {
                         <div>
                           <p className="font-medium">{payment.concept}</p>
                           <p className="text-sm text-muted-foreground">
-                            {formatDate(payment.date)}
+                            {typeof payment.date === 'string' ? formatDate(payment.date) : payment.date}
                           </p>
                         </div>
                         <div className="text-right">
