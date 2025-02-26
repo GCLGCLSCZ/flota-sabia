@@ -2,12 +2,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DollarSign } from "lucide-react";
-import { PaymentSummary } from "./PaymentSummary";
-import { PaymentHistory } from "./PaymentHistory";
-import { NewPaymentDialog } from "./NewPaymentDialog";
+import { NewPaymentDialog } from "./components/NewPaymentDialog";
+import { PaymentSummary } from "./components/PaymentSummary";
+import { PaymentHistory } from "./components/PaymentHistory";
+import { useApp } from "@/context/AppContext";
 
 const Payments = () => {
+  const { vehicles, payments, addPayment } = useApp();
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
+
+  const handleNewPayment = (paymentData: any) => {
+    addPayment(paymentData);
+  };
 
   return (
     <div className="space-y-6">
@@ -25,13 +31,15 @@ const Payments = () => {
       </div>
 
       <div className="grid md:grid-cols-[300px,1fr] gap-6">
-        <PaymentSummary />
-        <PaymentHistory />
+        <PaymentSummary vehicles={vehicles} payments={payments} />
+        <PaymentHistory payments={payments} vehicles={vehicles} />
       </div>
 
-      <NewPaymentDialog 
+      <NewPaymentDialog
         open={showNewPaymentDialog}
         onOpenChange={setShowNewPaymentDialog}
+        vehicles={vehicles}
+        onSubmit={handleNewPayment}
       />
     </div>
   );
