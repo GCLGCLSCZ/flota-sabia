@@ -1,5 +1,4 @@
-
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Vehicle, Payment, Investor, Driver } from "@/types";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -27,12 +26,53 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const STORAGE_KEYS = {
+  VEHICLES: 'app_vehicles',
+  PAYMENTS: 'app_payments',
+  INVESTORS: 'app_investors',
+  DRIVERS: 'app_drivers',
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [investors, setInvestors] = useState<Investor[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  // Inicializar estados con datos del localStorage
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.VEHICLES);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [payments, setPayments] = useState<Payment[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [investors, setInvestors] = useState<Investor[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.INVESTORS);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [drivers, setDrivers] = useState<Driver[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.DRIVERS);
+    return stored ? JSON.parse(stored) : [];
+  });
+
   const { toast } = useToast();
+
+  // Persistir cambios en localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(vehicles));
+  }, [vehicles]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+  }, [payments]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.INVESTORS, JSON.stringify(investors));
+  }, [investors]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DRIVERS, JSON.stringify(drivers));
+  }, [drivers]);
 
   // Funciones de validación
   const validateVehicleData = (vehicle: Partial<Vehicle>) => {
@@ -84,7 +124,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  // Funciones de agregar/actualizar con validación
   const addVehicle = (vehicleData: Omit<Vehicle, "id">) => {
     const validation = validateVehicleData(vehicleData);
     
