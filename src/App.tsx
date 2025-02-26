@@ -12,6 +12,7 @@ import Investors from "./pages/Investors";
 import Calendar from "./pages/Calendar";
 import Payments from "./pages/Payments";
 import Settings from "./pages/Settings";
+import DriversPage from "./pages/Drivers/DriversPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="vehicles" element={<Vehicles />} />
               <Route path="investors" element={<Investors />} />
+              <Route path="drivers" element={<DriversPage />} />
               <Route path="calendar" element={<Calendar />} />
               <Route path="payments" element={<Payments />} />
               <Route path="settings" element={<Settings />} />

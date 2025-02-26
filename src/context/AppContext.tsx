@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useState, ReactNode } from "react";
-import { Vehicle, Payment, Investor } from "@/types";
+import { Vehicle, Payment, Investor, Driver } from "@/types";
 
 interface AppContextType {
   vehicles: Vehicle[];
@@ -9,12 +9,16 @@ interface AppContextType {
   setPayments: (payments: Payment[]) => void;
   investors: Investor[];
   setInvestors: (investors: Investor[]) => void;
+  drivers: Driver[];
+  setDrivers: (drivers: Driver[]) => void;
   addVehicle: (vehicle: Omit<Vehicle, "id">) => void;
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   addPayment: (payment: Omit<Payment, "id">) => void;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
   addInvestor: (investor: Omit<Investor, "id">) => void;
   updateInvestor: (id: string, investor: Partial<Investor>) => void;
+  addDriver: (driver: Omit<Driver, "id">) => void;
+  updateDriver: (id: string, driver: Partial<Driver>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -23,6 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [investors, setInvestors] = useState<Investor[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
 
   const addVehicle = (vehicleData: Omit<Vehicle, "id">) => {
     const newVehicle: Vehicle = {
@@ -38,6 +43,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           inv.name === vehicleData.investor
             ? { ...inv, vehicleCount: (inv.vehicleCount || 0) + 1 }
             : inv
+        )
+      );
+    }
+
+    // Actualizar el chofer si está asignado
+    if (vehicleData.driverId) {
+      setDrivers(prevDrivers =>
+        prevDrivers.map(driver =>
+          driver.id === vehicleData.driverId
+            ? { ...driver, vehicleId: newVehicle.id }
+            : driver
         )
       );
     }
@@ -95,6 +111,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const addDriver = (driverData: Omit<Driver, "id">) => {
+    const newDriver: Driver = {
+      id: Date.now().toString(),
+      ...driverData,
+      status: "active",
+    };
+    setDrivers([...drivers, newDriver]);
+  };
+
+  const updateDriver = (id: string, driverData: Partial<Driver>) => {
+    setDrivers(prevDrivers =>
+      prevDrivers.map(driver =>
+        driver.id === id ? { ...driver, ...driverData } : driver
+      )
+    );
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -104,12 +137,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPayments,
         investors,
         setInvestors,
+        drivers,
+        setDrivers,
         addVehicle,
         updateVehicle,
         addPayment,
         updatePayment,
         addInvestor,
         updateInvestor,
+        addDriver,
+        updateDriver,
       }}
     >
       {children}

@@ -8,6 +8,20 @@ export interface Maintenance {
   status: "pending" | "in-progress" | "completed";
 }
 
+export interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  documentId: string;
+  licenseNumber: string;
+  licenseExpiry: string;
+  address: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  status: "active" | "inactive";
+  vehicleId?: string;
+}
+
 export interface Vehicle {
   id: string;
   plate: string;
@@ -24,6 +38,7 @@ export interface Vehicle {
   monthlyEarnings?: number;
   driverName: string;
   driverPhone: string;
+  driverId?: string;
 }
 
 export interface Payment {
