@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Car, DollarSign } from "lucide-react";
+import { Calendar as CalendarIcon, Car, DollarSign, Printer, WhatsApp } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Payment {
   id: string;
@@ -29,6 +29,10 @@ interface Payment {
   date: Date;
   concept: string;
   status: "pending" | "completed" | "cancelled";
+  paymentMethod: "cash" | "transfer";
+  receiptNumber: string;
+  bankName?: string;
+  transferNumber?: string;
 }
 
 interface Vehicle {
@@ -36,29 +40,40 @@ interface Vehicle {
   plate: string;
   model: string;
   dailyRate: number;
+  driverName: string;
+  driverPhone: string;
 }
 
 const Payments = () => {
   const { toast } = useToast();
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [amount, setAmount] = useState("");
   const [concept, setConcept] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
+  const [bankName, setBankName] = useState("Ganadero");
+  const [transferNumber, setTransferNumber] = useState("");
+  const [customBank, setCustomBank] = useState("");
+  const [showCustomBank, setShowCustomBank] = useState(false);
 
-  // Datos de ejemplo
+  // Datos de ejemplo actualizados con información del conductor
   const vehicles: Vehicle[] = [
     {
       id: "1",
       plate: "ABC-123",
       model: "Toyota Corolla",
       dailyRate: 50,
+      driverName: "Juan Pérez",
+      driverPhone: "591712345678"
     },
     {
       id: "2",
       plate: "DEF-456",
       model: "Nissan Sentra",
       dailyRate: 45,
+      driverName: "Carlos López",
+      driverPhone: "591787654321"
     },
   ];
 
@@ -70,6 +85,8 @@ const Payments = () => {
       date: new Date(2024, 2, 15),
       concept: "Renta semanal",
       status: "completed",
+      paymentMethod: "cash",
+      receiptNumber: "REC-001",
     },
     {
       id: "p2",
@@ -78,11 +95,22 @@ const Payments = () => {
       date: new Date(2024, 2, 16),
       concept: "Renta semanal",
       status: "pending",
+      paymentMethod: "transfer",
+      receiptNumber: "REC-002",
+      bankName: "Ganadero",
+      transferNumber: "TRF123456",
     },
   ];
 
+  const generateReceiptNumber = () => {
+    const lastReceipt = payments
+      .map(p => parseInt(p.receiptNumber.split('-')[1]))
+      .sort((a, b) => b - a)[0] || 0;
+    return `REC-${String(lastReceipt + 1).padStart(3, '0')}`;
+  };
+
   const handleNewPayment = () => {
-    if (!selectedVehicle || !selectedDate || !amount || !concept) {
+    if (!selectedVehicle || !amount || !concept) {
       toast({
         title: "Campos incompletos",
         description: "Por favor completa todos los campos",
@@ -91,18 +119,59 @@ const Payments = () => {
       return;
     }
 
+    if (paymentMethod === "transfer" && !transferNumber) {
+      toast({
+        title: "Número de transferencia requerido",
+        description: "Por favor ingresa el número de transferencia",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const receiptNumber = generateReceiptNumber();
     toast({
       title: "Pago registrado",
       description: `Se ha registrado un pago de $${amount} para el vehículo ${
         vehicles.find((v) => v.id === selectedVehicle)?.plate
-      }`,
+      }. Recibo #${receiptNumber}`,
     });
 
     setShowNewPaymentDialog(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
     setSelectedVehicle("");
-    setSelectedDate(undefined);
+    setSelectedDate(new Date());
     setAmount("");
     setConcept("");
+    setPaymentMethod("cash");
+    setBankName("Ganadero");
+    setTransferNumber("");
+    setCustomBank("");
+    setShowCustomBank(false);
+  };
+
+  const handlePrintReceipt = (payment: Payment) => {
+    // Aquí iría la lógica de impresión
+    toast({
+      title: "Imprimiendo recibo",
+      description: `Recibo #${payment.receiptNumber}`,
+    });
+  };
+
+  const handleWhatsAppReceipt = (payment: Payment, vehicle: Vehicle) => {
+    const receiptText = `*Recibo de Pago #${payment.receiptNumber}*
+🚗 Vehículo: ${vehicle.plate} - ${vehicle.model}
+💵 Monto: $${payment.amount}
+📅 Fecha: ${format(payment.date, "dd/MM/yyyy")}
+🧾 Concepto: ${payment.concept}
+💳 Método de pago: ${payment.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}
+${payment.bankName ? `🏦 Banco: ${payment.bankName}` : ""}
+${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` : ""}`;
+
+    const whatsappUrl = `https://wa.me/${vehicle.driverPhone}?text=${encodeURIComponent(receiptText)}`;
+    window.open(whatsappUrl, "_blank");
   };
 
   const getStatusColor = (status: Payment["status"]) => {
@@ -175,6 +244,8 @@ const Payments = () => {
                     </span>
                   </div>
                   <div className="text-sm text-muted-foreground">
+                    <p>Conductor: {vehicle.driverName}</p>
+                    <p>Teléfono: {vehicle.driverPhone}</p>
                     <p>Tarifa diaria: ${vehicle.dailyRate}</p>
                     <p>Total pagado: ${totalPaid}</p>
                     <p>Pagos pendientes: {pendingPayments}</p>
@@ -211,8 +282,12 @@ const Payments = () => {
                       <p className="text-sm text-muted-foreground">
                         {format(payment.date, "dd/MM/yyyy")}
                       </p>
+                      <p className="text-sm text-muted-foreground">
+                        Recibo #{payment.receiptNumber} - 
+                        {payment.paymentMethod === "cash" ? "Efectivo" : `Transferencia ${payment.bankName}`}
+                      </p>
                     </div>
-                    <div className="text-right space-y-1">
+                    <div className="text-right space-y-2">
                       <p className="font-medium">${payment.amount}</p>
                       <span
                         className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusColor(
@@ -221,6 +296,22 @@ const Payments = () => {
                       >
                         {getStatusText(payment.status)}
                       </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePrintReceipt(payment)}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => vehicle && handleWhatsAppReceipt(payment, vehicle)}
+                        >
+                          <WhatsApp className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -260,13 +351,92 @@ const Payments = () => {
 
             <div className="space-y-2">
               <Label>Fecha</Label>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Selecciona una fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
+
+            <div className="space-y-2">
+              <Label>Método de Pago</Label>
+              <Select
+                value={paymentMethod}
+                onValueChange={(value: "cash" | "transfer") => setPaymentMethod(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Efectivo</SelectItem>
+                  <SelectItem value="transfer">Transferencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {paymentMethod === "transfer" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Banco</Label>
+                  <Select
+                    value={showCustomBank ? "otro" : bankName}
+                    onValueChange={(value) => {
+                      if (value === "otro") {
+                        setShowCustomBank(true);
+                      } else {
+                        setShowCustomBank(false);
+                        setBankName(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ganadero">Banco Ganadero</SelectItem>
+                      <SelectItem value="otro">Otro banco</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {showCustomBank && (
+                  <div className="space-y-2">
+                    <Label>Nombre del Banco</Label>
+                    <Input
+                      value={customBank}
+                      onChange={(e) => {
+                        setCustomBank(e.target.value);
+                        setBankName(e.target.value);
+                      }}
+                      placeholder="Ingresa el nombre del banco"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Número de Transferencia</Label>
+                  <Input
+                    value={transferNumber}
+                    onChange={(e) => setTransferNumber(e.target.value)}
+                    placeholder="Ej: TRF123456"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label>Monto</Label>
