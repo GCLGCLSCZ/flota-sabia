@@ -15,7 +15,11 @@ const Sidebar = () => {
   return (
     <div className="h-full w-64 bg-white border-r border-gray-200 px-3 py-4 flex flex-col animate-fade-in">
       <div className="mb-8 px-4">
-        <h1 className="text-xl font-semibold text-gray-800">FlotaSabia</h1>
+        <Link to="/" className="block">
+          <h1 className="text-xl font-semibold text-gray-800 hover:text-primary transition-colors cursor-pointer">
+            FlotaSabia
+          </h1>
+        </Link>
       </div>
       <nav className="space-y-1 flex-1">
         {menuItems.map((item) => (
