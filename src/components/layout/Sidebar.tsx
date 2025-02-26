@@ -1,11 +1,12 @@
 
 import { Link } from "react-router-dom";
-import { Car, Users, Calendar, DollarSign, Settings, Bell } from "lucide-react";
+import { Car, Users, Calendar, DollarSign, Settings, UserSquare2 } from "lucide-react";
 
 const Sidebar = () => {
   const menuItems = [
     { icon: Car, label: "Vehículos", path: "/vehicles" },
     { icon: Users, label: "Inversores", path: "/investors" },
+    { icon: UserSquare2, label: "Choferes", path: "/drivers" },
     { icon: Calendar, label: "Calendario", path: "/calendar" },
     { icon: DollarSign, label: "Pagos", path: "/payments" },
     { icon: Settings, label: "Configuración", path: "/settings" },
