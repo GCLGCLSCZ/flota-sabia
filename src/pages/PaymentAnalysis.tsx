@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -25,6 +26,8 @@ interface PaymentsByVehicle {
   totalAmount: number;
   count: number;
   payments: Payment[];
+  companyEarnings: number;
+  paidInstallments: number;
 }
 
 interface PaymentsByDate {
@@ -33,6 +36,8 @@ interface PaymentsByDate {
   totalAmount: number;
   count: number;
   payments: Payment[];
+  companyEarnings: number;
+  paidInstallments: number;
 }
 
 interface PaymentsByMethod {
@@ -40,6 +45,8 @@ interface PaymentsByMethod {
   totalAmount: number;
   count: number;
   payments: Payment[];
+  companyEarnings: number;
+  paidInstallments: number;
 }
 
 const PaymentAnalysis = () => {
@@ -102,6 +109,37 @@ const PaymentAnalysis = () => {
     return filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
   }, [filteredPayments]);
 
+  // Calcular ganancias totales de la empresa y cuotas pagadas
+  const { totalCompanyEarnings, totalPaidInstallments } = useMemo(() => {
+    const vehiclePayments = new Map<string, number>();
+    
+    // Sumar los pagos por vehículo
+    filteredPayments.forEach((payment) => {
+      if (payment.status === "completed") {
+        const currentTotal = vehiclePayments.get(payment.vehicleId) || 0;
+        vehiclePayments.set(payment.vehicleId, currentTotal + payment.amount);
+      }
+    });
+    
+    // Calcular cuotas pagadas y ganancias de la empresa
+    let totalEarnings = 0;
+    let totalInstallments = 0;
+    
+    vehiclePayments.forEach((totalPaid, vehicleId) => {
+      const vehicle = vehicles.find(v => v.id === vehicleId);
+      if (vehicle && vehicle.installmentAmount > 0) {
+        const paidInstallments = totalPaid / vehicle.installmentAmount;
+        totalInstallments += paidInstallments;
+        totalEarnings += vehicle.dailyRate * paidInstallments;
+      }
+    });
+    
+    return {
+      totalCompanyEarnings: Number(totalEarnings.toFixed(2)),
+      totalPaidInstallments: Number(totalInstallments.toFixed(2))
+    };
+  }, [filteredPayments, vehicles]);
+
   // Group payments by vehicle
   const paymentsByVehicle = useMemo(() => {
     const groups: PaymentsByVehicle[] = [];
@@ -122,8 +160,20 @@ const PaymentAnalysis = () => {
           vehicleModel: vehicle.model,
           totalAmount: payment.amount,
           count: 1,
-          payments: [payment]
+          payments: [payment],
+          companyEarnings: 0,
+          paidInstallments: 0
         });
+      }
+    });
+    
+    // Calcular cuotas pagadas y ganancias de la empresa por vehículo
+    groups.forEach(group => {
+      const vehicle = vehicles.find(v => v.id === group.vehicleId);
+      if (vehicle && vehicle.installmentAmount > 0) {
+        const paidInstallments = group.totalAmount / vehicle.installmentAmount;
+        group.paidInstallments = Number(paidInstallments.toFixed(2));
+        group.companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
       }
     });
     
@@ -149,13 +199,44 @@ const PaymentAnalysis = () => {
           formattedDate: format(paymentDate, "dd 'de' MMMM, yyyy", { locale: es }),
           totalAmount: payment.amount,
           count: 1,
-          payments: [payment]
+          payments: [payment],
+          companyEarnings: 0,
+          paidInstallments: 0
         });
       }
     });
     
+    // Calcular cuotas pagadas y ganancias por fecha
+    groups.forEach(group => {
+      let dailyEarnings = 0;
+      let dailyInstallments = 0;
+      
+      // Agrupar pagos por vehículo en cada fecha
+      const vehicleDailyPayments = new Map<string, number>();
+      
+      group.payments.forEach(payment => {
+        if (payment.status === "completed") {
+          const currentAmount = vehicleDailyPayments.get(payment.vehicleId) || 0;
+          vehicleDailyPayments.set(payment.vehicleId, currentAmount + payment.amount);
+        }
+      });
+      
+      // Calcular ganancias por vehículo en cada fecha
+      vehicleDailyPayments.forEach((amount, vehicleId) => {
+        const vehicle = vehicles.find(v => v.id === vehicleId);
+        if (vehicle && vehicle.installmentAmount > 0) {
+          const installments = amount / vehicle.installmentAmount;
+          dailyInstallments += installments;
+          dailyEarnings += vehicle.dailyRate * installments;
+        }
+      });
+      
+      group.companyEarnings = Number(dailyEarnings.toFixed(2));
+      group.paidInstallments = Number(dailyInstallments.toFixed(2));
+    });
+    
     return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredPayments]);
+  }, [filteredPayments, vehicles]);
 
   // Group payments by method
   const paymentsByMethod = useMemo(() => {
@@ -169,7 +250,9 @@ const PaymentAnalysis = () => {
         method: "cash",
         totalAmount: cashPayments.reduce((sum, p) => sum + p.amount, 0),
         count: cashPayments.length,
-        payments: cashPayments
+        payments: cashPayments,
+        companyEarnings: 0,
+        paidInstallments: 0
       });
     }
     
@@ -178,12 +261,41 @@ const PaymentAnalysis = () => {
         method: "transfer",
         totalAmount: transferPayments.reduce((sum, p) => sum + p.amount, 0),
         count: transferPayments.length,
-        payments: transferPayments
+        payments: transferPayments,
+        companyEarnings: 0,
+        paidInstallments: 0
       });
     }
     
+    // Calcular ganancias por método de pago
+    groups.forEach(group => {
+      const vehicleMethodPayments = new Map<string, number>();
+      
+      group.payments.forEach(payment => {
+        if (payment.status === "completed") {
+          const currentAmount = vehicleMethodPayments.get(payment.vehicleId) || 0;
+          vehicleMethodPayments.set(payment.vehicleId, currentAmount + payment.amount);
+        }
+      });
+      
+      let methodEarnings = 0;
+      let methodInstallments = 0;
+      
+      vehicleMethodPayments.forEach((amount, vehicleId) => {
+        const vehicle = vehicles.find(v => v.id === vehicleId);
+        if (vehicle && vehicle.installmentAmount > 0) {
+          const installments = amount / vehicle.installmentAmount;
+          methodInstallments += installments;
+          methodEarnings += vehicle.dailyRate * installments;
+        }
+      });
+      
+      group.companyEarnings = Number(methodEarnings.toFixed(2));
+      group.paidInstallments = Number(methodInstallments.toFixed(2));
+    });
+    
     return groups;
-  }, [filteredPayments]);
+  }, [filteredPayments, vehicles]);
 
   const getPaymentMethodLabel = (method: "cash" | "transfer") => {
     return method === "cash" ? "Efectivo" : "Transferencia";
@@ -314,11 +426,27 @@ const PaymentAnalysis = () => {
             </div>
           </div>
 
-          <div className="mt-4 flex justify-end">
-            <div className="text-sm font-medium">
-              <span className="mr-2">Total de pagos:</span>
-              <span className="text-lg">${totalAmount.toFixed(2)}</span>
-            </div>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-muted/50">
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Total pagado</div>
+                <div className="text-2xl font-bold">{totalAmount.toFixed(2)} Bs</div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-muted/50">
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Cuotas pagadas</div>
+                <div className="text-2xl font-bold">{totalPaidInstallments}</div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-green-50 dark:bg-green-900/20">
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground dark:text-gray-300">Ganancia de la empresa</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalCompanyEarnings} Bs</div>
+              </CardContent>
+            </Card>
           </div>
         </CardContent>
       </Card>
@@ -350,9 +478,17 @@ const PaymentAnalysis = () => {
                         <Car className="h-5 w-5" />
                         <span>{group.vehiclePlate} - {group.vehicleModel}</span>
                       </div>
-                      <Badge variant="secondary" className="text-base font-normal">
-                        ${group.totalAmount.toFixed(2)}
-                      </Badge>
+                      <div className="flex gap-4">
+                        <Badge variant="outline" className="text-base font-normal">
+                          Cuotas: {group.paidInstallments}
+                        </Badge>
+                        <Badge variant="outline" className="text-base font-normal text-green-600">
+                          Ganancia: {group.companyEarnings} Bs
+                        </Badge>
+                        <Badge variant="secondary" className="text-base font-normal">
+                          {group.totalAmount.toFixed(2)} Bs
+                        </Badge>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -381,7 +517,7 @@ const PaymentAnalysis = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              ${payment.amount.toFixed(2)}
+                              {payment.amount.toFixed(2)} Bs
                             </TableCell>
                           </TableRow>
                         ))}
@@ -411,9 +547,17 @@ const PaymentAnalysis = () => {
                         <CalendarIcon className="h-5 w-5" />
                         <span>{group.formattedDate}</span>
                       </div>
-                      <Badge variant="secondary" className="text-base font-normal">
-                        ${group.totalAmount.toFixed(2)}
-                      </Badge>
+                      <div className="flex gap-4">
+                        <Badge variant="outline" className="text-base font-normal">
+                          Cuotas: {group.paidInstallments}
+                        </Badge>
+                        <Badge variant="outline" className="text-base font-normal text-green-600">
+                          Ganancia: {group.companyEarnings} Bs
+                        </Badge>
+                        <Badge variant="secondary" className="text-base font-normal">
+                          {group.totalAmount.toFixed(2)} Bs
+                        </Badge>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -446,7 +590,7 @@ const PaymentAnalysis = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right font-medium">
-                                ${payment.amount.toFixed(2)}
+                                {payment.amount.toFixed(2)} Bs
                               </TableCell>
                             </TableRow>
                           );
@@ -477,9 +621,17 @@ const PaymentAnalysis = () => {
                         <List className="h-5 w-5" />
                         <span>{getPaymentMethodLabel(group.method)}</span>
                       </div>
-                      <Badge variant="secondary" className="text-base font-normal">
-                        ${group.totalAmount.toFixed(2)}
-                      </Badge>
+                      <div className="flex gap-4">
+                        <Badge variant="outline" className="text-base font-normal">
+                          Cuotas: {group.paidInstallments}
+                        </Badge>
+                        <Badge variant="outline" className="text-base font-normal text-green-600">
+                          Ganancia: {group.companyEarnings} Bs
+                        </Badge>
+                        <Badge variant="secondary" className="text-base font-normal">
+                          {group.totalAmount.toFixed(2)} Bs
+                        </Badge>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -512,7 +664,7 @@ const PaymentAnalysis = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right font-medium">
-                                ${payment.amount.toFixed(2)}
+                                {payment.amount.toFixed(2)} Bs
                               </TableCell>
                             </TableRow>
                           );
