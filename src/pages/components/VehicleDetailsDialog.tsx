@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Pencil, Trash2, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -21,11 +23,14 @@ interface VehicleDetailsDialogProps {
 const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
   const [tab, setTab] = useState("details");
   const { payments, updateVehicle } = useApp();
+  const { toast } = useToast();
+  const [editingMaintenanceId, setEditingMaintenanceId] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<Omit<Maintenance, "id" | "status">>({
     date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cost: 0,
     costMaterials: 0,
+    costLabor: 0,
     salePrice: 0,
     type: "mechanical",
     proformaNumber: "",
@@ -66,15 +71,116 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   // Cuotas restantes
   const remainingInstallments = (vehicle.totalInstallments || 0) - calculatedPaidInstallments;
 
+  // Calcular el costo total (materiales + mano de obra)
+  const calculateTotalCost = () => {
+    return maintenance.costMaterials + maintenance.costLabor;
+  };
+
+  // Calcular la ganancia (precio de venta - costo total)
+  const calculateProfit = () => {
+    const totalCost = calculateTotalCost();
+    return maintenance.salePrice - totalCost;
+  };
+
   const handleSubmitMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
-    onAddMaintenance(vehicle.id, maintenance);
+    
+    if (editingMaintenanceId) {
+      // Actualizar mantenimiento existente
+      if (!vehicle.maintenanceHistory) return;
+      
+      const updatedHistory = vehicle.maintenanceHistory.map(item => 
+        item.id === editingMaintenanceId ? 
+        { ...item, ...maintenance } : 
+        item
+      );
+      
+      updateVehicle(vehicle.id, { maintenanceHistory: updatedHistory });
+      
+      toast({
+        title: "Mantenimiento actualizado",
+        description: "El registro de mantenimiento ha sido actualizado exitosamente.",
+      });
+      
+      setEditingMaintenanceId(null);
+    } else {
+      // Agregar nuevo mantenimiento
+      onAddMaintenance(vehicle.id, maintenance);
+    }
+    
     // Reset form
     setMaintenance({
       date: format(new Date(), "yyyy-MM-dd"),
       description: "",
       cost: 0,
       costMaterials: 0,
+      costLabor: 0,
+      salePrice: 0,
+      type: "mechanical",
+      proformaNumber: "",
+      isInsuranceCovered: false
+    });
+  };
+
+  const handleEditMaintenance = (item: Maintenance) => {
+    setEditingMaintenanceId(item.id);
+    setMaintenance({
+      date: item.date,
+      description: item.description,
+      cost: item.cost,
+      costMaterials: item.costMaterials,
+      costLabor: item.costLabor || 0, // Manejar posible valor null en registros antiguos
+      salePrice: item.salePrice,
+      type: item.type || "mechanical",
+      proformaNumber: item.proformaNumber || "",
+      isInsuranceCovered: item.isInsuranceCovered || false
+    });
+    
+    // Mover a la pestaña de mantenimiento
+    setTab("maintenance");
+    
+    // Hacer scroll al formulario
+    setTimeout(() => {
+      document.getElementById("maintenance-form")?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
+  const handleDeleteMaintenance = (id: string) => {
+    if (!vehicle.maintenanceHistory) return;
+    
+    const updatedHistory = vehicle.maintenanceHistory.filter(item => item.id !== id);
+    updateVehicle(vehicle.id, { maintenanceHistory: updatedHistory });
+    
+    toast({
+      title: "Mantenimiento eliminado",
+      description: "El registro de mantenimiento ha sido eliminado exitosamente.",
+      variant: "destructive"
+    });
+    
+    if (editingMaintenanceId === id) {
+      setEditingMaintenanceId(null);
+      setMaintenance({
+        date: format(new Date(), "yyyy-MM-dd"),
+        description: "",
+        cost: 0,
+        costMaterials: 0,
+        costLabor: 0,
+        salePrice: 0,
+        type: "mechanical",
+        proformaNumber: "",
+        isInsuranceCovered: false
+      });
+    }
+  };
+  
+  const handleCancelEdit = () => {
+    setEditingMaintenanceId(null);
+    setMaintenance({
+      date: format(new Date(), "yyyy-MM-dd"),
+      description: "",
+      cost: 0,
+      costMaterials: 0,
+      costLabor: 0,
       salePrice: 0,
       type: "mechanical",
       proformaNumber: "",
@@ -152,6 +258,23 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
       item.id === id ? { ...item, complete } : item
     );
     updateVehicle(vehicle.id, { cardex: updatedCardex });
+  };
+
+  // Calcular costo total cuando cambien los valores de costMaterials o costLabor
+  const handleCostChange = (type: 'materials' | 'labor', value: number) => {
+    if (type === 'materials') {
+      setMaintenance({
+        ...maintenance,
+        costMaterials: value,
+        cost: value + maintenance.costLabor
+      });
+    } else {
+      setMaintenance({
+        ...maintenance,
+        costLabor: value,
+        cost: maintenance.costMaterials + value
+      });
+    }
   };
 
   return (
@@ -272,30 +395,67 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                         <th className="p-2 text-left">Descripción</th>
                         <th className="p-2 text-left">Proforma</th>
                         <th className="p-2 text-left">Seguro</th>
-                        <th className="p-2 text-left">Costo Mat.</th>
-                        <th className="p-2 text-left">Costo Total</th>
+                        <th className="p-2 text-left">Materiales</th>
+                        <th className="p-2 text-left">Mano de Obra</th>
+                        <th className="p-2 text-left">Total</th>
+                        <th className="p-2 text-left">Venta</th>
+                        <th className="p-2 text-left">Ganancia</th>
                         <th className="p-2 text-left">Estado</th>
+                        <th className="p-2 text-left">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {vehicle.maintenanceHistory.map(maintenance => (
-                        <tr key={maintenance.id} className="border-b border-muted/30">
-                          <td className="p-2">{format(new Date(maintenance.date), "dd MMM yyyy", { locale: es })}</td>
-                          <td className="p-2">
-                            {maintenance.type === "mechanical" ? "Mecánica" : 
-                             maintenance.type === "body_paint" ? "Chapería y Pintura" : "General"}
-                          </td>
-                          <td className="p-2">{maintenance.description}</td>
-                          <td className="p-2">{maintenance.proformaNumber || "-"}</td>
-                          <td className="p-2">{maintenance.isInsuranceCovered ? "Sí" : "No"}</td>
-                          <td className="p-2">Bs {maintenance.costMaterials}</td>
-                          <td className="p-2">Bs {maintenance.cost}</td>
-                          <td className="p-2">{
-                            maintenance.status === "pending" ? "Pendiente" : 
-                            maintenance.status === "completed" ? "Completado" : "Cancelado"
-                          }</td>
-                        </tr>
-                      ))}
+                      {vehicle.maintenanceHistory.map(maintenance => {
+                        const totalCost = maintenance.cost;
+                        const profit = maintenance.salePrice - totalCost;
+                        const profitPercentage = totalCost > 0 ? Math.round((profit / totalCost) * 100) : 0;
+                        
+                        return (
+                          <tr key={maintenance.id} className="border-b border-muted/30">
+                            <td className="p-2">{format(new Date(maintenance.date), "dd MMM yyyy", { locale: es })}</td>
+                            <td className="p-2">
+                              {maintenance.type === "mechanical" ? "Mecánica" : 
+                              maintenance.type === "body_paint" ? "Chapería y Pintura" : "General"}
+                            </td>
+                            <td className="p-2">{maintenance.description}</td>
+                            <td className="p-2">{maintenance.proformaNumber || "-"}</td>
+                            <td className="p-2">{maintenance.isInsuranceCovered ? "Sí" : "No"}</td>
+                            <td className="p-2">Bs {maintenance.costMaterials}</td>
+                            <td className="p-2">Bs {maintenance.costLabor || 0}</td>
+                            <td className="p-2">Bs {totalCost}</td>
+                            <td className="p-2">Bs {maintenance.salePrice}</td>
+                            <td className="p-2">
+                              <span className={profit >= 0 ? "text-green-600" : "text-red-600"}>
+                                Bs {profit} ({profitPercentage}%)
+                              </span>
+                            </td>
+                            <td className="p-2">{
+                              maintenance.status === "pending" ? "Pendiente" : 
+                              maintenance.status === "completed" ? "Completado" : "Cancelado"
+                            }</td>
+                            <td className="p-2">
+                              <div className="flex space-x-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleEditMaintenance(maintenance)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleDeleteMaintenance(maintenance.id)}
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -304,8 +464,20 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
               )}
             </div>
 
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold mb-2">Registrar Nuevo Mantenimiento</h3>
+            <div className="mt-4" id="maintenance-form">
+              <h3 className="text-sm font-semibold mb-2">
+                {editingMaintenanceId ? "Editar Mantenimiento" : "Registrar Nuevo Mantenimiento"}
+                {editingMaintenanceId && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCancelEdit}
+                    className="ml-2 text-xs"
+                  >
+                    Cancelar edición
+                  </Button>
+                )}
+              </h3>
               <form onSubmit={handleSubmitMaintenance} className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -376,7 +548,17 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                     <Input 
                       type="number" 
                       value={maintenance.costMaterials}
-                      onChange={(e) => setMaintenance({...maintenance, costMaterials: Number(e.target.value)})}
+                      onChange={(e) => handleCostChange('materials', Number(e.target.value))}
+                      className="w-full p-2 text-sm border rounded"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs">Costo Mano de Obra (Bs)</label>
+                    <Input 
+                      type="number" 
+                      value={maintenance.costLabor}
+                      onChange={(e) => handleCostChange('labor', Number(e.target.value))}
                       className="w-full p-2 text-sm border rounded"
                       required
                     />
@@ -386,10 +568,12 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                     <Input 
                       type="number" 
                       value={maintenance.cost}
-                      onChange={(e) => setMaintenance({...maintenance, cost: Number(e.target.value)})}
-                      className="w-full p-2 text-sm border rounded"
-                      required
+                      readOnly
+                      className="w-full p-2 text-sm border rounded bg-gray-100"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Suma automática de materiales y mano de obra
+                    </p>
                   </div>
                   <div>
                     <label className="text-xs">Precio de Venta (Bs)</label>
@@ -400,10 +584,21 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                       className="w-full p-2 text-sm border rounded"
                       required
                     />
+                    <div className="flex items-center mt-1">
+                      <p className={`text-xs ${calculateProfit() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        Ganancia: Bs {calculateProfit().toFixed(2)} 
+                        {maintenance.cost > 0 && ` (${Math.round((calculateProfit() / maintenance.cost) * 100)}%)`}
+                      </p>
+                      {calculateProfit() < 0 && (
+                        <AlertCircle className="h-3 w-3 text-red-500 ml-1" />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <Button type="submit" size="sm">Registrar Mantenimiento</Button>
+                  <Button type="submit" size="sm">
+                    {editingMaintenanceId ? "Actualizar Mantenimiento" : "Registrar Mantenimiento"}
+                  </Button>
                 </div>
               </form>
             </div>

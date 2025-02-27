@@ -35,11 +35,15 @@ const VehiclesPage = () => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (!vehicle) return;
     
+    // Asegurar que el costo total sea la suma de materiales y mano de obra
+    const totalCost = maintenance.costMaterials + maintenance.costLabor;
+    
     const updatedMaintenance = [
       ...(vehicle.maintenanceHistory || []),
       {
         id: Date.now().toString(),
         ...maintenance,
+        cost: totalCost,
         status: "pending" as const,
       },
     ];

@@ -30,6 +30,7 @@ export interface Maintenance {
   description: string;
   cost: number;
   costMaterials: number;
+  costLabor: number;
   salePrice: number;
   status: "pending" | "completed" | "cancelled";
   type?: "mechanical" | "body_paint";
