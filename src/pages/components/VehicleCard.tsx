@@ -5,8 +5,10 @@ import { Vehicle } from "@/types";
 import { BadgeInfo, Car, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useApp } from "@/context/AppContext";
 
 const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
+  const { payments } = useApp();
   const isActive = vehicle.status === "active";
   const cardClass = isActive
     ? "border-l-4 border-l-primary"
@@ -17,8 +19,16 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   const paidInstallments = vehicle.paidInstallments || 0;
   const remainingInstallments = totalInstallments - paidInstallments;
   
-  // Cálculo de total pagado
-  const totalPaid = paidInstallments * (vehicle.installmentAmount || 0);
+  // Obtener los pagos realizados a este vehículo
+  const vehiclePayments = payments.filter(p => p.vehicleId === vehicle.id);
+  
+  // Calcular el total pagado desde los pagos registrados
+  const totalPaidFromPayments = vehiclePayments
+    .filter(p => p.status === "completed")
+    .reduce((sum, p) => sum + p.amount, 0);
+  
+  // Usar el valor calculado o el valor almacenado en el vehículo
+  const totalPaid = totalPaidFromPayments || (paidInstallments * (vehicle.installmentAmount || 0));
 
   return (
     <Card className={`${cardClass} dark:bg-gray-800 dark:text-white dark:border-gray-700`}>
@@ -68,6 +78,23 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
               Total pagado
             </p>
             <p className="font-medium">{totalPaid} Bs</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Pagos registrados</p>
+            <p className="font-medium">{vehiclePayments.length}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Último pago
+            </p>
+            <p className="font-medium">
+              {vehiclePayments.length > 0 
+                ? format(new Date(vehiclePayments[vehiclePayments.length - 1].date), "dd/MM/yyyy") 
+                : "Sin pagos"}
+            </p>
           </div>
         </div>
 
