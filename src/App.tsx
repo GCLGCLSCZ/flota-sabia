@@ -15,6 +15,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { useEffect } from "react";
 import "./App.css";
 
+// Importamos la página de Drivers
+import Drivers from "@/pages/Drivers";
+
 function App() {
   // Establecer el título de la aplicación
   useEffect(() => {
@@ -33,6 +36,7 @@ function App() {
             <Route path="payment-analysis" element={<PaymentAnalysis />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="investors" element={<Investors />} />
+            <Route path="drivers" element={<Drivers />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Route>

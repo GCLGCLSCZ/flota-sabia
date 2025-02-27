@@ -10,6 +10,7 @@ import {
   Users,
   PieChart,
   Menu,
+  User,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -108,6 +109,11 @@ export default function Sidebar() {
           href: "/vehicles",
           title: "Vehículos",
           icon: <Car className="h-5 w-5" />,
+        },
+        {
+          href: "/drivers",
+          title: "Choferes",
+          icon: <User className="h-5 w-5" />,
         },
         {
           href: "/payments",
