@@ -11,7 +11,7 @@ import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
 
 const VehiclesPage = () => {
-  const { updateVehicle } = useApp();
+  const { updateVehicle, vehicles } = useApp();
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -32,31 +32,31 @@ const VehiclesPage = () => {
     vehicleId: string,
     maintenance: Omit<Maintenance, "id" | "status">
   ) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) return;
+    
+    const updatedMaintenance = [
+      ...(vehicle.maintenanceHistory || []),
+      {
+        id: Date.now().toString(),
+        ...maintenance,
+        status: "pending",
+      },
+    ];
+    
     updateVehicle(vehicleId, {
-      maintenanceHistory: [
-        ...(selectedVehicle?.maintenanceHistory || []),
-        {
-          id: Date.now().toString(),
-          ...maintenance,
-          status: "pending",
-        },
-      ],
+      maintenanceHistory: updatedMaintenance,
     });
+    
     setSelectedVehicle((prev) =>
       prev?.id === vehicleId
         ? {
             ...prev,
-            maintenanceHistory: [
-              ...(prev.maintenanceHistory || []),
-              {
-                id: Date.now().toString(),
-                ...maintenance,
-                status: "pending",
-              },
-            ],
+            maintenanceHistory: updatedMaintenance,
           }
         : prev
     );
+    
     toast({
       title: "Mantenimiento agregado",
       description: "Se ha agregado un nuevo registro de mantenimiento.",

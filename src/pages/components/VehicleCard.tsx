@@ -58,9 +58,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">Conductor</p>
             <p className="font-medium truncate">
-              {vehicle.driverId
-                ? vehicle.driverName || "Asignado"
-                : "Sin asignar"}
+              {vehicle.driverName ? vehicle.driverName : "Sin asignar"}
             </p>
           </div>
           <div>
@@ -68,9 +66,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
               Inversionista
             </p>
             <p className="font-medium truncate">
-              {vehicle.investorId
-                ? vehicle.investorName || "Asignado"
-                : "Sin asignar"}
+              {vehicle.investor ? vehicle.investor : "Sin asignar"}
             </p>
           </div>
         </div>

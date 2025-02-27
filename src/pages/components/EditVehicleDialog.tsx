@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Vehicle } from "@/types";
 import { useApp } from "@/context/AppContext";
+import { useState, useEffect } from "react";
 
 interface EditVehicleDialogProps {
   vehicle: Vehicle | null;
@@ -13,19 +14,75 @@ interface EditVehicleDialogProps {
 }
 
 const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
-  const { updateVehicle } = useApp();
+  const { updateVehicle, drivers, investors } = useApp();
+  const [editedVehicle, setEditedVehicle] = useState<Vehicle | null>(null);
 
-  if (!vehicle) return null;
+  useEffect(() => {
+    if (vehicle) {
+      setEditedVehicle({ ...vehicle });
+    }
+  }, [vehicle]);
+
+  if (!vehicle || !editedVehicle) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateVehicle(vehicle.id, vehicle);
+    updateVehicle(vehicle.id, editedVehicle);
     onClose();
+  };
+
+  const handleDriverSelect = (driverId: string) => {
+    if (driverId === "none") {
+      setEditedVehicle({
+        ...editedVehicle,
+        driverId: undefined,
+        driverName: "",
+        driverPhone: ""
+      });
+      return;
+    }
+    
+    const selectedDriver = drivers.find(d => d.id === driverId);
+    if (selectedDriver) {
+      setEditedVehicle({
+        ...editedVehicle,
+        driverId: selectedDriver.id,
+        driverName: selectedDriver.name,
+        driverPhone: selectedDriver.phone || ""
+      });
+    }
+  };
+
+  const handleInvestorSelect = (investorName: string) => {
+    if (investorName === "none") {
+      setEditedVehicle({
+        ...editedVehicle,
+        investor: "",
+        investorId: undefined,
+        investorName: ""
+      });
+      return;
+    }
+    
+    const selectedInvestor = investors.find(i => i.name === investorName);
+    if (selectedInvestor) {
+      setEditedVehicle({
+        ...editedVehicle,
+        investor: selectedInvestor.name,
+        investorId: selectedInvestor.id,
+        investorName: selectedInvestor.name
+      });
+    } else {
+      setEditedVehicle({
+        ...editedVehicle,
+        investor: investorName
+      });
+    }
   };
 
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Vehículo</DialogTitle>
         </DialogHeader>
@@ -35,8 +92,8 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               <Label htmlFor="edit-plate">Placa</Label>
               <Input
                 id="edit-plate"
-                value={vehicle.plate}
-                onChange={(e) => updateVehicle(vehicle.id, { ...vehicle, plate: e.target.value })}
+                value={editedVehicle.plate}
+                onChange={(e) => setEditedVehicle({...editedVehicle, plate: e.target.value})}
                 required
               />
             </div>
@@ -44,8 +101,8 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               <Label htmlFor="edit-brand">Marca</Label>
               <Input
                 id="edit-brand"
-                value={vehicle.brand}
-                onChange={(e) => updateVehicle(vehicle.id, { ...vehicle, brand: e.target.value })}
+                value={editedVehicle.brand}
+                onChange={(e) => setEditedVehicle({...editedVehicle, brand: e.target.value})}
                 required
               />
             </div>
@@ -53,8 +110,8 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               <Label htmlFor="edit-model">Modelo</Label>
               <Input
                 id="edit-model"
-                value={vehicle.model}
-                onChange={(e) => updateVehicle(vehicle.id, { ...vehicle, model: e.target.value })}
+                value={editedVehicle.model}
+                onChange={(e) => setEditedVehicle({...editedVehicle, model: e.target.value})}
                 required
               />
             </div>
@@ -62,17 +119,17 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               <Label htmlFor="edit-year">Año</Label>
               <Input
                 id="edit-year"
-                value={vehicle.year}
-                onChange={(e) => updateVehicle(vehicle.id, { ...vehicle, year: e.target.value })}
+                value={editedVehicle.year}
+                onChange={(e) => setEditedVehicle({...editedVehicle, year: e.target.value})}
                 required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-status">Estado</Label>
               <Select
-                value={vehicle.status}
+                value={editedVehicle.status}
                 onValueChange={(value: "active" | "maintenance" | "inactive") =>
-                  updateVehicle(vehicle.id, { ...vehicle, status: value })
+                  setEditedVehicle({...editedVehicle, status: value})
                 }
               >
                 <SelectTrigger>
@@ -86,16 +143,65 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-investor">Inversor</Label>
+              <Label htmlFor="edit-dailyRate">Tarifa diaria (Bs)</Label>
               <Input
-                id="edit-investor"
-                value={vehicle.investor}
-                onChange={(e) => updateVehicle(vehicle.id, { ...vehicle, investor: e.target.value })}
+                id="edit-dailyRate"
+                type="number"
+                value={editedVehicle.dailyRate || 0}
+                onChange={(e) => setEditedVehicle({...editedVehicle, dailyRate: Number(e.target.value)})}
                 required
               />
             </div>
+
+            {/* Selector de Inversionista */}
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="edit-investor">Inversionista</Label>
+              <Select
+                value={editedVehicle.investor || "none"}
+                onValueChange={handleInvestorSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar inversionista" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {investors.map((investor) => (
+                    <SelectItem key={investor.id} value={investor.name}>
+                      {investor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Selector de Conductor */}
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="edit-driver">Conductor</Label>
+              <Select
+                value={editedVehicle.driverId || "none"}
+                onValueChange={handleDriverSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar conductor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {drivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      {driver.name} - {driver.phone}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editedVehicle.driverName && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Conductor asignado: {editedVehicle.driverName}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex justify-end gap-4">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
             <Button type="submit">Guardar Cambios</Button>
           </div>
         </form>
