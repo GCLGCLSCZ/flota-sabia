@@ -41,7 +41,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   // Usar el valor calculado para el total pagado
   const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
   
-  // Calcular cuotas atrasadas (excluyendo domingos)
+  // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
   const calculateOverdueInstallments = () => {
     if (!vehicle.contractStartDate) return 0;
     
@@ -51,21 +51,30 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     // Si la fecha de inicio es posterior a hoy, no hay cuotas atrasadas
     if (isAfter(startDate, today)) return 0;
     
-    // Calcular días transcurridos excluyendo domingos
+    // Obtener días no laborables específicos para este vehículo
+    const nonWorkingDays = vehicle.daysNotWorked || [];
+    const nonWorkingDatesSet = new Set(nonWorkingDays.map(day => day.split('T')[0]));
+    
+    // Calcular días transcurridos excluyendo domingos y días no laborables
     let dayCount = 0;
     let currentDate = new Date(startDate);
     
     while (currentDate <= today) {
-      if (!isSunday(currentDate)) {
+      // Convertir la fecha actual a formato YYYY-MM-DD para comparar con daysNotWorked
+      const currentDateStr = currentDate.toISOString().split('T')[0];
+      
+      // Si no es domingo y no está en la lista de días no laborables
+      if (!isSunday(currentDate) && !nonWorkingDatesSet.has(currentDateStr)) {
         dayCount++;
       }
+      
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    // Las cuotas que deberían haberse pagado hasta hoy
+    // Las cuotas que deberían haberse pagado hasta hoy (permite decimales)
     const expectedInstallments = dayCount;
     
-    // Cuotas atrasadas = esperadas - pagadas (si es negativo, no hay atraso)
+    // Cuotas atrasadas = esperadas - pagadas (permitimos decimales en el resultado)
     return Math.max(0, expectedInstallments - paidInstallments);
   };
   
@@ -113,7 +122,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">Cuotas atrasadas</p>
             <p className={`font-medium ${overdueInstallments > 0 ? "text-destructive" : ""}`}>
-              {overdueInstallments}
+              {overdueInstallments.toFixed(2)}
             </p>
           </div>
           <div>
