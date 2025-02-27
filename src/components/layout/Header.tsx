@@ -3,9 +3,11 @@ import { Bell, Sun, Moon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   // Cargar el tema desde localStorage al iniciar
@@ -29,10 +31,20 @@ const Header = () => {
     });
   };
 
+  // Navegar al dashboard
+  const navigateToDashboard = () => {
+    navigate("/dashboard");
+  };
+
   return (
     <header className="h-16 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 flex items-center justify-between animate-fade-in transition-colors">
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Panel de Control</h2>
+        <h2 
+          onClick={navigateToDashboard}
+          className="text-lg font-semibold text-gray-800 dark:text-white cursor-pointer hover:text-primary transition-colors"
+        >
+          Panel de Control
+        </h2>
       </div>
       <div className="flex items-center gap-4">
         <Button 
