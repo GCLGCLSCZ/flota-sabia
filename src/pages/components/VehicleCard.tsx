@@ -12,6 +12,14 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     ? "border-l-4 border-l-primary"
     : "border-l-4 border-l-muted opacity-70";
 
+  // Cálculo de cuotas restantes
+  const totalInstallments = vehicle.totalInstallments || 0;
+  const paidInstallments = vehicle.paidInstallments || 0;
+  const remainingInstallments = totalInstallments - paidInstallments;
+  
+  // Cálculo de total pagado
+  const totalPaid = paidInstallments * (vehicle.installmentAmount || 0);
+
   return (
     <Card className={`${cardClass} dark:bg-gray-800 dark:text-white dark:border-gray-700`}>
       <CardHeader className="p-4">
@@ -39,18 +47,27 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
       <CardContent className="p-4 pt-0 text-sm space-y-2 overflow-visible">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Pago diario</p>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Comisión empresa</p>
             <p className="font-medium">{vehicle.dailyRate} Bs</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Último pago
+              Cuota diaria
             </p>
-            <p className="font-medium">
-              {vehicle.lastPayment
-                ? format(new Date(vehicle.lastPayment), "dd MMM yyyy", { locale: es })
-                : "No registrado"}
+            <p className="font-medium">{vehicle.installmentAmount || 0} Bs</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Cuotas restantes</p>
+            <p className="font-medium">{remainingInstallments} / {totalInstallments}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Total pagado
             </p>
+            <p className="font-medium">{totalPaid} Bs</p>
           </div>
         </div>
 
