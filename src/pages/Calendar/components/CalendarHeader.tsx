@@ -1,41 +1,29 @@
 
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Ban, CalendarIcon } from "lucide-react";
+import { CalendarHeaderProps } from "../types";
 
-interface CalendarHeaderProps {
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
-  currentMonth: string;
-}
-
-export const CalendarHeader = ({ onPrevMonth, onNextMonth, currentMonth }: CalendarHeaderProps) => {
+const CalendarHeader = ({ onAddNonWorkingDay, onAddMaintenance }: CalendarHeaderProps) => {
   return (
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-semibold">Calendario</h1>
-        <Select defaultValue="month">
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Seleccionar vista" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">Vista Mensual</SelectItem>
-            <SelectItem value="week">Vista Semanal</SelectItem>
-            <SelectItem value="day">Vista Diaria</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="flex justify-between items-center">
+      <div>
+        <h1 className="text-2xl font-semibold">Calendario de Vehículos</h1>
+        <p className="text-muted-foreground mt-1">
+          Gestiona los días no trabajados y mantenimientos programados
+        </p>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={onPrevMonth}>
-          <ChevronLeft className="h-4 w-4" />
+      <div className="space-x-4">
+        <Button variant="outline" onClick={onAddNonWorkingDay}>
+          <Ban className="mr-2 h-4 w-4" />
+          Marcar Día No Laborable
         </Button>
-        <div className="text-lg font-medium min-w-[200px] text-center">
-          {currentMonth}
-        </div>
-        <Button variant="outline" size="icon" onClick={onNextMonth}>
-          <ChevronRight className="h-4 w-4" />
+        <Button onClick={onAddMaintenance}>
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          Programar Mantenimiento
         </Button>
       </div>
     </div>
   );
 };
+
+export default CalendarHeader;
