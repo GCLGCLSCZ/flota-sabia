@@ -1,6 +1,6 @@
 
 import { Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "./context/ThemeProvider";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from "./context/AppContext";
 import Layout from "./components/layout/Layout";

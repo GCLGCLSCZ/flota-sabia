@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/context/AppContext";
@@ -21,6 +22,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -40,11 +42,11 @@ import "./settlement-print.css";
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, settings, addPayment, updatePayment } = useApp();
+  const { investors, vehicles, payments, settings, addPayment, updatePayment, deletePayment } = useApp();
   const { toast } = useToast();
   
   // Estado para la funcionalidad de pago
-  const [showPaymentDialog, setShowNewPaymentDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState({
     id: "",
@@ -171,12 +173,14 @@ const InvestorSettlement = () => {
 
   // Función para abrir el diálogo de pago
   const openPaymentDialog = () => {
-    setShowNewPaymentDialog(true);
-  };
-
-  // Función para cerrar el diálogo de pago
-  const closePaymentDialog = () => {
-    setShowNewPaymentDialog(false);
+    setPaymentInfo({
+      id: "",
+      date: format(new Date(), "yyyy-MM-dd"),
+      transferNumber: "",
+      amount: totals.pendingToPay > 0 ? totals.pendingToPay : totals.netAmount
+    });
+    setIsEditingPayment(false);
+    setShowPaymentDialog(true);
   };
 
   // Función para editar un pago existente
@@ -190,11 +194,19 @@ const InvestorSettlement = () => {
       transferNumber: latestPayment.transferNumber || "",
       amount: latestPayment.amount
     });
-    setShowNewPaymentDialog(true);
+    setShowPaymentDialog(true);
   };
 
-  // Función para eliminar un pago
-  const deletePayment = () => {
+  // Iniciar proceso de eliminación
+  const handleDeletePayment = () => {
+    if (!latestPayment) return;
+    
+    setPaymentToDelete(latestPayment.id);
+    setShowDeleteDialog(true);
+  };
+  
+  // Eliminar pago (función local)
+  const handleDeleteConfirm = () => {
     if (!paymentToDelete) return;
     
     // Actualizar el estado del pago a "cancelled"
@@ -212,14 +224,6 @@ const InvestorSettlement = () => {
     setShowDeleteDialog(false);
     setPaymentToDelete(null);
     setForceUpdate(prev => prev + 1);
-  };
-  
-  // Iniciar proceso de eliminación
-  const handleDeletePayment = () => {
-    if (!latestPayment) return;
-    
-    setPaymentToDelete(latestPayment.id);
-    setShowDeleteDialog(true);
   };
   
   // Manejar el registro o actualización de un pago
@@ -256,37 +260,42 @@ const InvestorSettlement = () => {
         date: paymentInfo.date,
         amount: paymentInfo.amount,
         concept: concept,
-        paymentMethod: "transfer",
-        status: "completed",
+        paymentMethod: "transfer" as const,
+        status: "completed" as const,
         bankName: "Banco Ganadero",
         transferNumber: paymentInfo.transferNumber
       };
       
-      addPayment(paymentData);
+      const success = addPayment(paymentData);
       
-      setRecentPaymentId(paymentData.id);
-      setPaymentRegistered(true);
-      toast({
-        title: "Pago registrado",
-        description: "El pago ha sido registrado exitosamente"
-      });
-      
-      // Forzar la actualización de los cálculos
-      setForceUpdate(prev => prev + 1);
+      if (success) {
+        // Buscar el ID del pago recién agregado
+        setTimeout(() => {
+          const newlyAddedPayment = payments
+            .filter(p => 
+              p.concept === paymentData.concept && 
+              p.transferNumber === paymentData.transferNumber
+            )
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          
+          if (newlyAddedPayment) {
+            setRecentPaymentId(newlyAddedPayment.id);
+          }
+          
+          setPaymentRegistered(true);
+          toast({
+            title: "Pago registrado",
+            description: "El pago ha sido registrado exitosamente"
+          });
+          
+          // Forzar la actualización de los cálculos
+          setForceUpdate(prev => prev + 1);
+        }, 100);
+      }
     }
     
-    setShowNewPaymentDialog(false);
+    setShowPaymentDialog(false);
     setIsEditingPayment(false);
-  };
-  
-  // Función para abrir el diálogo de pago
-  const openPaymentDialog = () => {
-    setShowNewPaymentDialog(true);
-  };
-  
-  // Función para cerrar el diálogo de pago
-  const closePaymentDialog = () => {
-    setShowNewPaymentDialog(false);
   };
 
   return (
@@ -441,7 +450,7 @@ const InvestorSettlement = () => {
       </Card>
 
       {/* Diálogo de pago */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{isEditingPayment ? "Editar Pago" : "Registrar Pago"}</DialogTitle>
@@ -489,9 +498,14 @@ const InvestorSettlement = () => {
               />
             </div>
           </div>
-          <Button onClick={handlePaymentSubmit}>
-            {isEditingPayment ? "Actualizar Pago" : "Registrar Pago"}
-          </Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handlePaymentSubmit}>
+              {isEditingPayment ? "Actualizar Pago" : "Registrar Pago"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -506,7 +520,7 @@ const InvestorSettlement = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={deletePayment} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-500 hover:bg-red-600">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
