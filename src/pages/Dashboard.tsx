@@ -103,18 +103,18 @@ const Dashboard = () => {
   }, [vehicles]);
 
   return (
-    <div className="w-full pb-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="w-full pb-8 zoom-safe">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((stat) => (
-          <Card key={stat.label} className="p-4 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white overflow-visible">
-            <div className="flex items-start justify-between">
-              <div className="w-3/4 overflow-visible">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 truncate">{stat.label}</p>
-                <p className="text-2xl font-semibold mt-2">{stat.value}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{stat.change}</p>
+          <Card key={stat.label} className="p-3 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white">
+            <div className="flex justify-between items-start space-x-2">
+              <div className="w-3/4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">{stat.label}</p>
+                <p className="text-xl sm:text-2xl font-semibold mt-1">{stat.value}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{stat.change}</p>
               </div>
               <div className={`${stat.color} bg-gray-50 dark:bg-gray-700 p-2 rounded-lg`}>
-                <stat.icon className="w-5 h-5" />
+                <stat.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
           </Card>
@@ -123,8 +123,8 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-4 dark:bg-gray-800 dark:text-white">
-          <h3 className="text-lg font-semibold mb-4">Vehículos con Pagos Atrasados</h3>
-          <div className="space-y-4">
+          <h3 className="text-base sm:text-lg font-semibold mb-4">Vehículos con Pagos Atrasados</h3>
+          <div className="space-y-3">
             {vehiclesWithLatePayments.length > 0 ? vehiclesWithLatePayments.map((vehicle) => {
               const lastPayment = payments
                 .filter(p => p.vehicleId === vehicle.id)
@@ -141,13 +141,13 @@ const Dashboard = () => {
                   className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div>
-                    <p className="font-medium">{vehicle.plate}</p>
+                    <p className="font-medium text-sm">{vehicle.plate}</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
                       {daysSinceLastPayment} días de atraso
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-warning">
+                    <p className="font-medium text-warning text-sm">
                       Bs {vehicle.dailyRate * daysSinceLastPayment}
                     </p>
                     <button className="text-xs text-primary hover:underline dark:text-blue-400">
@@ -158,15 +158,15 @@ const Dashboard = () => {
               );
             }) : (
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <p className="text-gray-600 dark:text-gray-400">No hay vehículos con pagos atrasados</p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">No hay vehículos con pagos atrasados</p>
               </div>
             )}
           </div>
         </Card>
 
         <Card className="p-4 dark:bg-gray-800 dark:text-white">
-          <h3 className="text-lg font-semibold mb-4">Mantenimientos Próximos</h3>
-          <div className="space-y-4">
+          <h3 className="text-base sm:text-lg font-semibold mb-4">Mantenimientos Próximos</h3>
+          <div className="space-y-3">
             {upcomingMaintenance.length > 0 ? upcomingMaintenance.map((maintenance) => {
               const daysUntilMaintenance = Math.ceil(
                 (maintenance.date.getTime() - new Date().getTime()) / 
@@ -179,11 +179,11 @@ const Dashboard = () => {
                   className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div>
-                    <p className="font-medium">{maintenance.plate}</p>
+                    <p className="font-medium text-sm">{maintenance.plate}</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">{maintenance.service}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-gray-600 dark:text-gray-300">
+                    <p className="font-medium text-gray-600 dark:text-gray-300 text-sm">
                       En {daysUntilMaintenance} días
                     </p>
                     <button className="text-xs text-primary hover:underline dark:text-blue-400">
@@ -194,7 +194,7 @@ const Dashboard = () => {
               );
             }) : (
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <p className="text-gray-600 dark:text-gray-400">No hay mantenimientos programados</p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">No hay mantenimientos programados</p>
               </div>
             )}
           </div>
