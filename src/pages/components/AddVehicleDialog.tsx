@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +143,7 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dailyRate">Tarifa Diaria</Label>
+              <Label htmlFor="dailyRate">Comisión por Administración (Bs)</Label>
               <Input
                 id="dailyRate"
                 type="number"
@@ -152,9 +151,12 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 onChange={(e) => setFormData({ ...formData, dailyRate: Number(e.target.value) })}
                 required
               />
+              <p className="text-sm text-muted-foreground">
+                Comisión diaria que se cobra por la administración del vehículo
+              </p>
             </div>
             
-            {/* Campos nuevos para el contrato */}
+            {/* Campos del contrato */}
             <div className="space-y-2">
               <Label htmlFor="contractStartDate">Fecha de inicio del contrato</Label>
               <Input
@@ -178,7 +180,7 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="installmentAmount">Monto de cada cuota (Bs)</Label>
+              <Label htmlFor="installmentAmount">Renta Diaria (Bs)</Label>
               <Input
                 id="installmentAmount"
                 type="number"
@@ -186,6 +188,9 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 onChange={(e) => setFormData({ ...formData, installmentAmount: Number(e.target.value) })}
                 required
               />
+              <p className="text-sm text-muted-foreground">
+                Monto diario que debe pagar el conductor por el vehículo
+              </p>
             </div>
             
             <div className="space-y-2 col-span-2">

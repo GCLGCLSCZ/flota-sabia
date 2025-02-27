@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,14 +138,31 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-dailyRate">Tarifa diaria (Bs)</Label>
+              <Label htmlFor="edit-dailyRate">Comisión por Administración (Bs)</Label>
               <Input
                 id="edit-dailyRate"
                 type="number"
-                value={editedVehicle.dailyRate || 0}
+                value={editedVehicle.dailyRate}
                 onChange={(e) => setEditedVehicle({...editedVehicle, dailyRate: Number(e.target.value)})}
                 required
               />
+              <p className="text-sm text-muted-foreground">
+                Comisión diaria que se cobra por la administración del vehículo
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-installmentAmount">Renta Diaria (Bs)</Label>
+              <Input
+                id="edit-installmentAmount"
+                type="number"
+                value={editedVehicle.installmentAmount || 0}
+                onChange={(e) => setEditedVehicle({...editedVehicle, installmentAmount: Number(e.target.value)})}
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                Monto diario que debe pagar el conductor por el vehículo
+              </p>
             </div>
             
             {/* Campos de contrato */}
