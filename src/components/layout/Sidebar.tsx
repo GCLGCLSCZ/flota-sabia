@@ -9,6 +9,7 @@ import {
   Car,
   Users,
   PieChart,
+  Menu,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 type SidebarSection = {
@@ -33,17 +34,62 @@ type SidebarSection = {
 
 export default function Sidebar() {
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const isMobile = useIsMobile();
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Si es móvil, cerramos el sidebar por defecto
+  // Si es móvil, manejamos de otra forma
   useEffect(() => {
-    if (isMobile) {
+    if (!isMobile) {
+      // En escritorio, activamos el comportamiento de hover
       setIsSidebarOpen(false);
-    } else {
-      setIsSidebarOpen(true);
     }
   }, [isMobile]);
+
+  // Función para manejar el hover en el área sensible
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setIsHovering(true);
+    setIsSidebarOpen(true);
+  };
+
+  // Función para manejar cuando el mouse sale
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    // Pequeño delay para que no se cierre inmediatamente
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (!isHovering) {
+        setIsSidebarOpen(false);
+      }
+    }, 300);
+  };
+
+  // Click fuera para cerrar en móvil
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isMobile && isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMobile, isSidebarOpen]);
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Datos de navegación
   const navigationSections: SidebarSection[] = [
@@ -101,76 +147,75 @@ export default function Sidebar() {
 
   return (
     <>
+      {/* Área sensible al hover para la detección */}
+      <div 
+        className="fixed top-0 left-0 h-full w-4 z-40 cursor-pointer"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Mini indicador de menú */}
+        {!isSidebarOpen && !isMobile && (
+          <div className="absolute top-16 left-1 bg-white dark:bg-gray-800 p-1 rounded-full shadow-md opacity-30 hover:opacity-100 transition-opacity">
+            <Menu className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Botón para abrir menú en móvil */}
+      {isMobile && !isSidebarOpen && (
+        <button 
+          className="fixed top-16 left-2 z-40 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md"
+          onClick={() => setIsSidebarOpen(true)}
+        >
+          <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        </button>
+      )}
+
+      {/* Sidebar */}
       <div
+        ref={sidebarRef}
         className={cn(
           "h-screen fixed top-0 z-30 pt-16 transition-all bg-white border-r dark:bg-gray-950 custom-scrollbar",
           isSidebarOpen
             ? "w-64 transform-none shadow-lg lg:shadow-none"
-            : "w-0 -translate-x-full lg:w-20 lg:translate-x-0"
+            : "w-0 -translate-x-full"
         )}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <div className="flex h-full flex-col gap-2 p-2">
           <div
-            className={cn(
-              "flex flex-col gap-1",
-              !isSidebarOpen && "lg:items-center lg:gap-1"
-            )}
+            className="flex flex-col gap-1"
           >
             {navigationSections.map((section, idx) => (
               <div key={idx} className="px-2 pt-2">
-                {isSidebarOpen && (
-                  <h3 className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {section.title}
-                  </h3>
-                )}
+                <h3 className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {section.title}
+                </h3>
                 {section.links.map((link, linkIdx) => (
-                  <div key={linkIdx}>
-                    {isSidebarOpen ? (
-                      <NavLink
-                        to={link.href}
-                        className={({ isActive }) =>
-                          cn(
-                            "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                            isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "transparent"
-                          )
-                        }
-                      >
-                        {link.icon}
-                        <span className="ml-3">{link.title}</span>
-                      </NavLink>
-                    ) : (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <NavLink
-                              to={link.href}
-                              className={({ isActive }) =>
-                                cn(
-                                  "flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground",
-                                  isActive
-                                    ? "bg-accent text-accent-foreground"
-                                    : "transparent"
-                                )
-                              }
-                            >
-                              {link.icon}
-                            </NavLink>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">
-                            {link.title}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
+                  <NavLink
+                    key={linkIdx}
+                    to={link.href}
+                    className={({ isActive }) =>
+                      cn(
+                        "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                        isActive
+                          ? "bg-accent text-accent-foreground"
+                          : "transparent"
+                      )
+                    }
+                  >
+                    {link.icon}
+                    <span className="ml-3">{link.title}</span>
+                  </NavLink>
                 ))}
               </div>
             ))}
           </div>
         </div>
       </div>
+      
+      {/* Overlay para móvil */}
       {isMobile && isSidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/50"
