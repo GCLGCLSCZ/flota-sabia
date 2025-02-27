@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Vehicle } from "@/types";
 import { BadgeInfo, Car, Edit, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { format, differenceInDays, isAfter, isSunday, parseISO } from "date-fns";
 import { useApp } from "@/context/AppContext";
 
 const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
@@ -36,11 +35,41 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     ? calculatedPaidInstallments 
     : vehicle.paidInstallments || 0;
     
-  // Calcular cuotas restantes
+  // Calcular cuotas restantes del total
   const remainingInstallments = totalInstallments - paidInstallments;
   
   // Usar el valor calculado para el total pagado
   const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
+  
+  // Calcular cuotas atrasadas (excluyendo domingos)
+  const calculateOverdueInstallments = () => {
+    if (!vehicle.contractStartDate) return 0;
+    
+    const startDate = parseISO(vehicle.contractStartDate);
+    const today = new Date();
+    
+    // Si la fecha de inicio es posterior a hoy, no hay cuotas atrasadas
+    if (isAfter(startDate, today)) return 0;
+    
+    // Calcular días transcurridos excluyendo domingos
+    let dayCount = 0;
+    let currentDate = new Date(startDate);
+    
+    while (currentDate <= today) {
+      if (!isSunday(currentDate)) {
+        dayCount++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Las cuotas que deberían haberse pagado hasta hoy
+    const expectedInstallments = dayCount;
+    
+    // Cuotas atrasadas = esperadas - pagadas (si es negativo, no hay atraso)
+    return Math.max(0, expectedInstallments - paidInstallments);
+  };
+  
+  const overdueInstallments = calculateOverdueInstallments();
 
   return (
     <Card className={`${cardClass} dark:bg-gray-800 dark:text-white dark:border-gray-700`}>
@@ -82,14 +111,31 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
         
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Cuotas restantes</p>
-            <p className="font-medium">{remainingInstallments} / {totalInstallments}</p>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Cuotas atrasadas</p>
+            <p className={`font-medium ${overdueInstallments > 0 ? "text-destructive" : ""}`}>
+              {overdueInstallments}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Total pagado
+              Cuotas restantes
             </p>
+            <p className="font-medium">{remainingInstallments} / {totalInstallments}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Total pagado</p>
             <p className="font-medium">{totalPaid} Bs</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Deuda actual
+            </p>
+            <p className={`font-medium ${overdueInstallments > 0 ? "text-destructive" : ""}`}>
+              {(overdueInstallments * installmentAmount).toFixed(0)} Bs
+            </p>
           </div>
         </div>
 
