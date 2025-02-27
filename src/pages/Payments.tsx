@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,36 +14,17 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface Payment {
-  id: string;
-  vehicleId: string;
-  amount: number;
-  date: Date;
-  concept: string;
-  status: "pending" | "completed" | "cancelled";
-  paymentMethod: "cash" | "transfer";
-  receiptNumber: string;
-  bankName?: string;
-  transferNumber?: string;
-}
-
-interface Vehicle {
-  id: string;
-  plate: string;
-  model: string;
-  dailyRate: number;
-  driverName: string;
-  driverPhone: string;
-}
+import { useApp } from "@/context/AppContext";
+import { Payment } from "@/types";
 
 const Payments = () => {
   const { toast } = useToast();
@@ -56,50 +38,9 @@ const Payments = () => {
   const [transferNumber, setTransferNumber] = useState("");
   const [customBank, setCustomBank] = useState("");
   const [showCustomBank, setShowCustomBank] = useState(false);
-
-  const vehicles: Vehicle[] = [
-    {
-      id: "1",
-      plate: "ABC-123",
-      model: "Toyota Corolla",
-      dailyRate: 50,
-      driverName: "Juan Pérez",
-      driverPhone: "591712345678"
-    },
-    {
-      id: "2",
-      plate: "DEF-456",
-      model: "Nissan Sentra",
-      dailyRate: 45,
-      driverName: "Carlos López",
-      driverPhone: "591787654321"
-    },
-  ];
-
-  const payments: Payment[] = [
-    {
-      id: "p1",
-      vehicleId: "1",
-      amount: 350,
-      date: new Date(2024, 2, 15),
-      concept: "Renta semanal",
-      status: "completed",
-      paymentMethod: "cash",
-      receiptNumber: "REC-001",
-    },
-    {
-      id: "p2",
-      vehicleId: "2",
-      amount: 315,
-      date: new Date(2024, 2, 16),
-      concept: "Renta semanal",
-      status: "pending",
-      paymentMethod: "transfer",
-      receiptNumber: "REC-002",
-      bankName: "Ganadero",
-      transferNumber: "TRF123456",
-    },
-  ];
+  
+  // Usar el contexto de la aplicación para obtener los vehículos y pagos
+  const { vehicles, payments, addPayment } = useApp();
 
   const generateReceiptNumber = () => {
     const lastReceipt = payments
@@ -108,51 +49,54 @@ const Payments = () => {
     return `REC-${String(lastReceipt + 1).padStart(3, '0')}`;
   };
 
-const handleNewPayment = () => {
-  if (!selectedVehicle || !amount || !concept) {
-    toast({
-      title: "Campos incompletos",
-      description: "Por favor completa todos los campos",
-      variant: "destructive",
-    });
-    return;
-  }
+  const handleNewPayment = () => {
+    if (!selectedVehicle || !amount || !concept) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor completa todos los campos",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  if (paymentMethod === "transfer" && !transferNumber) {
-    toast({
-      title: "Número de transferencia requerido",
-      description: "Por favor ingresa el número de transferencia",
-      variant: "destructive",
-    });
-    return;
-  }
+    if (paymentMethod === "transfer" && !transferNumber) {
+      toast({
+        title: "Número de transferencia requerido",
+        description: "Por favor ingresa el número de transferencia",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // Convertir la fecha a string en formato YYYY-MM-DD
-  const formattedDate = selectedDate.toISOString().split('T')[0];
+    // Crear el objeto de pago
+    const paymentData: Omit<Payment, "id"> = {
+      vehicleId: selectedVehicle,
+      amount: parseFloat(amount),
+      date: selectedDate.toISOString().split('T')[0],
+      concept,
+      status: "completed",
+      paymentMethod,
+      receiptNumber: generateReceiptNumber(),
+      ...(paymentMethod === "transfer" && {
+        bankName: customBank || bankName,
+        transferNumber,
+      }),
+    };
 
-  const paymentData = {
-    vehicleId: selectedVehicle,
-    amount: parseFloat(amount),
-    date: formattedDate,
-    concept,
-    status: "completed" as const,
-    paymentMethod,
-    receiptNumber: generateReceiptNumber(),
-    ...(paymentMethod === "transfer" && {
-      bankName: customBank || bankName,
-      transferNumber,
-    }),
-  };
+    // Añadir el pago usando el contexto
+    const success = addPayment(paymentData);
 
-    toast({
-      title: "Pago registrado",
-      description: `Se ha registrado un pago de $${amount} para el vehículo ${
-        vehicles.find((v) => v.id === selectedVehicle)?.plate
-      }. Recibo #${generateReceiptNumber()}`,
-    });
+    if (success) {
+      toast({
+        title: "Pago registrado",
+        description: `Se ha registrado un pago de $${amount} para el vehículo ${
+          vehicles.find((v) => v.id === selectedVehicle)?.plate
+        }. Recibo #${paymentData.receiptNumber}`,
+      });
 
-    setShowNewPaymentDialog(false);
-    resetForm();
+      setShowNewPaymentDialog(false);
+      resetForm();
+    }
   };
 
   const resetForm = () => {
@@ -174,11 +118,11 @@ const handleNewPayment = () => {
     });
   };
 
-  const handleWhatsAppReceipt = (payment: Payment, vehicle: Vehicle) => {
+  const handleWhatsAppReceipt = (payment: Payment, vehicle: any) => {
     const receiptText = `*Recibo de Pago #${payment.receiptNumber}*
 🚗 Vehículo: ${vehicle.plate} - ${vehicle.model}
 💵 Monto: $${payment.amount}
-📅 Fecha: ${format(payment.date, "dd/MM/yyyy")}
+📅 Fecha: ${format(new Date(payment.date), "dd/MM/yyyy")}
 🧾 Concepto: ${payment.concept}
 💳 Método de pago: ${payment.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}
 ${payment.bankName ? `🏦 Banco: ${payment.bankName}` : ""}
@@ -287,14 +231,14 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                       <div className="flex items-center gap-2">
                         <Car className="h-4 w-4" />
                         <span className="font-medium">
-                          {vehicle?.plate} - {vehicle?.model}
+                          {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Vehículo no encontrado"}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {payment.concept}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {format(payment.date, "dd/MM/yyyy")}
+                        {format(new Date(payment.date), "dd/MM/yyyy")}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Recibo #{payment.receiptNumber} - 
@@ -318,13 +262,15 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                         >
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => vehicle && handleWhatsAppReceipt(payment, vehicle)}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
+                        {vehicle && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleWhatsAppReceipt(payment, vehicle)}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
