@@ -35,9 +35,8 @@ type SidebarSection = {
 export default function Sidebar() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const isMobile = useIsMobile();
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Si es móvil, manejamos de otra forma
@@ -50,21 +49,20 @@ export default function Sidebar() {
 
   // Función para manejar el hover en el área sensible
   const handleMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
-    setIsHovering(true);
     setIsSidebarOpen(true);
   };
 
   // Función para manejar cuando el mouse sale
   const handleMouseLeave = () => {
-    setIsHovering(false);
-    // Pequeño delay para que no se cierre inmediatamente
-    hoverTimeoutRef.current = setTimeout(() => {
-      if (!isHovering) {
-        setIsSidebarOpen(false);
-      }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      setIsSidebarOpen(false);
     }, 300);
   };
 
@@ -85,8 +83,8 @@ export default function Sidebar() {
   // Limpiar timeout al desmontar
   useEffect(() => {
     return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
@@ -151,7 +149,6 @@ export default function Sidebar() {
       <div 
         className="fixed top-0 left-0 h-full w-4 z-40 cursor-pointer"
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
       >
         {/* Mini indicador de menú */}
         {!isSidebarOpen && !isMobile && (
@@ -180,7 +177,6 @@ export default function Sidebar() {
             ? "w-64 transform-none shadow-lg lg:shadow-none"
             : "w-0 -translate-x-full"
         )}
-        onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         <div className="flex h-full flex-col gap-2 p-2">
