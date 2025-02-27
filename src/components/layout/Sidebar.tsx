@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type SidebarSection = {
   title: string;
@@ -34,7 +34,7 @@ type SidebarSection = {
 export default function Sidebar() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
 
   // Si es móvil, cerramos el sidebar por defecto
   useEffect(() => {

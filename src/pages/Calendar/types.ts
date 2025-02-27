@@ -1,7 +1,6 @@
 
 import { Vehicle } from "@/types";
 import { DateRange } from "react-day-picker";
-import { ToastAction } from "@/components/ui/toast";
 
 export interface NonWorkingDay {
   date: Date;
@@ -51,7 +50,7 @@ export interface NonWorkingDayDialogProps {
     toast: (props: {
       title?: string;
       description?: string;
-      action?: React.ReactElement<typeof ToastAction>;
+      action?: React.ReactElement<any>;
       variant?: "default" | "destructive";
     }) => void;
   };
