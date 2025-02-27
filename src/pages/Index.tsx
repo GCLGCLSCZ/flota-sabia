@@ -57,8 +57,11 @@ const Index = () => {
   return (
     <div className="w-full min-h-[calc(100vh-4rem)] flex flex-col p-4">
       <div className="text-center my-4 md:my-8">
-        <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4">Sistema de Gestión de Flota</h1>
-        <p className="text-sm md:text-xl text-muted-foreground max-w-2xl mx-auto px-2">
+        <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4">Gestión de Flota TAXI SERVICE</h1>
+        <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto px-2">
+          NIT: 9664233012 | Contacto: 60002611
+        </p>
+        <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto px-2 mt-2">
           Administra tu flota de vehículos, controla pagos, programa mantenimientos y más.
         </p>
       </div>
