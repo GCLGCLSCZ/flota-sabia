@@ -177,7 +177,7 @@ const InvestorSettlement = () => {
       id: "",
       date: format(new Date(), "yyyy-MM-dd"),
       transferNumber: "",
-      amount: totals.pendingToPay > 0 ? totals.pendingToPay : totals.netAmount
+      amount: totals.pendingToPay > 0 ? totals.pendingToPay : totals.totalToPay
     });
     setIsEditingPayment(false);
     setShowPaymentDialog(true);

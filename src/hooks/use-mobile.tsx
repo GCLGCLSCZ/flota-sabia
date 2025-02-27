@@ -24,3 +24,6 @@ export function useMobileDetect(): boolean {
 
   return isMobile;
 }
+
+// Añadimos un alias para compatibilidad
+export const useIsMobile = useMobileDetect;
