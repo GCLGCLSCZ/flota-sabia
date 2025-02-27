@@ -57,9 +57,7 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
     if (investorName === "none") {
       setEditedVehicle({
         ...editedVehicle,
-        investor: "",
-        investorId: undefined,
-        investorName: ""
+        investor: ""
       });
       return;
     }
@@ -68,9 +66,7 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
     if (selectedInvestor) {
       setEditedVehicle({
         ...editedVehicle,
-        investor: selectedInvestor.name,
-        investorId: selectedInvestor.id,
-        investorName: selectedInvestor.name
+        investor: selectedInvestor.name
       });
     } else {
       setEditedVehicle({

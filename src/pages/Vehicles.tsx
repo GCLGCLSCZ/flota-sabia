@@ -40,7 +40,7 @@ const VehiclesPage = () => {
       {
         id: Date.now().toString(),
         ...maintenance,
-        status: "pending",
+        status: "pending" as const,
       },
     ];
     
@@ -48,14 +48,15 @@ const VehiclesPage = () => {
       maintenanceHistory: updatedMaintenance,
     });
     
-    setSelectedVehicle((prev) =>
-      prev?.id === vehicleId
-        ? {
-            ...prev,
-            maintenanceHistory: updatedMaintenance,
-          }
-        : prev
-    );
+    setSelectedVehicle((prev) => {
+      if (prev?.id === vehicleId) {
+        return {
+          ...prev,
+          maintenanceHistory: updatedMaintenance,
+        };
+      }
+      return prev;
+    });
     
     toast({
       title: "Mantenimiento agregado",
