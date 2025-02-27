@@ -1,106 +1,82 @@
 
 import { useState } from "react";
-import { Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Vehicle, Maintenance } from "@/types";
 import { useApp } from "@/context/AppContext";
-import { VehicleCard } from "./components/VehicleCard";
-import { AddVehicleDialog } from "./components/AddVehicleDialog";
-import { EditVehicleDialog } from "./components/EditVehicleDialog";
-import { DeleteVehicleDialog } from "./components/DeleteVehicleDialog";
-import { VehicleDetailsDialog } from "./components/VehicleDetailsDialog";
+import { useToast } from "@/components/ui/use-toast";
+import { Vehicle, Maintenance } from "@/types";
+import { VehiclesHeader } from "../components/VehiclesHeader";
+import { VehicleList } from "../components/VehicleList";
+import AddVehicleDialog from "../components/AddVehicleDialog";
+import EditVehicleDialog from "../components/EditVehicleDialog";
+import DeleteVehicleDialog from "../components/DeleteVehicleDialog";
+import VehicleDetailsDialog from "../components/VehicleDetailsDialog";
 
-const Vehicles = () => {
-  const { vehicles, setVehicles } = useApp();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+const VehiclesPage = () => {
+  const { updateVehicle, vehicles } = useApp();
+  const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
-  const filteredVehicles = vehicles.filter(
-    (vehicle) =>
-      vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.investor.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleDeleteVehicle = (vehicleId: string) => {
-    setVehicles(vehicles.filter((v) => v.id !== vehicleId));
-    setShowDeleteDialog(false);
+  const handleDelete = (vehicleId: string) => {
+    updateVehicle(vehicleId, { status: "inactive" });
+    setDeletingVehicle(null);
+    toast({
+      title: "Vehículo eliminado",
+      description: "El vehículo ha sido eliminado exitosamente",
+      variant: "destructive",
+    });
   };
 
   const handleAddMaintenance = (
     vehicleId: string,
     maintenance: Omit<Maintenance, "id" | "status">
   ) => {
-    setVehicles(
-      vehicles.map((vehicle) =>
-        vehicle.id === vehicleId
-          ? {
-              ...vehicle,
-              maintenanceHistory: [
-                ...(vehicle.maintenanceHistory || []),
-                {
-                  id: Date.now().toString(),
-                  ...maintenance,
-                  status: "pending",
-                },
-              ],
-            }
-          : vehicle
-      )
-    );
-    setShowDetails(false);
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) return;
+    
+    // Asegurar que el costo total sea la suma de materiales y mano de obra
+    const totalCost = maintenance.costMaterials + maintenance.costLabor;
+    
+    const updatedMaintenance = [
+      ...(vehicle.maintenanceHistory || []),
+      {
+        id: Date.now().toString(),
+        ...maintenance,
+        cost: totalCost,
+        status: "pending" as const,
+      },
+    ];
+    
+    updateVehicle(vehicleId, {
+      maintenanceHistory: updatedMaintenance,
+    });
+    
+    setSelectedVehicle((prev) => {
+      if (prev?.id === vehicleId) {
+        return {
+          ...prev,
+          maintenanceHistory: updatedMaintenance,
+        };
+      }
+      return prev;
+    });
+    
+    toast({
+      title: "Mantenimiento agregado",
+      description: "Se ha agregado un nuevo registro de mantenimiento.",
+    });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold">Gestión de Vehículos</h1>
-          <p className="text-muted-foreground mt-1">
-            Administra los vehículos y sus mantenimientos
-          </p>
-        </div>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Agregar Vehículo
-        </Button>
-      </div>
-
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            className="pl-10"
-            placeholder="Buscar por placa, marca, modelo o inversor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVehicles.map((vehicle) => (
-          <VehicleCard
-            key={vehicle.id}
-            vehicle={vehicle}
-            onEdit={() => setEditingVehicle(vehicle)}
-            onDelete={() => {
-              setSelectedVehicle(vehicle);
-              setShowDeleteDialog(true);
-            }}
-            onShowDetails={() => {
-              setSelectedVehicle(vehicle);
-              setShowDetails(true);
-            }}
-          />
-        ))}
-      </div>
+    <div className="w-full py-3 space-y-4 zoom-safe custom-scrollbar">
+      <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
+      
+      <VehicleList
+        onEdit={setEditingVehicle}
+        onDelete={setDeletingVehicle}
+        onShowDetails={setSelectedVehicle}
+      />
 
       <AddVehicleDialog
         isOpen={showAddDialog}
@@ -113,18 +89,18 @@ const Vehicles = () => {
       />
 
       <DeleteVehicleDialog
-        vehicle={showDeleteDialog ? selectedVehicle : null}
-        onConfirm={handleDeleteVehicle}
-        onClose={() => setShowDeleteDialog(false)}
+        vehicle={deletingVehicle}
+        onConfirm={(id) => handleDelete(id)}
+        onClose={() => setDeletingVehicle(null)}
       />
 
       <VehicleDetailsDialog
-        vehicle={showDetails ? selectedVehicle : null}
-        onClose={() => setShowDetails(false)}
+        vehicle={selectedVehicle}
+        onClose={() => setSelectedVehicle(null)}
         onAddMaintenance={handleAddMaintenance}
       />
     </div>
   );
 };
 
-export default Vehicles;
+export default VehiclesPage;
