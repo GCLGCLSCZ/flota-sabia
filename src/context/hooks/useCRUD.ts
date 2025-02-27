@@ -51,6 +51,18 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
   };
 
   const update = (id: string, itemData: Partial<T>) => {
+    if (options.validator) {
+      const validation = options.validator(itemData);
+      if (!validation.isValid) {
+        toast({
+          title: "Error de validación",
+          description: validation.errors.join("\n"),
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
     setItems(prevItems =>
       prevItems.map(item =>
         item.id === id ? { ...item, ...itemData } : item
@@ -65,6 +77,8 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
       title: "Elemento actualizado",
       description: "Los datos han sido actualizados exitosamente"
     });
+
+    return true;
   };
 
   return {

@@ -8,21 +8,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle, Edit } from "lucide-react";
 import { Vehicle, Investor, Discount, Maintenance, CardexItem, Payment } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import "./settlement-print.css";
 
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, settings, addPayment } = useApp();
+  const { investors, vehicles, payments, settings, addPayment, updatePayment } = useApp();
+  const { toast } = useToast();
   
   // Estado para la funcionalidad de pago
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState({
+    id: "",
     date: format(new Date(), "yyyy-MM-dd"),
     transferNumber: "",
     amount: 0
@@ -351,7 +355,10 @@ const InvestorSettlement = () => {
   
   // Buscar el último pago realizado en este período
   const latestPayment = useMemo(() => {
-    if (!recentPaymentId) {
+    if (recentPaymentId) {
+      // Buscar el pago específico que acabamos de registrar o editar
+      return payments.find(p => p.id === recentPaymentId);
+    } else {
       // Buscar pagos recientes para este período
       const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
       const monthStart = startOfMonth(selectedMonthDate);
@@ -366,9 +373,6 @@ const InvestorSettlement = () => {
           isWithinInterval(parseISO(p.date), { start: monthStart, end: new Date() })
         )
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-    } else {
-      // Buscar el pago específico que acabamos de registrar
-      return payments.find(p => p.id === recentPaymentId);
     }
   }, [payments, selectedMonth, recentPaymentId]);
   
@@ -377,50 +381,92 @@ const InvestorSettlement = () => {
     window.print();
   };
   
-  // Manejar el registro de un nuevo pago
+  // Iniciar edición de un pago existente
+  const handleEditPayment = () => {
+    if (!latestPayment) return;
+    
+    setPaymentInfo({
+      id: latestPayment.id,
+      date: latestPayment.date,
+      transferNumber: latestPayment.transferNumber || "",
+      amount: latestPayment.amount
+    });
+    
+    setIsEditingPayment(true);
+    setShowPaymentDialog(true);
+  };
+  
+  // Manejar el registro o actualización de un pago
   const handlePaymentSubmit = () => {
     if (!investor) return;
     
     const monthLabel = format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM yyyy", { locale: es });
     
-    const newPayment: Omit<Payment, "id"> = {
-      date: paymentInfo.date,
-      amount: paymentInfo.amount || totals.netAmount,
-      concept: `Pago a inversionista: ${investor.name} - Rendición ${monthLabel}`,
-      paymentMethod: "transfer",
-      status: "completed",
-      vehicleId: settlementData[0]?.vehicleId || "",
-      bankName: investor.bankName || "",
-      transferNumber: paymentInfo.transferNumber
-    };
-    
-    const success = addPayment(newPayment);
-    
-    if (success) {
-      // Buscar el ID del pago recién agregado
-      const newlyAddedPayment = payments
-        .filter(p => 
-          p.concept === newPayment.concept && 
-          p.transferNumber === newPayment.transferNumber
-        )
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    if (isEditingPayment) {
+      // Actualizar pago existente
+      if (!paymentInfo.id) return;
       
-      if (newlyAddedPayment) {
-        setRecentPaymentId(newlyAddedPayment.id);
-      }
+      updatePayment(paymentInfo.id, {
+        date: paymentInfo.date,
+        amount: paymentInfo.amount,
+        transferNumber: paymentInfo.transferNumber
+      });
       
+      setRecentPaymentId(paymentInfo.id);
       setPaymentRegistered(true);
-      setShowPaymentDialog(false);
+      toast({
+        title: "Pago actualizado",
+        description: "El pago ha sido actualizado exitosamente"
+      });
+    } else {
+      // Registrar nuevo pago
+      const newPayment: Omit<Payment, "id"> = {
+        date: paymentInfo.date,
+        amount: paymentInfo.amount || totals.netAmount,
+        concept: `Pago a inversionista: ${investor.name} - Rendición ${monthLabel}`,
+        paymentMethod: "transfer",
+        status: "completed",
+        vehicleId: settlementData[0]?.vehicleId || "",
+        bankName: investor.bankName || "",
+        transferNumber: paymentInfo.transferNumber
+      };
+      
+      const success = addPayment(newPayment);
+      
+      if (success) {
+        // Buscar el ID del pago recién agregado
+        const newlyAddedPayment = payments
+          .filter(p => 
+            p.concept === newPayment.concept && 
+            p.transferNumber === newPayment.transferNumber
+          )
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        
+        if (newlyAddedPayment) {
+          setRecentPaymentId(newlyAddedPayment.id);
+        }
+        
+        setPaymentRegistered(true);
+        toast({
+          title: "Pago registrado",
+          description: "El pago ha sido registrado exitosamente"
+        });
+      }
     }
+    
+    setShowPaymentDialog(false);
+    setIsEditingPayment(false);
   };
   
   // Abrir diálogo para registrar un pago
   const openPaymentDialog = () => {
     setPaymentInfo({
+      id: "",
       date: format(new Date(), "yyyy-MM-dd"),
       transferNumber: "",
       amount: totals.pendingAmount > 0 ? totals.pendingAmount : totals.netAmount
     });
+    setIsEditingPayment(false);
     setShowPaymentDialog(true);
   };
   
@@ -795,10 +841,24 @@ const InvestorSettlement = () => {
               </div>
             </div>
             <div className="p-4 border rounded-lg bg-muted/30">
-              <p className="text-sm text-muted-foreground">Pagado</p>
-              <p className={`text-2xl font-bold ${totals.paidToInvestor > 0 ? 'text-green-600' : ''}`}>
-                {totals.paidToInvestor.toFixed(2)} Bs
-              </p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pagado</p>
+                  <p className={`text-2xl font-bold ${totals.paidToInvestor > 0 ? 'text-green-600' : ''}`}>
+                    {totals.paidToInvestor.toFixed(2)} Bs
+                  </p>
+                </div>
+                {latestPayment && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="px-2 print:hidden" 
+                    onClick={handleEditPayment}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               
               {/* Si existe un pago registrado para este período, mostrar detalles */}
               {latestPayment && (
@@ -882,11 +942,13 @@ const InvestorSettlement = () => {
         </CardContent>
       </Card>
 
-      {/* Modal de Registro de Pago */}
+      {/* Modal de Registro o Edición de Pago */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Registrar Pago al Inversionista</DialogTitle>
+            <DialogTitle>
+              {isEditingPayment ? "Editar Pago al Inversionista" : "Registrar Pago al Inversionista"}
+            </DialogTitle>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
@@ -944,11 +1006,14 @@ const InvestorSettlement = () => {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowPaymentDialog(false);
+              setIsEditingPayment(false);
+            }}>
               Cancelar
             </Button>
             <Button type="submit" onClick={handlePaymentSubmit}>
-              Registrar Pago
+              {isEditingPayment ? "Actualizar Pago" : "Registrar Pago"}
             </Button>
           </DialogFooter>
         </DialogContent>
