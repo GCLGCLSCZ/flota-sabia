@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -63,7 +64,7 @@ const VehiclesPage = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6 space-y-6 overflow-visible">
       <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
       
       <VehicleList
