@@ -39,6 +39,12 @@ export interface Vehicle {
   driverName: string;
   driverPhone: string;
   driverId?: string;
+  // Nuevos campos para el contrato
+  contractStartDate?: string;
+  totalInstallments?: number;
+  paidInstallments?: number;
+  installmentAmount?: number;
+  totalPaid?: number;
 }
 
 export interface Payment {

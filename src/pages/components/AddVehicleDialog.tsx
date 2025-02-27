@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { Vehicle } from "@/types";
+import { format } from "date-fns";
 
 interface AddVehicleDialogProps {
   isOpen: boolean;
@@ -26,6 +27,12 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
     driverName: "",
     driverPhone: "",
     driverId: undefined,
+    // Nuevos campos para el contrato
+    contractStartDate: format(new Date(), "yyyy-MM-dd"),
+    totalInstallments: 24, // Por defecto 24 cuotas (2 años)
+    paidInstallments: 0,
+    installmentAmount: 0,
+    totalPaid: 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,6 +136,41 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 required
               />
             </div>
+            
+            {/* Campos nuevos para el contrato */}
+            <div className="space-y-2">
+              <Label htmlFor="contractStartDate">Fecha de inicio del contrato</Label>
+              <Input
+                id="contractStartDate"
+                type="date"
+                value={formData.contractStartDate}
+                onChange={(e) => setFormData({ ...formData, contractStartDate: e.target.value })}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="totalInstallments">Número total de cuotas</Label>
+              <Input
+                id="totalInstallments"
+                type="number"
+                value={formData.totalInstallments}
+                onChange={(e) => setFormData({ ...formData, totalInstallments: Number(e.target.value) })}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="installmentAmount">Monto de cada cuota (Bs)</Label>
+              <Input
+                id="installmentAmount"
+                type="number"
+                value={formData.installmentAmount}
+                onChange={(e) => setFormData({ ...formData, installmentAmount: Number(e.target.value) })}
+                required
+              />
+            </div>
+            
             <div className="space-y-2 col-span-2">
               <Label htmlFor="driver">Conductor (Opcional)</Label>
               <Select 

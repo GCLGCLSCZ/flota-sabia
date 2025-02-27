@@ -148,6 +148,51 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
                 required
               />
             </div>
+            
+            {/* Campos de contrato */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-contractStartDate">Fecha de inicio del contrato</Label>
+              <Input
+                id="edit-contractStartDate"
+                type="date"
+                value={editedVehicle.contractStartDate || ""}
+                onChange={(e) => setEditedVehicle({...editedVehicle, contractStartDate: e.target.value})}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-totalInstallments">Número total de cuotas</Label>
+              <Input
+                id="edit-totalInstallments"
+                type="number"
+                value={editedVehicle.totalInstallments || 0}
+                onChange={(e) => setEditedVehicle({...editedVehicle, totalInstallments: Number(e.target.value)})}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-installmentAmount">Monto por cuota (Bs)</Label>
+              <Input
+                id="edit-installmentAmount"
+                type="number"
+                value={editedVehicle.installmentAmount || 0}
+                onChange={(e) => setEditedVehicle({...editedVehicle, installmentAmount: Number(e.target.value)})}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-paidInstallments">Cuotas pagadas</Label>
+              <Input
+                id="edit-paidInstallments"
+                type="number"
+                value={editedVehicle.paidInstallments || 0}
+                onChange={(e) => setEditedVehicle({...editedVehicle, paidInstallments: Number(e.target.value)})}
+                required
+              />
+            </div>
 
             {/* Selector de Inversionista */}
             <div className="space-y-2 col-span-2">
