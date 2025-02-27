@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Vehicle, Maintenance } from "@/types";
 import { VehiclesHeader } from "./components/VehiclesHeader";
 import { VehicleList } from "./components/VehicleList";
@@ -11,7 +11,7 @@ import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
 
 const VehiclesPage = () => {
-  const { updateVehicle, vehicles } = useApp();
+  const { updateVehicle, deleteVehicle, vehicles } = useApp();
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -19,7 +19,14 @@ const VehiclesPage = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   const handleDelete = (vehicleId: string) => {
-    updateVehicle(vehicleId, { status: "inactive" });
+    // Si existe la función deleteVehicle en el contexto, usarla
+    if (typeof deleteVehicle === 'function') {
+      deleteVehicle(vehicleId);
+    } else {
+      // Si no existe, marcar como inactivo
+      updateVehicle(vehicleId, { status: "inactive" });
+    }
+    
     setDeletingVehicle(null);
     toast({
       title: "Vehículo eliminado",
@@ -72,11 +79,23 @@ const VehiclesPage = () => {
     <div className="w-full py-3 space-y-4 zoom-safe custom-scrollbar">
       <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
       
-      <VehicleList
-        onEdit={setEditingVehicle}
-        onDelete={setDeletingVehicle}
-        onShowDetails={setSelectedVehicle}
-      />
+      {vehicles && vehicles.length > 0 ? (
+        <VehicleList
+          onEdit={setEditingVehicle}
+          onDelete={setDeletingVehicle}
+          onShowDetails={setSelectedVehicle}
+        />
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-muted-foreground">No hay vehículos registrados</p>
+          <button 
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90" 
+            onClick={() => setShowAddDialog(true)}
+          >
+            Agregar vehículo
+          </button>
+        </div>
+      )}
 
       <AddVehicleDialog
         isOpen={showAddDialog}

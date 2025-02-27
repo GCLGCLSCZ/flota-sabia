@@ -6,15 +6,28 @@ import { BadgeInfo, Car, Edit, Trash2 } from "lucide-react";
 import { format, differenceInDays, isAfter, isSunday, parseISO } from "date-fns";
 import { useApp } from "@/context/AppContext";
 
-const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
+interface VehicleCardProps {
+  vehicle: Vehicle;
+  onEdit: () => void;
+  onDelete: () => void;
+  onShowDetails: () => void;
+}
+
+const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }: VehicleCardProps) => {
   const { payments } = useApp();
+  
+  if (!vehicle) {
+    console.error("Vehicle card received null or undefined vehicle");
+    return null;
+  }
+  
   const isActive = vehicle.status === "active";
   const cardClass = isActive
     ? "border-l-4 border-l-primary"
     : "border-l-4 border-l-muted opacity-70";
 
   // Obtener los pagos realizados a este vehículo
-  const vehiclePayments = payments.filter(p => p.vehicleId === vehicle.id);
+  const vehiclePayments = payments?.filter(p => p.vehicleId === vehicle.id) || [];
   
   // Calcular el total pagado desde los pagos registrados
   const totalPaidFromPayments = vehiclePayments
@@ -81,7 +94,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     return Math.max(0, expectedInstallments - paidInstallments);
   };
   
-  const overdueInstallments = calculateOverdueInstallments();
+  const overdueInstallments = vehicle.contractStartDate ? calculateOverdueInstallments() : 0;
 
   return (
     <Card className={`${cardClass} dark:bg-gray-800 dark:text-white dark:border-gray-700`}>
