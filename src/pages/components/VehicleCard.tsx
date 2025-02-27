@@ -40,6 +40,9 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   
   // Usar el valor calculado para el total pagado
   const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
+
+  // Calcular la ganancia total de la empresa basada en la comisión diaria
+  const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
   
   // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
   const calculateOverdueInstallments = () => {
@@ -112,9 +115,24 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Ganancia empresa
+            </p>
+            <p className="font-medium text-success">{companyEarnings} Bs</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
               Cuota diaria
             </p>
             <p className="font-medium">{installmentAmount} Bs</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Total pagado
+            </p>
+            <p className="font-medium">{totalPaid} Bs</p>
           </div>
         </div>
         
@@ -135,23 +153,12 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
         
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Total pagado</p>
-            <p className="font-medium">{totalPaid} Bs</p>
-          </div>
-          <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
               Deuda actual
             </p>
             <p className={`font-medium ${overdueInstallments > 0 ? "text-destructive" : ""}`}>
               {(overdueInstallments * installmentAmount).toFixed(0)} Bs
             </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Pagos registrados</p>
-            <p className="font-medium">{vehiclePayments.length}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
