@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useApp } from "@/context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { format, parse, parseISO, startOfMonth, endOfMonth, isSunday, subMonths, isWithinInterval, isAfter, isBefore, isSameMonth } from "date-fns";
@@ -17,6 +17,501 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import "./settlement-print.css";
 
+// Componentes más pequeños para mejorar la legibilidad y rendimiento
+const ContractSummary = ({ totals, settlementData }) => (
+  <Card className="print:shadow-none print:border-0">
+    <CardHeader className="print:pb-2">
+      <CardTitle className="text-lg flex items-center gap-2">
+        <FileText className="h-5 w-5" />
+        Resumen Contractual
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-3 border rounded-lg bg-muted/20">
+          <p className="text-sm text-muted-foreground">Monto Total Contrato</p>
+          <p className="text-lg font-bold">{totals.contractTotalAmount.toFixed(2)} Bs</p>
+        </div>
+        <div className="p-3 border rounded-lg bg-muted/20">
+          <p className="text-sm text-muted-foreground">Total Pagado Hasta la Fecha</p>
+          <p className="text-lg font-bold">{totals.totalPaid.toFixed(2)} Bs</p>
+        </div>
+        <div className="p-3 border rounded-lg bg-muted/20">
+          <p className="text-sm text-muted-foreground">Saldo Pendiente Total</p>
+          <p className="text-lg font-bold">{(totals.contractTotalAmount - totals.totalPaid).toFixed(2)} Bs</p>
+        </div>
+        <div className="p-3 border rounded-lg bg-muted/20">
+          <p className="text-sm text-muted-foreground">Porcentaje Completado</p>
+          <p className="text-lg font-bold">
+            {totals.contractTotalAmount > 0 
+              ? Math.round((totals.totalPaid / totals.contractTotalAmount) * 100) 
+              : 0}%
+          </p>
+        </div>
+      </div>
+      
+      {/* Tabla de Resumen por Vehículo */}
+      <div className="mt-4 overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vehículo</TableHead>
+              <TableHead className="text-right">Total Cuotas</TableHead>
+              <TableHead className="text-right">Cuotas Pagadas</TableHead>
+              <TableHead className="text-right">Cuotas Restantes</TableHead>
+              <TableHead className="text-right">Total Pagado</TableHead>
+              <TableHead className="text-right">Saldo Pendiente</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {settlementData.map((item) => (
+              <TableRow key={`contract-${item.vehicleId}`}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <Car className="h-4 w-4" />
+                    <div>
+                      <div>{item.plate}</div>
+                      <div className="text-xs text-muted-foreground">{item.model}</div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">{Math.round(item.contractTotalAmount / item.dailyRate)}</TableCell>
+                <TableCell className="text-right">{item.paidInstallments}</TableCell>
+                <TableCell className="text-right">{item.remainingInstallments}</TableCell>
+                <TableCell className="text-right">{item.totalPaid.toFixed(2)} Bs</TableCell>
+                <TableCell className="text-right">{(item.contractTotalAmount - item.totalPaid).toFixed(2)} Bs</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const SettlementDetails = ({ settlementData, totals }) => (
+  <Card className="print:shadow-none print:border-0">
+    <CardHeader className="print:pb-2">
+      <CardTitle className="text-lg flex items-center gap-2">
+        <FileText className="h-5 w-5" />
+        Detalle de Rendición por Vehículo
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {settlementData.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vehículo</TableHead>
+              <TableHead className="text-right">Días Trabajados</TableHead>
+              <TableHead className="text-right">Cuota Diaria</TableHead>
+              <TableHead className="text-right">Total Generado</TableHead>
+              <TableHead className="text-right">Comisión Adm.</TableHead>
+              <TableHead className="text-right">Total Comisión</TableHead>
+              <TableHead className="text-right">Costo GPS</TableHead>
+              <TableHead className="text-right">Descuentos</TableHead>
+              <TableHead className="text-right">Monto Neto</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {settlementData.map((item) => (
+              <TableRow key={item.vehicleId}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <Car className="h-4 w-4" />
+                    <div>
+                      <div>{item.plate}</div>
+                      <div className="text-xs text-muted-foreground">{item.model}</div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">{item.workingDays}</TableCell>
+                <TableCell className="text-right">{item.dailyRate} Bs</TableCell>
+                <TableCell className="text-right">{item.totalGenerated.toFixed(2)} Bs</TableCell>
+                <TableCell className="text-right">{item.adminFee} Bs</TableCell>
+                <TableCell className="text-right">{item.adminTotal.toFixed(2)} Bs</TableCell>
+                <TableCell className="text-right text-orange-600">{item.gpsFee.toFixed(2)} Bs</TableCell>
+                <TableCell className="text-right text-orange-600">
+                  {(item.totalDiscounts + item.maintenanceCosts + item.cardexCosts) > 0 
+                    ? `${(item.totalDiscounts + item.maintenanceCosts + item.cardexCosts).toFixed(2)} Bs` 
+                    : "-"}
+                </TableCell>
+                <TableCell className="text-right font-medium">{item.netAmount.toFixed(2)} Bs</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="bg-muted/50">
+              <TableCell colSpan={3} className="font-bold">TOTALES</TableCell>
+              <TableCell className="text-right font-bold">{totals.totalGenerated.toFixed(2)} Bs</TableCell>
+              <TableCell className="text-right"></TableCell>
+              <TableCell className="text-right font-bold">{totals.adminTotal.toFixed(2)} Bs</TableCell>
+              <TableCell className="text-right font-bold text-orange-600">{totals.gpsFeeTotal.toFixed(2)} Bs</TableCell>
+              <TableCell className="text-right font-bold text-orange-600">
+                {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs
+              </TableCell>
+              <TableCell className="text-right font-bold">{totals.netAmount.toFixed(2)} Bs</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center py-6">
+          <p className="text-muted-foreground">No hay vehículos registrados para este inversionista en el período seleccionado.</p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+);
+
+const MaintenanceDetails = ({ settlementData, totals }) => {
+  if (!settlementData.some(item => (item.maintenance && item.maintenance.length > 0) || (item.cardexItems && item.cardexItems.length > 0))) {
+    return null;
+  }
+  
+  return (
+    <Card className="print:shadow-none print:border-0">
+      <CardHeader className="print:pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Wrench className="h-5 w-5 text-orange-500" />
+          Detalle de Mantenimientos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vehículo</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead className="text-right">Costo</TableHead>
+              <TableHead className="text-right">Precio de Venta</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* Mantenimientos regulares */}
+            {settlementData.map((item) => (
+              item.maintenance && item.maintenance.map((maintenance) => (
+                <TableRow key={`maintenance-${item.vehicleId}-${maintenance.id}`}>
+                  <TableCell className="font-medium">{item.plate}</TableCell>
+                  <TableCell>
+                    <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs">
+                      Mantenimiento
+                    </span>
+                  </TableCell>
+                  <TableCell>{maintenance.description}</TableCell>
+                  <TableCell>{format(new Date(maintenance.date), "dd/MM/yyyy")}</TableCell>
+                  <TableCell className="text-right">{maintenance.cost.toFixed(2)} Bs</TableCell>
+                  <TableCell className="text-right text-orange-600">{maintenance.salePrice.toFixed(2)} Bs</TableCell>
+                </TableRow>
+              ))
+            ))}
+            
+            {/* Items de cardex */}
+            {settlementData.map((item) => (
+              item.cardexItems && item.cardexItems.map((cardexItem) => (
+                <TableRow key={`cardex-${item.vehicleId}-${cardexItem.id}`}>
+                  <TableCell className="font-medium">{item.plate}</TableCell>
+                  <TableCell>
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                      {cardexItem.type === "oil_change" ? "Cambio de Aceite" :
+                       cardexItem.type === "filter_change" ? "Cambio de Filtros" :
+                       cardexItem.type === "spark_plugs" ? "Bujías" :
+                       cardexItem.type === "battery" ? "Batería" : "Otro"}
+                    </span>
+                  </TableCell>
+                  <TableCell>{cardexItem.description}</TableCell>
+                  <TableCell>{format(new Date(cardexItem.date), "dd/MM/yyyy")}</TableCell>
+                  <TableCell className="text-right text-orange-600">{cardexItem.cost.toFixed(2)} Bs</TableCell>
+                  <TableCell className="text-right">-</TableCell>
+                </TableRow>
+              ))
+            ))}
+            
+            {/* Fila de totales */}
+            <TableRow className="bg-muted/50">
+              <TableCell colSpan={5} className="font-bold">TOTAL MANTENIMIENTOS (Aplicado a rendición)</TableCell>
+              <TableCell className="text-right font-bold text-orange-600">
+                {(totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+const DiscountDetails = ({ settlementData, totals }) => {
+  if (!settlementData.some(item => item.discounts && item.discounts.length > 0)) {
+    return null;
+  }
+  
+  return (
+    <Card className="print:shadow-none print:border-0">
+      <CardHeader className="print:pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-orange-500" />
+          Detalle de Descuentos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vehículo</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {settlementData.map((item) => (
+              item.discounts && item.discounts.map((discount) => (
+                <TableRow key={`${item.vehicleId}-${discount.id}`}>
+                  <TableCell className="font-medium">{item.plate}</TableCell>
+                  <TableCell>{discount.description}</TableCell>
+                  <TableCell>
+                    {discount.type === "insurance" ? "Seguro" :
+                     discount.type === "repair" ? "Reparación" :
+                     discount.type === "maintenance" ? "Mantenimiento" : "Otro"}
+                  </TableCell>
+                  <TableCell>{format(new Date(discount.date), "dd/MM/yyyy")}</TableCell>
+                  <TableCell className="text-right text-orange-600">{discount.amount.toFixed(2)} Bs</TableCell>
+                </TableRow>
+              ))
+            ))}
+            
+            {/* Fila de totales */}
+            <TableRow className="bg-muted/50">
+              <TableCell colSpan={4} className="font-bold">TOTAL DESCUENTOS</TableCell>
+              <TableCell className="text-right font-bold text-orange-600">
+                {totals.totalDiscounts.toFixed(2)} Bs
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+const PaymentSummary = ({ 
+  totals, 
+  settlementData, 
+  openPaymentDialog, 
+  handleEditPayment, 
+  handleDeletePayment, 
+  settings, 
+  investor,
+  selectedMonth 
+}) => {
+  return (
+    <Card className="print:shadow-none print:border-0">
+      <CardHeader className="print:pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Resumen de Pagos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-4 border rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">Total a pagar</p>
+            <p className="text-2xl font-bold">{totals.netAmount.toFixed(2)} Bs</p>
+            <div className="mt-2 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Subtotal antes de GPS:</span>
+                <span>{totals.netAmountBeforeGps.toFixed(2)} Bs</span>
+              </div>
+              <div className="flex justify-between text-orange-600">
+                <span>Descuento GPS:</span>
+                <span>-{totals.gpsFeeTotal.toFixed(2)} Bs</span>
+              </div>
+              {totals.totalDiscounts > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>Descuentos:</span>
+                  <span>-{totals.totalDiscounts.toFixed(2)} Bs</span>
+                </div>
+              )}
+              {(totals.maintenanceCosts + totals.cardexCosts) > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>Mantenimientos:</span>
+                  <span>-{(totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="p-4 border rounded-lg bg-muted/30">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">Pagado</p>
+                <p className={`text-2xl font-bold ${totals.paidToInvestor > 0 ? 'text-green-600' : ''}`}>
+                  {totals.paidToInvestor.toFixed(2)} Bs
+                </p>
+              </div>
+            </div>
+            
+            {/* Lista de pagos registrados para este período */}
+            {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs font-medium">Pagos registrados:</p>
+                {settlementData[0].periodPayments.map(payment => (
+                  <div key={payment.id} className="text-xs border-b pb-2 last:border-0">
+                    <div className="flex justify-between mb-0.5">
+                      <span className="font-medium">
+                        {format(new Date(payment.date), "dd/MM/yyyy")}
+                      </span>
+                      <span className={payment.status === "analysing" ? "text-amber-600" : "text-green-600"}>
+                        {payment.amount.toFixed(2)} Bs
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>
+                        {payment.transferNumber 
+                          ? `Trans. #${payment.transferNumber}`
+                          : "Efectivo"}
+                      </span>
+                      <span className="print:hidden">
+                        <button 
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                          onClick={() => handleEditPayment(payment)}
+                        >
+                          <Edit className="h-3 w-3 inline" />
+                        </button>
+                        <button 
+                          className="text-red-600 hover:text-red-800"
+                          onClick={() => handleDeletePayment(payment.id)}
+                        >
+                          <Trash2 className="h-3 w-3 inline" />
+                        </button>
+                      </span>
+                    </div>
+                    <div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        payment.status === "completed" 
+                          ? "bg-green-100 text-green-800" 
+                          : payment.status === "analysing"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-gray-100"
+                      }`}>
+                        {payment.status === "completed" 
+                          ? "Completado" 
+                          : payment.status === "analysing"
+                            ? "En análisis"
+                            : "Pendiente"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {totals.analysingPayments > 0 && (
+              <div className="mt-2 bg-amber-50 p-1.5 rounded text-xs text-amber-700">
+                <p>Hay {totals.analysingPayments.toFixed(2)} Bs en pagos actualmente en análisis</p>
+              </div>
+            )}
+            
+            <div className="mt-3 print:hidden">
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="w-full text-xs"
+                onClick={openPaymentDialog}
+              >
+                <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 
+                  ? "Registrar otro pago" 
+                  : "Registrar pago"}
+              </Button>
+            </div>
+          </div>
+          <div className="p-4 border rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">Pendiente</p>
+            <p className={`text-2xl font-bold ${totals.pendingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {totals.pendingAmount.toFixed(2)} Bs
+            </p>
+            
+            {totals.analysingPayments > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground">Si se confirman los pagos en análisis:</p>
+                <p className={`text-base font-medium ${
+                  (totals.pendingAmount - totals.analysingPayments) > 0 
+                    ? 'text-red-600' 
+                    : 'text-green-600'
+                }`}>
+                  {(totals.pendingAmount - totals.analysingPayments).toFixed(2)} Bs
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="mt-6">
+          <h3 className="text-base font-medium mb-2">Nota:</h3>
+          <p className="text-sm text-muted-foreground">
+            Esta rendición corresponde al período del{" "}
+            {format(startOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM", { locale: es })} al{" "}
+            {format(endOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM 'de' yyyy", { locale: es })}.
+            El pago debe realizarse entre el 10 y 20 del mes siguiente al período reportado.
+          </p>
+          <div className="flex gap-1 mt-2 text-sm text-muted-foreground items-center">
+            <Wifi className="h-4 w-4 text-orange-600" />
+            <span>Se ha aplicado un descuento de {settings?.gpsMonthlyFee || 120} Bs por servicio de GPS a cada vehículo.</span>
+          </div>
+          {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts) > 0 && (
+            <div className="flex gap-1 mt-1 text-sm text-muted-foreground items-center">
+              <InfoIcon className="h-4 w-4 text-orange-600" />
+              <span>
+                Se han aplicado descuentos adicionales y costos de mantenimiento por un total de{" "}
+                {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs 
+                (detalles en las tablas de descuentos y mantenimientos).
+              </span>
+            </div>
+          )}
+        </div>
+        
+        {/* Datos del inversor */}
+        <div className="mt-4 p-4 border rounded-lg bg-muted/20">
+          <h3 className="text-base font-medium mb-2">Datos del Inversor</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm"><span className="font-medium">Nombre:</span> {investor.name}</p>
+              <p className="text-sm"><span className="font-medium">Contacto:</span> {investor.contact}</p>
+              <p className="text-sm"><span className="font-medium">Documento:</span> {investor.documentId}</p>
+            </div>
+            <div>
+              {investor.bankName && (
+                <p className="text-sm"><span className="font-medium">Banco:</span> {investor.bankName}</p>
+              )}
+              {investor.bankAccount && (
+                <p className="text-sm"><span className="font-medium">Cuenta:</span> {investor.bankAccount}</p>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-8 print:block hidden">
+          <div className="grid grid-cols-2 gap-16">
+            <div className="text-center">
+              <div className="border-t pt-4 mt-16">
+                <p className="font-medium">Firma del Administrador</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="border-t pt-4 mt-16">
+                <p className="font-medium">Firma del Inversionista</p>
+                <p className="text-sm text-muted-foreground mt-1">{investor.name}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Componente principal pero optimizado
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -72,7 +567,7 @@ const InvestorSettlement = () => {
   }, [investor, vehicles]);
   
   // Función para calcular los días trabajados en el mes seleccionado (excluyendo domingos y días no trabajados)
-  const calculateWorkingDays = (vehicle: Vehicle, monthStr: string) => {
+  const calculateWorkingDays = useCallback((vehicle: Vehicle, monthStr: string) => {
     // Parsear el mes seleccionado
     const selectedDate = parse(monthStr, "yyyy-MM", new Date());
     const monthStart = startOfMonth(selectedDate);
@@ -108,7 +603,7 @@ const InvestorSettlement = () => {
     }
     
     return workingDaysCount;
-  };
+  }, []);
   
   // Obtener los últimos 12 meses para el selector
   const months = useMemo(() => {
@@ -127,7 +622,7 @@ const InvestorSettlement = () => {
   }, []);
   
   // Verificar si un descuento aplica al mes seleccionado
-  const discountAppliesForMonth = (discount: Discount, monthStr: string) => {
+  const discountAppliesForMonth = useCallback((discount: Discount, monthStr: string) => {
     const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
     
     // Si el descuento especifica directamente el mes
@@ -175,10 +670,10 @@ const InvestorSettlement = () => {
     }
     
     return false;
-  };
+  }, []);
   
   // Filtrar mantenimientos y cardex para el mes seleccionado
-  const getMaintenanceForMonth = (vehicle: Vehicle, monthStr: string) => {
+  const getMaintenanceForMonth = useCallback((vehicle: Vehicle, monthStr: string) => {
     if (!vehicle.maintenanceHistory) return [];
     
     const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
@@ -189,9 +684,9 @@ const InvestorSettlement = () => {
       const maintenanceDate = parseISO(maintenance.date);
       return isWithinInterval(maintenanceDate, { start: monthStart, end: monthEnd });
     });
-  };
+  }, []);
   
-  const getCardexItemsForMonth = (vehicle: Vehicle, monthStr: string) => {
+  const getCardexItemsForMonth = useCallback((vehicle: Vehicle, monthStr: string) => {
     if (!vehicle.cardex) return [];
     
     const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
@@ -202,10 +697,10 @@ const InvestorSettlement = () => {
       const itemDate = parseISO(item.date);
       return isWithinInterval(itemDate, { start: monthStart, end: monthEnd });
     });
-  };
+  }, []);
 
   // Calcular las cuotas pagadas hasta el mes seleccionado
-  const calculatePaidInstallments = (vehicle: Vehicle, monthStr: string) => {
+  const calculatePaidInstallments = useCallback((vehicle: Vehicle, monthStr: string) => {
     const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
     const monthEnd = endOfMonth(selectedMonthDate);
     
@@ -222,13 +717,11 @@ const InvestorSettlement = () => {
     return vehicle.installmentAmount ? 
       Math.floor(paidUntilMonth / vehicle.installmentAmount) : 
       vehicle.paidInstallments || 0;
-  };
+  }, [payments]);
   
-  // Calcular la rendición de cuentas para el mes seleccionado
+  // Calcular la rendición de cuentas para el mes seleccionado - estamos haciendo memoización de funciones más pequeñas
   const settlementData = useMemo(() => {
     // Añadido forceUpdate para que el memo se ejecute cuando cambie
-    console.log("Recalculando settlement data, forceUpdate:", forceUpdate);
-    
     if (!investorVehicles.length) return [];
     
     // Usar el valor de configuración para el costo de GPS
@@ -281,8 +774,6 @@ const InvestorSettlement = () => {
            (p.concept.includes(vehicle.plate) && p.concept.toLowerCase().includes("inversionista"))) &&
           isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })
         );
-      
-      console.log("Period payments for vehicle", vehicle.plate, ":", periodPayments);
       
       // Solo se considera como pagado lo que tiene status "completed"
       const paidToInvestor = periodPayments
@@ -337,7 +828,19 @@ const InvestorSettlement = () => {
         contractTotalAmount: (vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0),
       };
     });
-  }, [investorVehicles, selectedMonth, payments, settings, forceUpdate, investor?.name]);
+  }, [
+    investorVehicles, 
+    selectedMonth, 
+    payments, 
+    settings, 
+    forceUpdate, 
+    investor?.name, 
+    calculateWorkingDays, 
+    discountAppliesForMonth, 
+    getMaintenanceForMonth, 
+    getCardexItemsForMonth, 
+    calculatePaidInstallments
+  ]);
   
   // Calcular totales
   const totals = useMemo(() => {
@@ -376,36 +879,13 @@ const InvestorSettlement = () => {
     });
   }, [settlementData]);
   
-  // Buscar el último pago realizado en este período
-  const latestPayment = useMemo(() => {
-    if (recentPaymentId) {
-      // Buscar el pago específico que acabamos de registrar o editar
-      return payments.find(p => p.id === recentPaymentId);
-    } else {
-      // Buscar pagos recientes para este período
-      const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
-      const monthStart = startOfMonth(selectedMonthDate);
-      const monthEnd = endOfMonth(selectedMonthDate);
-      
-      // Encontrar el pago más reciente
-      return payments
-        .filter(p => 
-          (p.status === "completed" || p.status === "analysing") && 
-          p.concept.toLowerCase().includes(`rendición`) &&
-          p.concept.toLowerCase().includes(format(monthStart, "MMMM yyyy", { locale: es }).toLowerCase()) &&
-          isWithinInterval(parseISO(p.date), { start: monthStart, end: new Date() })
-        )
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-    }
-  }, [payments, selectedMonth, recentPaymentId]);
-  
   // Manejar la impresión de la rendición
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     window.print();
-  };
+  }, []);
   
   // Iniciar edición de un pago existente
-  const handleEditPayment = (payment: Payment) => {
+  const handleEditPayment = useCallback((payment: Payment) => {
     setPaymentInfo({
       id: payment.id,
       date: payment.date,
@@ -416,16 +896,16 @@ const InvestorSettlement = () => {
     
     setIsEditingPayment(true);
     setShowPaymentDialog(true);
-  };
+  }, []);
   
   // Manejar la eliminación de un pago
-  const handleDeletePayment = (paymentId: string) => {
+  const handleDeletePayment = useCallback((paymentId: string) => {
     setPaymentToDelete(paymentId);
     setShowDeleteDialog(true);
-  };
+  }, []);
   
   // Confirmar la eliminación de un pago
-  const confirmDeletePayment = () => {
+  const confirmDeletePayment = useCallback(() => {
     if (paymentToDelete) {
       removePayment(paymentToDelete);
       setRecentPaymentId(null);
@@ -434,10 +914,10 @@ const InvestorSettlement = () => {
       setShowDeleteDialog(false);
       setPaymentToDelete(null);
     }
-  };
+  }, [paymentToDelete, removePayment]);
   
   // Manejar el registro o actualización de un pago
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = useCallback(() => {
     if (!investor) return;
     
     const monthLabel = format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM yyyy", { locale: es });
@@ -505,10 +985,21 @@ const InvestorSettlement = () => {
     
     setShowPaymentDialog(false);
     setIsEditingPayment(false);
-  };
+  }, [
+    investor, 
+    selectedMonth, 
+    isEditingPayment, 
+    paymentInfo, 
+    updatePayment, 
+    totals.netAmount, 
+    settlementData, 
+    addPayment, 
+    payments, 
+    toast
+  ]);
   
   // Abrir diálogo para registrar un pago
-  const openPaymentDialog = () => {
+  const openPaymentDialog = useCallback(() => {
     setPaymentInfo({
       id: "",
       date: format(new Date(), "yyyy-MM-dd"),
@@ -518,7 +1009,7 @@ const InvestorSettlement = () => {
     });
     setIsEditingPayment(false);
     setShowPaymentDialog(true);
-  };
+  }, [totals.pendingAmount, totals.netAmount]);
   
   if (!investor) {
     return (
@@ -591,472 +1082,21 @@ const InvestorSettlement = () => {
         </div>
       </div>
       
-      {/* Detalles del Contrato */}
-      <Card className="print:shadow-none print:border-0">
-        <CardHeader className="print:pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Resumen Contractual
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-3 border rounded-lg bg-muted/20">
-              <p className="text-sm text-muted-foreground">Monto Total Contrato</p>
-              <p className="text-lg font-bold">{totals.contractTotalAmount.toFixed(2)} Bs</p>
-            </div>
-            <div className="p-3 border rounded-lg bg-muted/20">
-              <p className="text-sm text-muted-foreground">Total Pagado Hasta la Fecha</p>
-              <p className="text-lg font-bold">{totals.totalPaid.toFixed(2)} Bs</p>
-            </div>
-            <div className="p-3 border rounded-lg bg-muted/20">
-              <p className="text-sm text-muted-foreground">Saldo Pendiente Total</p>
-              <p className="text-lg font-bold">{(totals.contractTotalAmount - totals.totalPaid).toFixed(2)} Bs</p>
-            </div>
-            <div className="p-3 border rounded-lg bg-muted/20">
-              <p className="text-sm text-muted-foreground">Porcentaje Completado</p>
-              <p className="text-lg font-bold">
-                {totals.contractTotalAmount > 0 
-                  ? Math.round((totals.totalPaid / totals.contractTotalAmount) * 100) 
-                  : 0}%
-              </p>
-            </div>
-          </div>
-          
-          {/* Tabla de Resumen por Vehículo */}
-          <div className="mt-4 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vehículo</TableHead>
-                  <TableHead className="text-right">Total Cuotas</TableHead>
-                  <TableHead className="text-right">Cuotas Pagadas</TableHead>
-                  <TableHead className="text-right">Cuotas Restantes</TableHead>
-                  <TableHead className="text-right">Total Pagado</TableHead>
-                  <TableHead className="text-right">Saldo Pendiente</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {settlementData.map((item) => (
-                  <TableRow key={`contract-${item.vehicleId}`}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        <div>
-                          <div>{item.plate}</div>
-                          <div className="text-xs text-muted-foreground">{item.model}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{Math.round(item.contractTotalAmount / item.dailyRate)}</TableCell>
-                    <TableCell className="text-right">{item.paidInstallments}</TableCell>
-                    <TableCell className="text-right">{item.remainingInstallments}</TableCell>
-                    <TableCell className="text-right">{item.totalPaid.toFixed(2)} Bs</TableCell>
-                    <TableCell className="text-right">{(item.contractTotalAmount - item.totalPaid).toFixed(2)} Bs</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="print:shadow-none print:border-0">
-        <CardHeader className="print:pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Detalle de Rendición por Vehículo
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {settlementData.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vehículo</TableHead>
-                  <TableHead className="text-right">Días Trabajados</TableHead>
-                  <TableHead className="text-right">Cuota Diaria</TableHead>
-                  <TableHead className="text-right">Total Generado</TableHead>
-                  <TableHead className="text-right">Comisión Adm.</TableHead>
-                  <TableHead className="text-right">Total Comisión</TableHead>
-                  <TableHead className="text-right">Costo GPS</TableHead>
-                  <TableHead className="text-right">Descuentos</TableHead>
-                  <TableHead className="text-right">Monto Neto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {settlementData.map((item) => (
-                  <TableRow key={item.vehicleId}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        <div>
-                          <div>{item.plate}</div>
-                          <div className="text-xs text-muted-foreground">{item.model}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{item.workingDays}</TableCell>
-                    <TableCell className="text-right">{item.dailyRate} Bs</TableCell>
-                    <TableCell className="text-right">{item.totalGenerated.toFixed(2)} Bs</TableCell>
-                    <TableCell className="text-right">{item.adminFee} Bs</TableCell>
-                    <TableCell className="text-right">{item.adminTotal.toFixed(2)} Bs</TableCell>
-                    <TableCell className="text-right text-orange-600">{item.gpsFee.toFixed(2)} Bs</TableCell>
-                    <TableCell className="text-right text-orange-600">
-                      {(item.totalDiscounts + item.maintenanceCosts + item.cardexCosts) > 0 
-                        ? `${(item.totalDiscounts + item.maintenanceCosts + item.cardexCosts).toFixed(2)} Bs` 
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{item.netAmount.toFixed(2)} Bs</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={3} className="font-bold">TOTALES</TableCell>
-                  <TableCell className="text-right font-bold">{totals.totalGenerated.toFixed(2)} Bs</TableCell>
-                  <TableCell className="text-right"></TableCell>
-                  <TableCell className="text-right font-bold">{totals.adminTotal.toFixed(2)} Bs</TableCell>
-                  <TableCell className="text-right font-bold text-orange-600">{totals.gpsFeeTotal.toFixed(2)} Bs</TableCell>
-                  <TableCell className="text-right font-bold text-orange-600">
-                    {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs
-                  </TableCell>
-                  <TableCell className="text-right font-bold">{totals.netAmount.toFixed(2)} Bs</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground">No hay vehículos registrados para este inversionista en el período seleccionado.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Detalles de mantenimiento */}
-      {settlementData.some(item => (item.maintenance && item.maintenance.length > 0) || (item.cardexItems && item.cardexItems.length > 0)) && (
-        <Card className="print:shadow-none print:border-0">
-          <CardHeader className="print:pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-orange-500" />
-              Detalle de Mantenimientos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vehículo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Costo</TableHead>
-                  <TableHead className="text-right">Precio de Venta</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Mantenimientos regulares */}
-                {settlementData.map((item) => (
-                  item.maintenance && item.maintenance.map((maintenance) => (
-                    <TableRow key={`maintenance-${item.vehicleId}-${maintenance.id}`}>
-                      <TableCell className="font-medium">{item.plate}</TableCell>
-                      <TableCell>
-                        <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs">
-                          Mantenimiento
-                        </span>
-                      </TableCell>
-                      <TableCell>{maintenance.description}</TableCell>
-                      <TableCell>{format(new Date(maintenance.date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-right">{maintenance.cost.toFixed(2)} Bs</TableCell>
-                      <TableCell className="text-right text-orange-600">{maintenance.salePrice.toFixed(2)} Bs</TableCell>
-                    </TableRow>
-                  ))
-                ))}
-                
-                {/* Items de cardex */}
-                {settlementData.map((item) => (
-                  item.cardexItems && item.cardexItems.map((cardexItem) => (
-                    <TableRow key={`cardex-${item.vehicleId}-${cardexItem.id}`}>
-                      <TableCell className="font-medium">{item.plate}</TableCell>
-                      <TableCell>
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                          {cardexItem.type === "oil_change" ? "Cambio de Aceite" :
-                           cardexItem.type === "filter_change" ? "Cambio de Filtros" :
-                           cardexItem.type === "spark_plugs" ? "Bujías" :
-                           cardexItem.type === "battery" ? "Batería" : "Otro"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{cardexItem.description}</TableCell>
-                      <TableCell>{format(new Date(cardexItem.date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-right text-orange-600">{cardexItem.cost.toFixed(2)} Bs</TableCell>
-                      <TableCell className="text-right">-</TableCell>
-                    </TableRow>
-                  ))
-                ))}
-                
-                {/* Fila de totales */}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={5} className="font-bold">TOTAL MANTENIMIENTOS (Aplicado a rendición)</TableCell>
-                  <TableCell className="text-right font-bold text-orange-600">
-                    {(totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Detalles de los descuentos */}
-      {settlementData.some(item => item.discounts && item.discounts.length > 0) && (
-        <Card className="print:shadow-none print:border-0">
-          <CardHeader className="print:pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Detalle de Descuentos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vehículo</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {settlementData.map((item) => (
-                  item.discounts && item.discounts.map((discount) => (
-                    <TableRow key={`${item.vehicleId}-${discount.id}`}>
-                      <TableCell className="font-medium">{item.plate}</TableCell>
-                      <TableCell>{discount.description}</TableCell>
-                      <TableCell>
-                        {discount.type === "insurance" ? "Seguro" :
-                         discount.type === "repair" ? "Reparación" :
-                         discount.type === "maintenance" ? "Mantenimiento" : "Otro"}
-                      </TableCell>
-                      <TableCell>{format(new Date(discount.date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-right text-orange-600">{discount.amount.toFixed(2)} Bs</TableCell>
-                    </TableRow>
-                  ))
-                ))}
-                
-                {/* Fila de totales */}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={4} className="font-bold">TOTAL DESCUENTOS</TableCell>
-                  <TableCell className="text-right font-bold text-orange-600">
-                    {totals.totalDiscounts.toFixed(2)} Bs
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-      
-      <Card className="print:shadow-none print:border-0">
-        <CardHeader className="print:pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Resumen de Pagos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <p className="text-sm text-muted-foreground">Total a pagar</p>
-              <p className="text-2xl font-bold">{totals.netAmount.toFixed(2)} Bs</p>
-              <div className="mt-2 text-xs text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Subtotal antes de GPS:</span>
-                  <span>{totals.netAmountBeforeGps.toFixed(2)} Bs</span>
-                </div>
-                <div className="flex justify-between text-orange-600">
-                  <span>Descuento GPS:</span>
-                  <span>-{totals.gpsFeeTotal.toFixed(2)} Bs</span>
-                </div>
-                {totals.totalDiscounts > 0 && (
-                  <div className="flex justify-between text-orange-600">
-                    <span>Descuentos:</span>
-                    <span>-{totals.totalDiscounts.toFixed(2)} Bs</span>
-                  </div>
-                )}
-                {(totals.maintenanceCosts + totals.cardexCosts) > 0 && (
-                  <div className="flex justify-between text-orange-600">
-                    <span>Mantenimientos:</span>
-                    <span>-{(totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pagado</p>
-                  <p className={`text-2xl font-bold ${totals.paidToInvestor > 0 ? 'text-green-600' : ''}`}>
-                    {totals.paidToInvestor.toFixed(2)} Bs
-                  </p>
-                </div>
-              </div>
-              
-              {/* Lista de pagos registrados para este período */}
-              {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs font-medium">Pagos registrados:</p>
-                  {settlementData[0].periodPayments.map(payment => (
-                    <div key={payment.id} className="text-xs border-b pb-2 last:border-0">
-                      <div className="flex justify-between mb-0.5">
-                        <span className="font-medium">
-                          {format(new Date(payment.date), "dd/MM/yyyy")}
-                        </span>
-                        <span className={payment.status === "analysing" ? "text-amber-600" : "text-green-600"}>
-                          {payment.amount.toFixed(2)} Bs
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>
-                          {payment.transferNumber 
-                            ? `Trans. #${payment.transferNumber}`
-                            : "Efectivo"}
-                        </span>
-                        <span className="print:hidden">
-                          <button 
-                            className="text-blue-600 hover:text-blue-800 mr-2"
-                            onClick={() => handleEditPayment(payment)}
-                          >
-                            <Edit className="h-3 w-3 inline" />
-                          </button>
-                          <button 
-                            className="text-red-600 hover:text-red-800"
-                            onClick={() => handleDeletePayment(payment.id)}
-                          >
-                            <Trash2 className="h-3 w-3 inline" />
-                          </button>
-                        </span>
-                      </div>
-                      <div>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                          payment.status === "completed" 
-                            ? "bg-green-100 text-green-800" 
-                            : payment.status === "analysing"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-gray-100"
-                        }`}>
-                          {payment.status === "completed" 
-                            ? "Completado" 
-                            : payment.status === "analysing"
-                              ? "En análisis"
-                              : "Pendiente"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {totals.analysingPayments > 0 && (
-                <div className="mt-2 bg-amber-50 p-1.5 rounded text-xs text-amber-700">
-                  <p>Hay {totals.analysingPayments.toFixed(2)} Bs en pagos actualmente en análisis</p>
-                </div>
-              )}
-              
-              <div className="mt-3 print:hidden">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="w-full text-xs"
-                  onClick={openPaymentDialog}
-                >
-                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                  {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 
-                    ? "Registrar otro pago" 
-                    : "Registrar pago"}
-                </Button>
-              </div>
-            </div>
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <p className="text-sm text-muted-foreground">Pendiente</p>
-              <p className={`text-2xl font-bold ${totals.pendingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {totals.pendingAmount.toFixed(2)} Bs
-              </p>
-              
-              {totals.analysingPayments > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs text-muted-foreground">Si se confirman los pagos en análisis:</p>
-                  <p className={`text-base font-medium ${
-                    (totals.pendingAmount - totals.analysingPayments) > 0 
-                      ? 'text-red-600' 
-                      : 'text-green-600'
-                  }`}>
-                    {(totals.pendingAmount - totals.analysingPayments).toFixed(2)} Bs
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="mt-6">
-            <h3 className="text-base font-medium mb-2">Nota:</h3>
-            <p className="text-sm text-muted-foreground">
-              Esta rendición corresponde al período del{" "}
-              {format(startOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM", { locale: es })} al{" "}
-              {format(endOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM 'de' yyyy", { locale: es })}.
-              El pago debe realizarse entre el 10 y 20 del mes siguiente al período reportado.
-            </p>
-            <div className="flex gap-1 mt-2 text-sm text-muted-foreground items-center">
-              <Wifi className="h-4 w-4 text-orange-600" />
-              <span>Se ha aplicado un descuento de {settings?.gpsMonthlyFee || 120} Bs por servicio de GPS a cada vehículo.</span>
-            </div>
-            {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts) > 0 && (
-              <div className="flex gap-1 mt-1 text-sm text-muted-foreground items-center">
-                <InfoIcon className="h-4 w-4 text-orange-600" />
-                <span>
-                  Se han aplicado descuentos adicionales y costos de mantenimiento por un total de{" "}
-                  {(totals.totalDiscounts + totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs 
-                  (detalles en las tablas de descuentos y mantenimientos).
-                </span>
-              </div>
-            )}
-          </div>
-          
-          {/* Datos del inversor */}
-          <div className="mt-4 p-4 border rounded-lg bg-muted/20">
-            <h3 className="text-base font-medium mb-2">Datos del Inversor</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm"><span className="font-medium">Nombre:</span> {investor.name}</p>
-                <p className="text-sm"><span className="font-medium">Contacto:</span> {investor.contact}</p>
-                <p className="text-sm"><span className="font-medium">Documento:</span> {investor.documentId}</p>
-              </div>
-              <div>
-                {investor.bankName && (
-                  <p className="text-sm"><span className="font-medium">Banco:</span> {investor.bankName}</p>
-                )}
-                {investor.bankAccount && (
-                  <p className="text-sm"><span className="font-medium">Cuenta:</span> {investor.bankAccount}</p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8 print:block hidden">
-            <div className="grid grid-cols-2 gap-16">
-              <div className="text-center">
-                <div className="border-t pt-4 mt-16">
-                  <p className="font-medium">Firma del Administrador</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="border-t pt-4 mt-16">
-                  <p className="font-medium">Firma del Inversionista</p>
-                  <p className="text-sm text-muted-foreground mt-1">{investor.name}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Componentes más pequeños para mejorar rendimiento */}
+      <ContractSummary totals={totals} settlementData={settlementData} />
+      <SettlementDetails settlementData={settlementData} totals={totals} />
+      <MaintenanceDetails settlementData={settlementData} totals={totals} />
+      <DiscountDetails settlementData={settlementData} totals={totals} />
+      <PaymentSummary 
+        totals={totals} 
+        settlementData={settlementData}
+        openPaymentDialog={openPaymentDialog}
+        handleEditPayment={handleEditPayment}
+        handleDeletePayment={handleDeletePayment}
+        settings={settings}
+        investor={investor}
+        selectedMonth={selectedMonth}
+      />
 
       {/* Modal de Registro o Edición de Pago */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
