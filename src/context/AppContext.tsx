@@ -1,6 +1,6 @@
 
 import { createContext, useContext, ReactNode } from "react";
-import { Vehicle, Payment, Investor, Driver } from "@/types";
+import { Vehicle, Payment, Investor, Driver, SystemSettings } from "@/types";
 import { STORAGE_KEYS } from "./storage";
 import { validateVehicleData, validateInvestorData, validateDriverData } from "./validators";
 import { useCRUD } from "./hooks/useCRUD";
@@ -14,6 +14,8 @@ interface AppContextType {
   setInvestors: (investors: Investor[]) => void;
   drivers: Driver[];
   setDrivers: (drivers: Driver[]) => void;
+  settings: SystemSettings;
+  updateSettings: (settings: Partial<SystemSettings>) => void;
   addVehicle: (vehicle: Omit<Vehicle, "id">) => boolean;
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   addPayment: (payment: Omit<Payment, "id">) => boolean;
@@ -28,6 +30,14 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Definir la configuración por defecto del sistema
+const DEFAULT_SETTINGS: SystemSettings = {
+  gpsMonthlyFee: 120,
+  currency: "bs",
+  dateFormat: "dd/MM/yyyy",
+  timezone: "la_paz"
+};
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const {
@@ -69,6 +79,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     validator: validateDriverData
   });
 
+  // Gestión de la configuración del sistema
+  const {
+    items: settingsArray,
+    setItems: setSettingsArray,
+  } = useCRUD<SystemSettings>({
+    storageKey: 'settings'
+  });
+
+  // Asegurarse de que siempre haya una configuración disponible
+  const settings = settingsArray.length > 0 ? settingsArray[0] : DEFAULT_SETTINGS;
+
+  // Función para actualizar la configuración
+  const updateSettings = (newSettings: Partial<SystemSettings>) => {
+    const updatedSettings = { ...settings, ...newSettings };
+    if (settingsArray.length > 0) {
+      setSettingsArray([updatedSettings]);
+    } else {
+      setSettingsArray([updatedSettings]);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -80,6 +111,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setInvestors,
         drivers,
         setDrivers,
+        settings,
+        updateSettings,
         addVehicle,
         updateVehicle,
         addPayment,

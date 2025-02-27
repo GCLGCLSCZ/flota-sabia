@@ -1,34 +1,41 @@
 
-import { Settings as SettingsIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { NotificationSettings } from "./components/NotificationSettings";
 import { SystemSettings } from "./components/SystemSettings";
-import { useAuth } from "@/context/AuthContext";
 
 const Settings = () => {
-  const { hasPermission } = useAuth();
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <SettingsIcon className="w-6 h-6" />
-          Configuración
-        </h1>
+        <h1 className="text-2xl font-semibold">Configuración</h1>
         <p className="text-muted-foreground mt-1">
-          Gestiona las configuraciones de tu cuenta y del sistema
+          Administra las configuraciones de tu cuenta y del sistema.
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-6">
+      <Tabs defaultValue="profile">
+        <TabsList className="w-full max-w-md">
+          <TabsTrigger value="profile" className="flex-1">
+            Perfil
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-1">
+            Notificaciones
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex-1">
+            Sistema
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile" className="mt-6">
           <ProfileSettings />
-          {hasPermission("edit", "settings") && <SystemSettings />}
-        </div>
-        <div>
+        </TabsContent>
+        <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
-        </div>
-      </div>
+        </TabsContent>
+        <TabsContent value="system" className="mt-6">
+          <SystemSettings />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

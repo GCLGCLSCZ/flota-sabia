@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -10,8 +11,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Settings2, Database, CloudCog } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
+import { useApp } from "@/context/AppContext";
 
 export const SystemSettings = () => {
+  const { settings, updateSettings } = useApp();
+  const { toast } = useToast();
+  const [gpsMonthlyFee, setGpsMonthlyFee] = useState(settings?.gpsMonthlyFee || 120);
+
+  const handleSaveSettings = () => {
+    updateSettings({
+      ...settings,
+      gpsMonthlyFee
+    });
+    
+    toast({
+      title: "Configuración actualizada",
+      description: "Los cambios han sido guardados correctamente.",
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -21,6 +41,19 @@ export const SystemSettings = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="gpsMonthlyFee">Costo Mensual de GPS (Bs)</Label>
+          <Input
+            id="gpsMonthlyFee"
+            type="number"
+            value={gpsMonthlyFee}
+            onChange={(e) => setGpsMonthlyFee(Number(e.target.value))}
+          />
+          <p className="text-sm text-muted-foreground">
+            Este valor se descontará de la rendición mensual de cada vehículo
+          </p>
+        </div>
+
         <div className="space-y-2">
           <Label>Moneda Principal</Label>
           <Select defaultValue="bs">
@@ -78,6 +111,10 @@ export const SystemSettings = () => {
             </Button>
           </div>
         </div>
+
+        <Button onClick={handleSaveSettings} className="mt-4">
+          Guardar Configuración
+        </Button>
       </CardContent>
     </Card>
   );

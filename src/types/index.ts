@@ -1,27 +1,4 @@
 
-export interface Maintenance {
-  id: string;
-  date: string;
-  description: string;
-  costMaterials: number;
-  salePrice: number;
-  status: "pending" | "in-progress" | "completed";
-}
-
-export interface Driver {
-  id: string;
-  name: string;
-  phone: string;
-  documentId: string;
-  licenseNumber: string;
-  licenseExpiry: string;
-  address: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  status: "active" | "inactive";
-  vehicleId?: string;
-}
-
 export interface Vehicle {
   id: string;
   plate: string;
@@ -30,34 +7,35 @@ export interface Vehicle {
   year: string;
   status: "active" | "maintenance" | "inactive";
   investor: string;
-  lastMaintenance?: string;
-  nextMaintenance?: string;
-  maintenanceHistory?: Maintenance[];
-  daysNotWorked?: string[];
   dailyRate: number;
-  monthlyEarnings?: number;
   driverName: string;
   driverPhone: string;
   driverId?: string;
-  // Nuevos campos para el contrato
   contractStartDate?: string;
+  maintenanceHistory?: Maintenance[];
+  daysNotWorked?: string[];
   totalInstallments?: number;
   paidInstallments?: number;
   installmentAmount?: number;
   totalPaid?: number;
 }
 
+export interface Maintenance {
+  id: string;
+  date: string;
+  description: string;
+  cost: number;
+  status: "pending" | "completed" | "cancelled";
+}
+
 export interface Payment {
   id: string;
-  vehicleId: string;
-  amount: number;
   date: string;
+  amount: number;
   concept: string;
-  status: "pending" | "completed" | "cancelled";
   paymentMethod: "cash" | "transfer";
-  receiptNumber: string;
-  bankName?: string;
-  transferNumber?: string;
+  status: "completed" | "pending" | "cancelled";
+  vehicleId: string;
 }
 
 export interface Investor {
@@ -65,54 +43,32 @@ export interface Investor {
   name: string;
   contact: string;
   documentId: string;
-  bankName?: string;
-  bankAccount: string;
   vehicleCount: number;
   status: "active" | "inactive";
+  bankName?: string;
+  bankAccount?: string;
   lastPayment: string;
   vehicles?: Vehicle[];
-  payments?: Payment[];
+  firstName?: string;
+  lastName?: string;
 }
 
-export interface User {
+export interface Driver {
   id: string;
   name: string;
-  email: string;
-  role: "admin" | "assistant";
-  company?: string;
-  status: "active" | "inactive";
-  lastLogin?: string;
+  ci: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  licenseNumber?: string;
+  licenseExpiry?: string;
+  status?: "active" | "inactive";
+  vehicles?: Vehicle[];
 }
 
-export type UserRole = "admin" | "assistant";
-
-export interface UserPermissions {
-  payments: {
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-    view: boolean;
-  };
-  vehicles: {
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-    view: boolean;
-  };
-  drivers: {
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-    view: boolean;
-  };
-  investors: {
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-    view: boolean;
-  };
-  settings: {
-    view: boolean;
-    edit: boolean;
-  };
+export interface SystemSettings {
+  gpsMonthlyFee: number;
+  currency: string;
+  dateFormat: string;
+  timezone: string;
 }

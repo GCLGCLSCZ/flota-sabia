@@ -8,14 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer } from "lucide-react";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi } from "lucide-react";
 import { Vehicle, Investor } from "@/types";
 import "./settlement-print.css";
 
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments } = useApp();
+  const { investors, vehicles, payments, settings } = useApp();
   
   // Primero definimos selectedMonth antes de usarlo
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -106,6 +106,9 @@ const InvestorSettlement = () => {
   const settlementData = useMemo(() => {
     if (!investorVehicles.length) return [];
     
+    // Usar el valor de configuración para el costo de GPS
+    const gpsMonthlyFee = settings?.gpsMonthlyFee || 120;
+    
     return investorVehicles.map(vehicle => {
       // Obtener los días trabajados en el mes
       const workingDays = calculateWorkingDays(vehicle, selectedMonth);
@@ -116,7 +119,10 @@ const InvestorSettlement = () => {
       
       const totalGenerated = workingDays * dailyRate;
       const adminTotal = workingDays * adminFee;
-      const netAmount = totalGenerated - adminTotal;
+      const netAmountBeforeGps = totalGenerated - adminTotal;
+      
+      // Aplicar descuento de GPS
+      const netAmount = netAmountBeforeGps - gpsMonthlyFee;
       
       // Verificar si hay pagos ya realizados al inversionista en este período
       const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
@@ -141,13 +147,15 @@ const InvestorSettlement = () => {
         totalGenerated,
         adminFee,
         adminTotal,
+        gpsFee: gpsMonthlyFee,
+        netAmountBeforeGps,
         netAmount,
         paidToInvestor,
         pendingAmount: netAmount - paidToInvestor,
         status: paidToInvestor >= netAmount ? "pagado" : "pendiente"
       };
     });
-  }, [investorVehicles, selectedMonth, payments]);
+  }, [investorVehicles, selectedMonth, payments, settings]);
   
   // Calcular totales
   const totals = useMemo(() => {
@@ -155,13 +163,17 @@ const InvestorSettlement = () => {
       return {
         totalGenerated: acc.totalGenerated + item.totalGenerated,
         adminTotal: acc.adminTotal + item.adminTotal,
+        gpsFeeTotal: acc.gpsFeeTotal + item.gpsFee,
+        netAmountBeforeGps: acc.netAmountBeforeGps + item.netAmountBeforeGps,
         netAmount: acc.netAmount + item.netAmount,
         paidToInvestor: acc.paidToInvestor + item.paidToInvestor,
         pendingAmount: acc.pendingAmount + item.pendingAmount
       };
     }, { 
       totalGenerated: 0, 
-      adminTotal: 0, 
+      adminTotal: 0,
+      gpsFeeTotal: 0,
+      netAmountBeforeGps: 0,
       netAmount: 0,
       paidToInvestor: 0,
       pendingAmount: 0
@@ -255,6 +267,7 @@ const InvestorSettlement = () => {
                   <TableHead className="text-right">Total Generado</TableHead>
                   <TableHead className="text-right">Comisión Adm.</TableHead>
                   <TableHead className="text-right">Total Comisión</TableHead>
+                  <TableHead className="text-right">Costo GPS</TableHead>
                   <TableHead className="text-right">Monto Neto</TableHead>
                 </TableRow>
               </TableHeader>
@@ -275,6 +288,7 @@ const InvestorSettlement = () => {
                     <TableCell className="text-right">{item.totalGenerated.toFixed(2)} Bs</TableCell>
                     <TableCell className="text-right">{item.adminFee} Bs</TableCell>
                     <TableCell className="text-right">{item.adminTotal.toFixed(2)} Bs</TableCell>
+                    <TableCell className="text-right text-orange-600">{item.gpsFee.toFixed(2)} Bs</TableCell>
                     <TableCell className="text-right font-medium">{item.netAmount.toFixed(2)} Bs</TableCell>
                   </TableRow>
                 ))}
@@ -283,6 +297,7 @@ const InvestorSettlement = () => {
                   <TableCell className="text-right font-bold">{totals.totalGenerated.toFixed(2)} Bs</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right font-bold">{totals.adminTotal.toFixed(2)} Bs</TableCell>
+                  <TableCell className="text-right font-bold text-orange-600">{totals.gpsFeeTotal.toFixed(2)} Bs</TableCell>
                   <TableCell className="text-right font-bold">{totals.netAmount.toFixed(2)} Bs</TableCell>
                 </TableRow>
               </TableBody>
@@ -307,6 +322,16 @@ const InvestorSettlement = () => {
             <div className="p-4 border rounded-lg bg-muted/30">
               <p className="text-sm text-muted-foreground">Total a pagar</p>
               <p className="text-2xl font-bold">{totals.netAmount.toFixed(2)} Bs</p>
+              <div className="mt-2 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Subtotal antes de GPS:</span>
+                  <span>{totals.netAmountBeforeGps.toFixed(2)} Bs</span>
+                </div>
+                <div className="flex justify-between text-orange-600">
+                  <span>Descuento GPS:</span>
+                  <span>-{totals.gpsFeeTotal.toFixed(2)} Bs</span>
+                </div>
+              </div>
             </div>
             <div className="p-4 border rounded-lg bg-muted/30">
               <p className="text-sm text-muted-foreground">Pagado</p>
@@ -329,6 +354,10 @@ const InvestorSettlement = () => {
               {format(startOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM", { locale: es })} al{" "}
               {format(endOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM 'de' yyyy", { locale: es })}.
               El pago debe realizarse entre el 10 y 20 del mes siguiente al período reportado.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
+              <Wifi className="h-4 w-4 text-orange-600" />
+              <span>Se ha aplicado un descuento de {settings?.gpsMonthlyFee || 120} Bs por servicio de GPS a cada vehículo.</span>
             </p>
           </div>
           
