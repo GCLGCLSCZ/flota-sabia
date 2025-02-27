@@ -212,8 +212,8 @@ const InvestorSettlement = () => {
       const maintenanceItems = getMaintenanceForMonth(vehicle, selectedMonth);
       const cardexItems = getCardexItemsForMonth(vehicle, selectedMonth);
       
-      // Total de costos de mantenimiento en el mes
-      const maintenanceCosts = maintenanceItems.reduce((sum, item) => sum + item.cost, 0);
+      // Total de costos de mantenimiento en el mes (USANDO EL PRECIO DE VENTA EN LUGAR DEL COSTO)
+      const maintenanceCosts = maintenanceItems.reduce((sum, item) => sum + item.salePrice, 0);
       
       // Total de costos de cardex en el mes
       const cardexCosts = cardexItems.reduce((sum, item) => sum + item.cost, 0);
@@ -446,6 +446,7 @@ const InvestorSettlement = () => {
                   <TableHead>Descripción</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Costo</TableHead>
+                  <TableHead className="text-right">Precio de Venta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -461,7 +462,8 @@ const InvestorSettlement = () => {
                       </TableCell>
                       <TableCell>{maintenance.description}</TableCell>
                       <TableCell>{format(new Date(maintenance.date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-right text-orange-600">{maintenance.cost.toFixed(2)} Bs</TableCell>
+                      <TableCell className="text-right">{maintenance.cost.toFixed(2)} Bs</TableCell>
+                      <TableCell className="text-right text-orange-600">{maintenance.salePrice.toFixed(2)} Bs</TableCell>
                     </TableRow>
                   ))
                 ))}
@@ -482,13 +484,14 @@ const InvestorSettlement = () => {
                       <TableCell>{cardexItem.description}</TableCell>
                       <TableCell>{format(new Date(cardexItem.date), "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-right text-orange-600">{cardexItem.cost.toFixed(2)} Bs</TableCell>
+                      <TableCell className="text-right">-</TableCell>
                     </TableRow>
                   ))
                 ))}
                 
                 {/* Fila de totales */}
                 <TableRow className="bg-muted/50">
-                  <TableCell colSpan={4} className="font-bold">TOTAL MANTENIMIENTOS</TableCell>
+                  <TableCell colSpan={5} className="font-bold">TOTAL MANTENIMIENTOS (Aplicado a rendición)</TableCell>
                   <TableCell className="text-right font-bold text-orange-600">
                     {(totals.maintenanceCosts + totals.cardexCosts).toFixed(2)} Bs
                   </TableCell>
