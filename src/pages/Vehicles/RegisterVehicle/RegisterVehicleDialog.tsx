@@ -90,6 +90,12 @@ export const RegisterVehicleDialog = ({
     });
   };
 
+  const handleDriverSelect = (id: string, name: string, phone: string) => {
+    setSelectedDriverId(id);
+    setSelectedDriverName(name);
+    setSelectedDriverPhone(phone);
+  };
+
   const handleFinish = () => {
     if (!selectedDriverId && !selectedDriverName) {
       toast({
@@ -156,11 +162,7 @@ export const RegisterVehicleDialog = ({
           {step === 3 && (
             <DriverStep
               selectedDriver={selectedDriverId}
-              onDriverSelect={(id, name, phone) => {
-                setSelectedDriverId(id);
-                setSelectedDriverName(name);
-                setSelectedDriverPhone(phone);
-              }}
+              onDriverSelect={handleDriverSelect}
               onNewDriver={handleNewDriver}
             />
           )}
