@@ -32,6 +32,9 @@ export interface Maintenance {
   costMaterials: number;
   salePrice: number;
   status: "pending" | "completed" | "cancelled";
+  type?: "mechanical" | "body_paint";
+  proformaNumber?: string;
+  isInsuranceCovered?: boolean;
 }
 
 export interface CardexItem {

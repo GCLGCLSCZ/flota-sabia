@@ -117,3 +117,33 @@
     overflow-wrap: break-word;
   }
 }
+
+/* Estilos personalizados para inputs y selects */
+select, textarea, .select-trigger, [role="combobox"] {
+  background-color: #F1F1F1 !important;
+}
+
+.dark select, .dark textarea, .dark .select-trigger, .dark [role="combobox"] {
+  background-color: #333 !important;
+}
+
+/* Estilos para dropdown menus */
+[role="menu"], .select-content {
+  background-color: #F1F1F1 !important;
+  border: 1px solid #E5E5E5;
+  z-index: 50;
+}
+
+.dark [role="menu"], .dark .select-content {
+  background-color: #333 !important;
+  border-color: #444;
+}
+
+/* Estilos para inputs de tipo checkbox y radio */
+input[type="checkbox"], input[type="radio"] {
+  background-color: #F1F1F1;
+}
+
+.dark input[type="checkbox"], .dark input[type="radio"] {
+  background-color: #333;
+}

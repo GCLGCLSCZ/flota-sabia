@@ -10,6 +10,7 @@ import { useApp } from "@/context/AppContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -26,6 +27,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     cost: 0,
     costMaterials: 0,
     salePrice: 0,
+    type: "mechanical",
+    proformaNumber: "",
+    isInsuranceCovered: false
   });
   
   const [newCardexItem, setNewCardexItem] = useState<Omit<CardexItem, "id" | "complete">>({
@@ -72,6 +76,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
       cost: 0,
       costMaterials: 0,
       salePrice: 0,
+      type: "mechanical",
+      proformaNumber: "",
+      isInsuranceCovered: false
     });
   };
   
@@ -261,7 +268,10 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="p-2 text-left">Fecha</th>
+                        <th className="p-2 text-left">Tipo</th>
                         <th className="p-2 text-left">Descripción</th>
+                        <th className="p-2 text-left">Proforma</th>
+                        <th className="p-2 text-left">Seguro</th>
                         <th className="p-2 text-left">Costo Mat.</th>
                         <th className="p-2 text-left">Costo Total</th>
                         <th className="p-2 text-left">Estado</th>
@@ -271,7 +281,13 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                       {vehicle.maintenanceHistory.map(maintenance => (
                         <tr key={maintenance.id} className="border-b border-muted/30">
                           <td className="p-2">{format(new Date(maintenance.date), "dd MMM yyyy", { locale: es })}</td>
+                          <td className="p-2">
+                            {maintenance.type === "mechanical" ? "Mecánica" : 
+                             maintenance.type === "body_paint" ? "Chapería y Pintura" : "General"}
+                          </td>
                           <td className="p-2">{maintenance.description}</td>
+                          <td className="p-2">{maintenance.proformaNumber || "-"}</td>
+                          <td className="p-2">{maintenance.isInsuranceCovered ? "Sí" : "No"}</td>
                           <td className="p-2">Bs {maintenance.costMaterials}</td>
                           <td className="p-2">Bs {maintenance.cost}</td>
                           <td className="p-2">{
@@ -303,21 +319,65 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                     />
                   </div>
                   <div>
-                    <label className="text-xs">Costo de Materiales (Bs)</label>
-                    <Input 
-                      type="number" 
-                      value={maintenance.costMaterials}
-                      onChange={(e) => setMaintenance({...maintenance, costMaterials: Number(e.target.value)})}
-                      className="w-full p-2 text-sm border rounded"
-                      required
-                    />
+                    <label className="text-xs">Tipo de Mantenimiento</label>
+                    <Select
+                      value={maintenance.type}
+                      onValueChange={(value: "mechanical" | "body_paint") => 
+                        setMaintenance({...maintenance, type: value})
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mechanical">Mecánica</SelectItem>
+                        <SelectItem value="body_paint">Chapería y Pintura</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs">Descripción</label>
                     <textarea 
                       value={maintenance.description}
                       onChange={(e) => setMaintenance({...maintenance, description: e.target.value})}
-                      className="w-full p-2 text-sm border rounded h-20"
+                      className="w-full p-2 text-sm border rounded h-20 bg-[#F1F1F1] dark:bg-zinc-800"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs">Número de Proforma</label>
+                    <Input 
+                      type="text" 
+                      value={maintenance.proformaNumber}
+                      onChange={(e) => setMaintenance({...maintenance, proformaNumber: e.target.value})}
+                      className="w-full p-2 text-sm border rounded"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2 mt-4">
+                      <Checkbox 
+                        id="isInsuranceCovered"
+                        checked={maintenance.isInsuranceCovered}
+                        onCheckedChange={(checked) => 
+                          setMaintenance({...maintenance, isInsuranceCovered: !!checked})
+                        }
+                        className="bg-[#F1F1F1] dark:bg-zinc-800"
+                      />
+                      <label 
+                        htmlFor="isInsuranceCovered" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Cubierto por Seguro
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs">Costo de Materiales (Bs)</label>
+                    <Input 
+                      type="number" 
+                      value={maintenance.costMaterials}
+                      onChange={(e) => setMaintenance({...maintenance, costMaterials: Number(e.target.value)})}
+                      className="w-full p-2 text-sm border rounded"
                       required
                     />
                   </div>
