@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Vehicle } from "@/types";
 import { useApp } from "@/context/AppContext";
 import { useState, useEffect } from "react";
+import VehicleBasicInfoFields from "./vehicle-form/VehicleBasicInfoFields";
+import FinancialInfoFields from "./vehicle-form/FinancialInfoFields";
 
 interface EditVehicleDialogProps {
   vehicle: Vehicle | null;
@@ -75,6 +78,13 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
     }
   };
 
+  const handleFormChange = (newData: Partial<Vehicle>) => {
+    setEditedVehicle(prev => {
+      if (!prev) return prev;
+      return { ...prev, ...newData };
+    });
+  };
+
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -83,42 +93,11 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-plate">Placa</Label>
-              <Input
-                id="edit-plate"
-                value={editedVehicle.plate}
-                onChange={(e) => setEditedVehicle({...editedVehicle, plate: e.target.value})}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-brand">Marca</Label>
-              <Input
-                id="edit-brand"
-                value={editedVehicle.brand}
-                onChange={(e) => setEditedVehicle({...editedVehicle, brand: e.target.value})}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-model">Modelo</Label>
-              <Input
-                id="edit-model"
-                value={editedVehicle.model}
-                onChange={(e) => setEditedVehicle({...editedVehicle, model: e.target.value})}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-year">Año</Label>
-              <Input
-                id="edit-year"
-                value={editedVehicle.year}
-                onChange={(e) => setEditedVehicle({...editedVehicle, year: e.target.value})}
-                required
-              />
-            </div>
+            <VehicleBasicInfoFields 
+              formData={editedVehicle} 
+              onChange={handleFormChange} 
+            />
+            
             <div className="space-y-2">
               <Label htmlFor="edit-status">Estado</Label>
               <Select
@@ -137,67 +116,11 @@ const EditVehicleDialog = ({ vehicle, onClose }: EditVehicleDialogProps) => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-dailyRate">Comisión por Administración (Bs)</Label>
-              <Input
-                id="edit-dailyRate"
-                type="number"
-                value={editedVehicle.dailyRate}
-                onChange={(e) => setEditedVehicle({...editedVehicle, dailyRate: Number(e.target.value)})}
-                required
-              />
-              <p className="text-sm text-muted-foreground">
-                Comisión diaria que se cobra por la administración del vehículo
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-installmentAmount">Renta Diaria (Bs)</Label>
-              <Input
-                id="edit-installmentAmount"
-                type="number"
-                value={editedVehicle.installmentAmount || 0}
-                onChange={(e) => setEditedVehicle({...editedVehicle, installmentAmount: Number(e.target.value)})}
-                required
-              />
-              <p className="text-sm text-muted-foreground">
-                Monto diario que debe pagar el conductor por el vehículo
-              </p>
-            </div>
             
-            {/* Campos de contrato */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-contractStartDate">Fecha de inicio del contrato</Label>
-              <Input
-                id="edit-contractStartDate"
-                type="date"
-                value={editedVehicle.contractStartDate || ""}
-                onChange={(e) => setEditedVehicle({...editedVehicle, contractStartDate: e.target.value})}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="edit-totalInstallments">Número total de cuotas</Label>
-              <Input
-                id="edit-totalInstallments"
-                type="number"
-                value={editedVehicle.totalInstallments || 0}
-                onChange={(e) => setEditedVehicle({...editedVehicle, totalInstallments: Number(e.target.value)})}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="edit-installmentAmount">Monto por cuota (Bs)</Label>
-              <Input
-                id="edit-installmentAmount"
-                type="number"
-                value={editedVehicle.installmentAmount || 0}
-                onChange={(e) => setEditedVehicle({...editedVehicle, installmentAmount: Number(e.target.value)})}
-                required
-              />
-            </div>
+            <FinancialInfoFields 
+              formData={editedVehicle} 
+              onChange={handleFormChange} 
+            />
             
             <div className="space-y-2">
               <Label htmlFor="edit-paidInstallments">Cuotas pagadas</Label>
