@@ -9,7 +9,7 @@
 .main-container {
   width: 100%;
   max-width: 100%;
-  overflow-x: visible;
+  overflow-x: auto;
   overflow-y: auto;
 }
 
@@ -61,6 +61,43 @@
     width: auto;
     max-width: 100%;
   }
+}
+
+/* Estilos para scrollbars personalizados (compatible con Chrome) */
+.custom-scrollbar {
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #222;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #444;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #666;
 }
 
 @media (prefers-color-scheme: dark) {

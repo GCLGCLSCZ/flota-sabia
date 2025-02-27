@@ -20,7 +20,7 @@ const Layout = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto p-3 sm:p-4 animate-fade-up dark:bg-gray-900 transition-colors">
+        <main className="flex-1 overflow-auto custom-scrollbar p-3 sm:p-4 animate-fade-up dark:bg-gray-900 transition-colors">
           <Outlet />
         </main>
       </div>

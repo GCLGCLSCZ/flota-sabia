@@ -64,7 +64,7 @@ const VehiclesPage = () => {
   };
 
   return (
-    <div className="w-full py-3 space-y-4 zoom-safe">
+    <div className="w-full py-3 space-y-4 zoom-safe custom-scrollbar">
       <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
       
       <VehicleList

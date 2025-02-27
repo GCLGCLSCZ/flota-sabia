@@ -103,7 +103,7 @@ const Dashboard = () => {
   }, [vehicles]);
 
   return (
-    <div className="w-full pb-8 zoom-safe">
+    <div className="w-full pb-8 zoom-safe custom-scrollbar">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((stat) => (
           <Card key={stat.label} className="p-3 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white">
@@ -124,7 +124,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-4 dark:bg-gray-800 dark:text-white">
           <h3 className="text-base sm:text-lg font-semibold mb-4">Vehículos con Pagos Atrasados</h3>
-          <div className="space-y-3">
+          <div className="space-y-3 custom-scrollbar">
             {vehiclesWithLatePayments.length > 0 ? vehiclesWithLatePayments.map((vehicle) => {
               const lastPayment = payments
                 .filter(p => p.vehicleId === vehicle.id)
@@ -166,7 +166,7 @@ const Dashboard = () => {
 
         <Card className="p-4 dark:bg-gray-800 dark:text-white">
           <h3 className="text-base sm:text-lg font-semibold mb-4">Mantenimientos Próximos</h3>
-          <div className="space-y-3">
+          <div className="space-y-3 custom-scrollbar">
             {upcomingMaintenance.length > 0 ? upcomingMaintenance.map((maintenance) => {
               const daysUntilMaintenance = Math.ceil(
                 (maintenance.date.getTime() - new Date().getTime()) / 

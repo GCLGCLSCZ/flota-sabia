@@ -103,7 +103,7 @@ export default function Sidebar() {
     <>
       <div
         className={cn(
-          "h-screen fixed top-0 z-30 pt-16 transition-all bg-white border-r dark:bg-gray-950",
+          "h-screen fixed top-0 z-30 pt-16 transition-all bg-white border-r dark:bg-gray-950 custom-scrollbar",
           isSidebarOpen
             ? "w-64 transform-none shadow-lg lg:shadow-none"
             : "w-0 -translate-x-full lg:w-20 lg:translate-x-0"
