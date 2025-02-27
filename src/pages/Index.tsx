@@ -110,7 +110,11 @@ const Index = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-4 flex-grow">
         {modules.map((module) => (
-          <Card key={module.route} className="flex flex-col hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white dark:border-gray-700">
+          <Card 
+            key={module.route} 
+            className="flex flex-col hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white dark:border-gray-700 cursor-pointer"
+            onClick={() => navigate(module.route)}
+          >
             <CardHeader className="p-4 md:p-6">
               <div className="flex justify-between items-start">
                 <div>
@@ -124,14 +128,10 @@ const Index = () => {
               <div className="text-xl md:text-2xl font-semibold text-primary mt-2 dark:text-gray-300">{module.stat}</div>
             </CardContent>
             <CardFooter className="p-4 md:p-6 pt-0">
-              <Button 
-                variant="ghost" 
-                className="w-full justify-between text-sm md:text-base dark:text-gray-300 dark:hover:bg-gray-700" 
-                onClick={() => navigate(module.route)}
-              >
+              <div className="w-full text-sm md:text-base dark:text-gray-300 flex items-center justify-between">
                 <span>Ir al módulo</span>
                 <ArrowRight className="h-4 w-4" />
-              </Button>
+              </div>
             </CardFooter>
           </Card>
         ))}
