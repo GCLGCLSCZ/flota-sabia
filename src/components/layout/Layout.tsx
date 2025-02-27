@@ -15,9 +15,6 @@ const Layout = () => {
     }
   }, []);
   
-  // Agregamos esto para depuración
-  console.log("Rendering Layout component");
-  
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors overflow-hidden">
       <Sidebar />

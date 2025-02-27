@@ -17,15 +17,13 @@ interface AppContextType {
   settings: SystemSettings;
   updateSettings: (settings: Partial<SystemSettings>) => void;
   addVehicle: (vehicle: Omit<Vehicle, "id">) => boolean;
-  updateVehicle: (id: string, vehicle: Partial<Vehicle>) => boolean;
-  deleteVehicle?: (id: string) => void;
+  updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   addPayment: (payment: Omit<Payment, "id">) => boolean;
-  updatePayment: (id: string, payment: Partial<Payment>) => boolean;
-  deletePayment: (id: string) => void;
+  updatePayment: (id: string, payment: Partial<Payment>) => void;
   addInvestor: (investor: Omit<Investor, "id">) => boolean;
-  updateInvestor: (id: string, investor: Partial<Investor>) => boolean;
+  updateInvestor: (id: string, investor: Partial<Investor>) => void;
   addDriver: (driver: Omit<Driver, "id">) => boolean;
-  updateDriver: (id: string, driver: Partial<Driver>) => boolean;
+  updateDriver: (id: string, driver: Partial<Driver>) => void;
   validateVehicleData: (vehicle: Partial<Vehicle>) => { isValid: boolean; errors: string[] };
   validateInvestorData: (investor: Partial<Investor>) => { isValid: boolean; errors: string[] };
   validateDriverData: (driver: Partial<Driver>) => { isValid: boolean; errors: string[] };
@@ -90,16 +88,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storageKey: 'settings'
   });
 
-  // Función para eliminar un pago (marcar como cancelado)
-  const deletePayment = (id: string) => {
-    updatePayment(id, { status: "cancelled" });
-  };
-
-  // Función para eliminar un vehículo
-  const deleteVehicle = (id: string) => {
-    updateVehicle(id, { status: "inactive" });
-  };
-
   // Asegurarse de que siempre haya una configuración disponible
   const settings = settingsArray.length > 0 ? settingsArray[0] : {
     id: 'default-settings',
@@ -120,27 +108,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Inicializar datos por defecto si no existen
-  if (vehicles.length === 0) {
-    console.log("Inicializando datos de vehículos por defecto");
-    const defaultVehicle = {
-      id: "1",
-      plate: "ABC-123",
-      brand: "Toyota",
-      model: "Corolla",
-      year: "2020",
-      status: "active" as const,
-      investor: "Juan Pérez",
-      dailyRate: 50,
-      driverName: "Carlos Gómez",
-      driverPhone: "70123456",
-      installmentAmount: 100,
-      totalInstallments: 30,
-      paidInstallments: 10
-    };
-    setVehicles([defaultVehicle]);
-  }
-
   return (
     <AppContext.Provider
       value={{
@@ -156,10 +123,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateSettings,
         addVehicle,
         updateVehicle,
-        deleteVehicle,
         addPayment,
         updatePayment,
-        deletePayment,
         addInvestor,
         updateInvestor,
         addDriver,
