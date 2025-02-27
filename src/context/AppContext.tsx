@@ -32,7 +32,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Definir la configuración por defecto del sistema
-const DEFAULT_SETTINGS: SystemSettings = {
+const DEFAULT_SETTINGS: Omit<SystemSettings, "id"> = {
   gpsMonthlyFee: 120,
   currency: "bs",
   dateFormat: "dd/MM/yyyy",
@@ -83,12 +83,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const {
     items: settingsArray,
     setItems: setSettingsArray,
+    add: addSettings
   } = useCRUD<SystemSettings>({
     storageKey: 'settings'
   });
 
   // Asegurarse de que siempre haya una configuración disponible
-  const settings = settingsArray.length > 0 ? settingsArray[0] : DEFAULT_SETTINGS;
+  const settings = settingsArray.length > 0 ? settingsArray[0] : {
+    id: 'default-settings',
+    ...DEFAULT_SETTINGS
+  };
 
   // Función para actualizar la configuración
   const updateSettings = (newSettings: Partial<SystemSettings>) => {
@@ -96,7 +100,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (settingsArray.length > 0) {
       setSettingsArray([updatedSettings]);
     } else {
-      setSettingsArray([updatedSettings]);
+      addSettings({
+        id: 'default-settings',
+        ...DEFAULT_SETTINGS,
+        ...newSettings
+      } as SystemSettings);
     }
   };
 

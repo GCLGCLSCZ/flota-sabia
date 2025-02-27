@@ -36,6 +36,9 @@ export interface Payment {
   paymentMethod: "cash" | "transfer";
   status: "completed" | "pending" | "cancelled";
   vehicleId: string;
+  receiptNumber?: string;
+  bankName?: string;
+  transferNumber?: string;
 }
 
 export interface Investor {
@@ -56,19 +59,46 @@ export interface Investor {
 export interface Driver {
   id: string;
   name: string;
-  ci: string;
   phone: string;
+  ci: string;
   email?: string;
   address?: string;
   licenseNumber?: string;
   licenseExpiry?: string;
   status?: "active" | "inactive";
   vehicles?: Vehicle[];
+  documentId?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  vehicleId?: string;
 }
 
 export interface SystemSettings {
+  id: string;
   gpsMonthlyFee: number;
   currency: string;
   dateFormat: string;
   timezone: string;
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  permissions: UserPermissions[];
+}
+
+export type UserRole = "admin" | "manager" | "user";
+
+export type UserPermissions = 
+  | "read:vehicles" 
+  | "write:vehicles" 
+  | "read:payments" 
+  | "write:payments"
+  | "read:investors"
+  | "write:investors"
+  | "read:drivers"
+  | "write:drivers"
+  | "read:settings"
+  | "write:settings";

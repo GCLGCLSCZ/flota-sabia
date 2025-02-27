@@ -35,7 +35,7 @@ export const validateDriverData = (driver: Partial<Driver>) => {
 
   if (!driver.name) errors.push("El nombre del conductor es requerido");
   if (!driver.phone) errors.push("El teléfono del conductor es requerido");
-  if (!driver.documentId) errors.push("El documento de identidad es requerido");
+  if (!driver.ci) errors.push("El número de CI es requerido");
   if (!driver.licenseNumber) errors.push("El número de licencia es requerido");
   if (!driver.licenseExpiry) errors.push("La fecha de vencimiento de la licencia es requerida");
 
