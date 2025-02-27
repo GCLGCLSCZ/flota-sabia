@@ -20,6 +20,8 @@ export interface Vehicle {
   totalPaid?: number;
   nextMaintenance?: string;
   monthlyEarnings?: number;
+  cardex?: CardexItem[];
+  discounts?: Discount[];
 }
 
 export interface Maintenance {
@@ -30,6 +32,29 @@ export interface Maintenance {
   costMaterials: number;
   salePrice: number;
   status: "pending" | "completed" | "cancelled";
+}
+
+export interface CardexItem {
+  id: string;
+  type: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
+  date: string;
+  description: string;
+  nextScheduledDate?: string;
+  kilometersAtService?: number;
+  nextServiceKilometers?: number;
+  cost: number;
+  complete: boolean;
+}
+
+export interface Discount {
+  id: string;
+  type: "insurance" | "repair" | "maintenance" | "other";
+  description: string;
+  amount: number;
+  date: string;
+  applyToMonths: string[]; // Lista de meses en formato 'YYYY-MM' a los que se aplica
+  recurring: boolean;
+  frequency?: "monthly" | "quarterly" | "biannual" | "annual";
 }
 
 export interface Payment {

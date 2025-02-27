@@ -2,11 +2,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vehicle, Maintenance } from "@/types";
+import { Vehicle, Maintenance, CardexItem, Discount } from "@/types";
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -16,13 +19,33 @@ interface VehicleDetailsDialogProps {
 
 const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
   const [tab, setTab] = useState("details");
-  const { payments } = useApp();
+  const { payments, updateVehicle } = useApp();
   const [maintenance, setMaintenance] = useState<Omit<Maintenance, "id" | "status">>({
     date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cost: 0,
     costMaterials: 0,
     salePrice: 0,
+  });
+  
+  const [newCardexItem, setNewCardexItem] = useState<Omit<CardexItem, "id" | "complete">>({
+    type: "oil_change",
+    date: format(new Date(), "yyyy-MM-dd"),
+    description: "Cambio de aceite",
+    nextScheduledDate: format(addMonths(new Date(), 2), "yyyy-MM-dd"),
+    kilometersAtService: 0,
+    nextServiceKilometers: 10000,
+    cost: 0
+  });
+  
+  const [newDiscount, setNewDiscount] = useState<Omit<Discount, "id">>({
+    type: "maintenance",
+    description: "",
+    amount: 0,
+    date: format(new Date(), "yyyy-MM-dd"),
+    applyToMonths: [format(new Date(), "yyyy-MM")],
+    recurring: false,
+    frequency: "monthly"
   });
 
   if (!vehicle) return null;
@@ -51,6 +74,78 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
       salePrice: 0,
     });
   };
+  
+  const handleSubmitCardexItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cardexItem: CardexItem = {
+      id: Date.now().toString(),
+      ...newCardexItem,
+      complete: false
+    };
+    
+    const updatedCardex = [...(vehicle.cardex || []), cardexItem];
+    updateVehicle(vehicle.id, { cardex: updatedCardex });
+    
+    // Reset form
+    setNewCardexItem({
+      type: "oil_change",
+      date: format(new Date(), "yyyy-MM-dd"),
+      description: "Cambio de aceite",
+      nextScheduledDate: format(addMonths(new Date(), 2), "yyyy-MM-dd"),
+      kilometersAtService: 0,
+      nextServiceKilometers: 10000,
+      cost: 0
+    });
+  };
+  
+  const handleSubmitDiscount = (e: React.FormEvent) => {
+    e.preventDefault();
+    const discount: Discount = {
+      id: Date.now().toString(),
+      ...newDiscount
+    };
+    
+    const updatedDiscounts = [...(vehicle.discounts || []), discount];
+    updateVehicle(vehicle.id, { discounts: updatedDiscounts });
+    
+    // Reset form
+    setNewDiscount({
+      type: "maintenance",
+      description: "",
+      amount: 0,
+      date: format(new Date(), "yyyy-MM-dd"),
+      applyToMonths: [format(new Date(), "yyyy-MM")],
+      recurring: false,
+      frequency: "monthly"
+    });
+  };
+  
+  const handleToggleRecurring = (value: boolean) => {
+    setNewDiscount({
+      ...newDiscount,
+      recurring: value
+    });
+  };
+  
+  const handleDeleteCardexItem = (id: string) => {
+    if (!vehicle.cardex) return;
+    const updatedCardex = vehicle.cardex.filter(item => item.id !== id);
+    updateVehicle(vehicle.id, { cardex: updatedCardex });
+  };
+  
+  const handleDeleteDiscount = (id: string) => {
+    if (!vehicle.discounts) return;
+    const updatedDiscounts = vehicle.discounts.filter(item => item.id !== id);
+    updateVehicle(vehicle.id, { discounts: updatedDiscounts });
+  };
+  
+  const handleCompleteCardexItem = (id: string, complete: boolean) => {
+    if (!vehicle.cardex) return;
+    const updatedCardex = vehicle.cardex.map(item => 
+      item.id === id ? { ...item, complete } : item
+    );
+    updateVehicle(vehicle.id, { cardex: updatedCardex });
+  };
 
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
@@ -60,10 +155,12 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-2">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-5 mb-4">
             <TabsTrigger value="details">Información General</TabsTrigger>
             <TabsTrigger value="contract">Contrato</TabsTrigger>
             <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
+            <TabsTrigger value="cardex">Cardex</TabsTrigger>
+            <TabsTrigger value="discounts">Descuentos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -197,7 +294,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs">Fecha</label>
-                    <input 
+                    <Input 
                       type="date" 
                       value={maintenance.date}
                       onChange={(e) => setMaintenance({...maintenance, date: e.target.value})}
@@ -207,7 +304,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   </div>
                   <div>
                     <label className="text-xs">Costo de Materiales (Bs)</label>
-                    <input 
+                    <Input 
                       type="number" 
                       value={maintenance.costMaterials}
                       onChange={(e) => setMaintenance({...maintenance, costMaterials: Number(e.target.value)})}
@@ -226,7 +323,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   </div>
                   <div>
                     <label className="text-xs">Costo Total (Bs)</label>
-                    <input 
+                    <Input 
                       type="number" 
                       value={maintenance.cost}
                       onChange={(e) => setMaintenance({...maintenance, cost: Number(e.target.value)})}
@@ -236,7 +333,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   </div>
                   <div>
                     <label className="text-xs">Precio de Venta (Bs)</label>
-                    <input 
+                    <Input 
                       type="number" 
                       value={maintenance.salePrice}
                       onChange={(e) => setMaintenance({...maintenance, salePrice: Number(e.target.value)})}
@@ -247,6 +344,331 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 </div>
                 <div className="text-right">
                   <Button type="submit" size="sm">Registrar Mantenimiento</Button>
+                </div>
+              </form>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="cardex" className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Cardex de Mantenimiento</h3>
+              {vehicle.cardex && vehicle.cardex.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="p-2 text-left">Servicio</th>
+                        <th className="p-2 text-left">Fecha</th>
+                        <th className="p-2 text-left">Próximo</th>
+                        <th className="p-2 text-left">Km</th>
+                        <th className="p-2 text-left">Costo</th>
+                        <th className="p-2 text-left">Estado</th>
+                        <th className="p-2 text-left">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicle.cardex.map(item => (
+                        <tr key={item.id} className={`border-b border-muted/30 ${item.complete ? 'bg-green-50 dark:bg-green-900/10' : ''}`}>
+                          <td className="p-2">
+                            <div className="font-medium">{item.description}</div>
+                            <div className="text-xs text-muted-foreground">{
+                              item.type === "oil_change" ? "Cambio Aceite" :
+                              item.type === "filter_change" ? "Cambio Filtros" :
+                              item.type === "spark_plugs" ? "Bujías" :
+                              item.type === "battery" ? "Batería" : "Otro"
+                            }</div>
+                          </td>
+                          <td className="p-2">{format(new Date(item.date), "dd/MM/yyyy")}</td>
+                          <td className="p-2">{item.nextScheduledDate ? format(new Date(item.nextScheduledDate), "dd/MM/yyyy") : "N/A"}</td>
+                          <td className="p-2">
+                            {item.kilometersAtService} 
+                            {item.nextServiceKilometers && <> → {item.nextServiceKilometers}</>}
+                          </td>
+                          <td className="p-2">Bs {item.cost}</td>
+                          <td className="p-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${item.complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                              {item.complete ? 'Completado' : 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex space-x-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleCompleteCardexItem(item.id, !item.complete)}
+                                className="h-6 px-2"
+                              >
+                                {item.complete ? 'Reabrir' : 'Completar'}
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDeleteCardexItem(item.id)}
+                                className="h-6 px-2 text-red-500 hover:text-red-700"
+                              >
+                                Eliminar
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No hay registros en el cardex</p>
+              )}
+            </div>
+            
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold mb-2">Agregar Nuevo Servicio al Cardex</h3>
+              <form onSubmit={handleSubmitCardexItem} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo de Servicio</Label>
+                    <Select
+                      value={newCardexItem.type}
+                      onValueChange={(value: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other") => 
+                        setNewCardexItem({...newCardexItem, type: value})
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="oil_change">Cambio de Aceite</SelectItem>
+                        <SelectItem value="filter_change">Cambio de Filtros</SelectItem>
+                        <SelectItem value="spark_plugs">Bujías</SelectItem>
+                        <SelectItem value="battery">Batería</SelectItem>
+                        <SelectItem value="other">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fecha del Servicio</Label>
+                    <Input 
+                      type="date" 
+                      value={newCardexItem.date}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, date: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Descripción</Label>
+                    <Input 
+                      type="text" 
+                      value={newCardexItem.description}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, description: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Costo (Bs)</Label>
+                    <Input 
+                      type="number" 
+                      value={newCardexItem.cost}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, cost: Number(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Kilómetros Actuales</Label>
+                    <Input 
+                      type="number" 
+                      value={newCardexItem.kilometersAtService}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, kilometersAtService: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Próximo Servicio (Km)</Label>
+                    <Input 
+                      type="number" 
+                      value={newCardexItem.nextServiceKilometers}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, nextServiceKilometers: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fecha Próximo Servicio</Label>
+                    <Input 
+                      type="date" 
+                      value={newCardexItem.nextScheduledDate}
+                      onChange={(e) => setNewCardexItem({...newCardexItem, nextScheduledDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Button type="submit" size="sm">Agregar al Cardex</Button>
+                </div>
+              </form>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="discounts" className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Descuentos Registrados</h3>
+              {vehicle.discounts && vehicle.discounts.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="p-2 text-left">Descripción</th>
+                        <th className="p-2 text-left">Tipo</th>
+                        <th className="p-2 text-left">Monto</th>
+                        <th className="p-2 text-left">Fecha</th>
+                        <th className="p-2 text-left">Recurrencia</th>
+                        <th className="p-2 text-left">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicle.discounts.map(discount => (
+                        <tr key={discount.id} className="border-b border-muted/30">
+                          <td className="p-2 font-medium">{discount.description}</td>
+                          <td className="p-2">{
+                            discount.type === "insurance" ? "Seguro" :
+                            discount.type === "repair" ? "Reparación" :
+                            discount.type === "maintenance" ? "Mantenimiento" : "Otro"
+                          }</td>
+                          <td className="p-2 text-red-600">-Bs {discount.amount}</td>
+                          <td className="p-2">{format(new Date(discount.date), "dd/MM/yyyy")}</td>
+                          <td className="p-2">
+                            {discount.recurring ? (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                {discount.frequency === "monthly" ? "Mensual" :
+                                 discount.frequency === "quarterly" ? "Trimestral" :
+                                 discount.frequency === "biannual" ? "Semestral" : "Anual"}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
+                                Único
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleDeleteDiscount(discount.id)}
+                              className="h-6 px-2 text-red-500 hover:text-red-700"
+                            >
+                              Eliminar
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No hay descuentos registrados</p>
+              )}
+            </div>
+            
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold mb-2">Agregar Nuevo Descuento</h3>
+              <form onSubmit={handleSubmitDiscount} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo de Descuento</Label>
+                    <Select
+                      value={newDiscount.type}
+                      onValueChange={(value: "insurance" | "repair" | "maintenance" | "other") => 
+                        setNewDiscount({...newDiscount, type: value})
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="insurance">Seguro</SelectItem>
+                        <SelectItem value="repair">Reparación</SelectItem>
+                        <SelectItem value="maintenance">Mantenimiento</SelectItem>
+                        <SelectItem value="other">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Monto (Bs)</Label>
+                    <Input 
+                      type="number" 
+                      value={newDiscount.amount}
+                      onChange={(e) => setNewDiscount({...newDiscount, amount: Number(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Descripción</Label>
+                    <Input 
+                      type="text" 
+                      value={newDiscount.description}
+                      onChange={(e) => setNewDiscount({...newDiscount, description: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fecha</Label>
+                    <Input 
+                      type="date" 
+                      value={newDiscount.date}
+                      onChange={(e) => setNewDiscount({...newDiscount, date: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">¿Es recurrente?</Label>
+                    <Select
+                      value={newDiscount.recurring ? "true" : "false"}
+                      onValueChange={(value) => handleToggleRecurring(value === "true")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Sí</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {newDiscount.recurring && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Frecuencia</Label>
+                      <Select
+                        value={newDiscount.frequency}
+                        onValueChange={(value: "monthly" | "quarterly" | "biannual" | "annual") => 
+                          setNewDiscount({...newDiscount, frequency: value})
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensual</SelectItem>
+                          <SelectItem value="quarterly">Trimestral</SelectItem>
+                          <SelectItem value="biannual">Semestral</SelectItem>
+                          <SelectItem value="annual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Mes de aplicación</Label>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Para descuentos recurrentes, se aplicará según la frecuencia seleccionada a partir de este mes.
+                    </div>
+                    <Input 
+                      type="month" 
+                      value={newDiscount.applyToMonths[0]}
+                      onChange={(e) => setNewDiscount({
+                        ...newDiscount, 
+                        applyToMonths: [e.target.value]
+                      })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Button type="submit" size="sm">Agregar Descuento</Button>
                 </div>
               </form>
             </div>

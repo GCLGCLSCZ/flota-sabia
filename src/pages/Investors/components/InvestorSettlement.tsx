@@ -2,14 +2,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
-import { format, parse, parseISO, startOfMonth, endOfMonth, isSunday, subMonths, isWithinInterval } from "date-fns";
+import { format, parse, parseISO, startOfMonth, endOfMonth, isSunday, subMonths, isWithinInterval, isAfter, isBefore, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi } from "lucide-react";
-import { Vehicle, Investor } from "@/types";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon } from "lucide-react";
+import { Vehicle, Investor, Discount } from "@/types";
 import "./settlement-print.css";
 
 const InvestorSettlement = () => {
@@ -102,6 +102,57 @@ const InvestorSettlement = () => {
     return result;
   }, []);
   
+  // Verificar si un descuento aplica al mes seleccionado
+  const discountAppliesForMonth = (discount: Discount, monthStr: string) => {
+    const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
+    
+    // Si el descuento especifica directamente el mes
+    if (discount.applyToMonths.includes(monthStr)) {
+      return true;
+    }
+    
+    // Para descuentos recurrentes, verificar si aplica según la frecuencia
+    if (discount.recurring && discount.applyToMonths.length > 0) {
+      const startMonth = parse(discount.applyToMonths[0], "yyyy-MM", new Date());
+      
+      // Si el mes seleccionado es anterior al mes inicial del descuento, no aplica
+      if (isBefore(selectedMonthDate, startMonth)) {
+        return false;
+      }
+      
+      // Si es el mismo mes, aplica
+      if (isSameMonth(selectedMonthDate, startMonth)) {
+        return true;
+      }
+      
+      // Verificar según la frecuencia
+      switch (discount.frequency) {
+        case "monthly":
+          // Aplica todos los meses después del mes inicial
+          return true;
+        case "quarterly":
+          // Verificar si han pasado múltiplos de 3 meses
+          const quarterDiff = (selectedMonthDate.getFullYear() - startMonth.getFullYear()) * 12 + 
+                            selectedMonthDate.getMonth() - startMonth.getMonth();
+          return quarterDiff % 3 === 0;
+        case "biannual":
+          // Verificar si han pasado múltiplos de 6 meses
+          const biannualDiff = (selectedMonthDate.getFullYear() - startMonth.getFullYear()) * 12 + 
+                             selectedMonthDate.getMonth() - startMonth.getMonth();
+          return biannualDiff % 6 === 0;
+        case "annual":
+          // Verificar si han pasado múltiplos de 12 meses
+          const annualDiff = (selectedMonthDate.getFullYear() - startMonth.getFullYear()) * 12 + 
+                           selectedMonthDate.getMonth() - startMonth.getMonth();
+          return annualDiff % 12 === 0;
+        default:
+          return false;
+      }
+    }
+    
+    return false;
+  };
+  
   // Calcular la rendición de cuentas para el mes seleccionado
   const settlementData = useMemo(() => {
     if (!investorVehicles.length) return [];
@@ -122,7 +173,16 @@ const InvestorSettlement = () => {
       const netAmountBeforeGps = totalGenerated - adminTotal;
       
       // Aplicar descuento de GPS
-      const netAmount = netAmountBeforeGps - gpsMonthlyFee;
+      const netAmountBeforeDiscounts = netAmountBeforeGps - gpsMonthlyFee;
+      
+      // Aplicar descuentos individuales
+      const applicableDiscounts = (vehicle.discounts || [])
+        .filter(discount => discountAppliesForMonth(discount, selectedMonth));
+      
+      const totalDiscounts = applicableDiscounts.reduce((sum, discount) => sum + discount.amount, 0);
+      
+      // Monto final después de todos los descuentos
+      const netAmount = netAmountBeforeDiscounts - totalDiscounts;
       
       // Verificar si hay pagos ya realizados al inversionista en este período
       const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
@@ -149,6 +209,8 @@ const InvestorSettlement = () => {
         adminTotal,
         gpsFee: gpsMonthlyFee,
         netAmountBeforeGps,
+        discounts: applicableDiscounts,
+        totalDiscounts,
         netAmount,
         paidToInvestor,
         pendingAmount: netAmount - paidToInvestor,
@@ -165,6 +227,7 @@ const InvestorSettlement = () => {
         adminTotal: acc.adminTotal + item.adminTotal,
         gpsFeeTotal: acc.gpsFeeTotal + item.gpsFee,
         netAmountBeforeGps: acc.netAmountBeforeGps + item.netAmountBeforeGps,
+        totalDiscounts: acc.totalDiscounts + item.totalDiscounts,
         netAmount: acc.netAmount + item.netAmount,
         paidToInvestor: acc.paidToInvestor + item.paidToInvestor,
         pendingAmount: acc.pendingAmount + item.pendingAmount
@@ -174,6 +237,7 @@ const InvestorSettlement = () => {
       adminTotal: 0,
       gpsFeeTotal: 0,
       netAmountBeforeGps: 0,
+      totalDiscounts: 0,
       netAmount: 0,
       paidToInvestor: 0,
       pendingAmount: 0
@@ -268,6 +332,7 @@ const InvestorSettlement = () => {
                   <TableHead className="text-right">Comisión Adm.</TableHead>
                   <TableHead className="text-right">Total Comisión</TableHead>
                   <TableHead className="text-right">Costo GPS</TableHead>
+                  <TableHead className="text-right">Descuentos</TableHead>
                   <TableHead className="text-right">Monto Neto</TableHead>
                 </TableRow>
               </TableHeader>
@@ -289,6 +354,7 @@ const InvestorSettlement = () => {
                     <TableCell className="text-right">{item.adminFee} Bs</TableCell>
                     <TableCell className="text-right">{item.adminTotal.toFixed(2)} Bs</TableCell>
                     <TableCell className="text-right text-orange-600">{item.gpsFee.toFixed(2)} Bs</TableCell>
+                    <TableCell className="text-right text-orange-600">{item.totalDiscounts > 0 ? `${item.totalDiscounts.toFixed(2)} Bs` : "-"}</TableCell>
                     <TableCell className="text-right font-medium">{item.netAmount.toFixed(2)} Bs</TableCell>
                   </TableRow>
                 ))}
@@ -298,6 +364,7 @@ const InvestorSettlement = () => {
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right font-bold">{totals.adminTotal.toFixed(2)} Bs</TableCell>
                   <TableCell className="text-right font-bold text-orange-600">{totals.gpsFeeTotal.toFixed(2)} Bs</TableCell>
+                  <TableCell className="text-right font-bold text-orange-600">{totals.totalDiscounts.toFixed(2)} Bs</TableCell>
                   <TableCell className="text-right font-bold">{totals.netAmount.toFixed(2)} Bs</TableCell>
                 </TableRow>
               </TableBody>
@@ -309,6 +376,48 @@ const InvestorSettlement = () => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Detalles de los descuentos */}
+      {settlementData.some(item => item.discounts && item.discounts.length > 0) && (
+        <Card className="print:shadow-none print:border-0">
+          <CardHeader className="print:pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Detalle de Descuentos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vehículo</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {settlementData.map((item) => (
+                  item.discounts && item.discounts.map((discount) => (
+                    <TableRow key={`${item.vehicleId}-${discount.id}`}>
+                      <TableCell className="font-medium">{item.plate}</TableCell>
+                      <TableCell>{discount.description}</TableCell>
+                      <TableCell>
+                        {discount.type === "insurance" ? "Seguro" :
+                         discount.type === "repair" ? "Reparación" :
+                         discount.type === "maintenance" ? "Mantenimiento" : "Otro"}
+                      </TableCell>
+                      <TableCell>{format(new Date(discount.date), "dd/MM/yyyy")}</TableCell>
+                      <TableCell className="text-right text-orange-600">{discount.amount.toFixed(2)} Bs</TableCell>
+                    </TableRow>
+                  ))
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
       
       <Card className="print:shadow-none print:border-0">
         <CardHeader className="print:pb-2">
@@ -331,6 +440,12 @@ const InvestorSettlement = () => {
                   <span>Descuento GPS:</span>
                   <span>-{totals.gpsFeeTotal.toFixed(2)} Bs</span>
                 </div>
+                {totals.totalDiscounts > 0 && (
+                  <div className="flex justify-between text-orange-600">
+                    <span>Otros descuentos:</span>
+                    <span>-{totals.totalDiscounts.toFixed(2)} Bs</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-4 border rounded-lg bg-muted/30">
@@ -355,10 +470,16 @@ const InvestorSettlement = () => {
               {format(endOfMonth(parse(selectedMonth, "yyyy-MM", new Date())), "dd 'de' MMMM 'de' yyyy", { locale: es })}.
               El pago debe realizarse entre el 10 y 20 del mes siguiente al período reportado.
             </p>
-            <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
+            <div className="flex gap-1 mt-2 text-sm text-muted-foreground items-center">
               <Wifi className="h-4 w-4 text-orange-600" />
               <span>Se ha aplicado un descuento de {settings?.gpsMonthlyFee || 120} Bs por servicio de GPS a cada vehículo.</span>
-            </p>
+            </div>
+            {totals.totalDiscounts > 0 && (
+              <div className="flex gap-1 mt-1 text-sm text-muted-foreground items-center">
+                <InfoIcon className="h-4 w-4 text-orange-600" />
+                <span>Se han aplicado descuentos adicionales por un total de {totals.totalDiscounts.toFixed(2)} Bs (detalles en la tabla de descuentos).</span>
+              </div>
+            )}
           </div>
           
           <div className="mt-8 print:block hidden">
