@@ -5,7 +5,7 @@ import { useApp } from "@/context/AppContext";
 import { useMemo } from "react";
 
 const Dashboard = () => {
-  const { vehicles, investors, payments, drivers } = useApp();
+  const { vehicles, investors, payments } = useApp();
 
   // Cálculo de estadísticas en tiempo real
   const statistics = useMemo(() => {
@@ -103,18 +103,18 @@ const Dashboard = () => {
   }, [vehicles]);
 
   return (
-    <div className="space-y-6 w-full overflow-x-hidden overflow-y-auto pb-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="w-full pb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {stats.map((stat) => (
-          <Card key={stat.label} className="p-6 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white">
+          <Card key={stat.label} className="p-4 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white overflow-visible">
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{stat.label}</p>
+              <div className="w-3/4 overflow-visible">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 truncate">{stat.label}</p>
                 <p className="text-2xl font-semibold mt-2">{stat.value}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{stat.change}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{stat.change}</p>
               </div>
-              <div className={`${stat.color} bg-gray-50 dark:bg-gray-700 p-3 rounded-lg`}>
-                <stat.icon className="w-6 h-6" />
+              <div className={`${stat.color} bg-gray-50 dark:bg-gray-700 p-2 rounded-lg`}>
+                <stat.icon className="w-5 h-5" />
               </div>
             </div>
           </Card>
@@ -122,7 +122,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 dark:bg-gray-800 dark:text-white">
+        <Card className="p-4 dark:bg-gray-800 dark:text-white">
           <h3 className="text-lg font-semibold mb-4">Vehículos con Pagos Atrasados</h3>
           <div className="space-y-4">
             {vehiclesWithLatePayments.length > 0 ? vehiclesWithLatePayments.map((vehicle) => {
@@ -138,11 +138,11 @@ const Dashboard = () => {
               return (
                 <div
                   key={vehicle.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div>
                     <p className="font-medium">{vehicle.plate}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       {daysSinceLastPayment} días de atraso
                     </p>
                   </div>
@@ -150,21 +150,21 @@ const Dashboard = () => {
                     <p className="font-medium text-warning">
                       Bs {vehicle.dailyRate * daysSinceLastPayment}
                     </p>
-                    <button className="text-sm text-primary hover:underline dark:text-blue-400">
+                    <button className="text-xs text-primary hover:underline dark:text-blue-400">
                       Ver detalles
                     </button>
                   </div>
                 </div>
               );
             }) : (
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
                 <p className="text-gray-600 dark:text-gray-400">No hay vehículos con pagos atrasados</p>
               </div>
             )}
           </div>
         </Card>
 
-        <Card className="p-6 dark:bg-gray-800 dark:text-white">
+        <Card className="p-4 dark:bg-gray-800 dark:text-white">
           <h3 className="text-lg font-semibold mb-4">Mantenimientos Próximos</h3>
           <div className="space-y-4">
             {upcomingMaintenance.length > 0 ? upcomingMaintenance.map((maintenance) => {
@@ -176,24 +176,24 @@ const Dashboard = () => {
               return (
                 <div
                   key={maintenance.plate}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div>
                     <p className="font-medium">{maintenance.plate}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{maintenance.service}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{maintenance.service}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-gray-600 dark:text-gray-300">
                       En {daysUntilMaintenance} días
                     </p>
-                    <button className="text-sm text-primary hover:underline dark:text-blue-400">
+                    <button className="text-xs text-primary hover:underline dark:text-blue-400">
                       Programar
                     </button>
                   </div>
                 </div>
               );
             }) : (
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
                 <p className="text-gray-600 dark:text-gray-400">No hay mantenimientos programados</p>
               </div>
             )}

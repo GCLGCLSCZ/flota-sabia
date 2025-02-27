@@ -64,7 +64,7 @@ const VehiclesPage = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6 overflow-visible">
+    <div className="w-full py-4 space-y-4 overflow-visible">
       <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
       
       <VehicleList

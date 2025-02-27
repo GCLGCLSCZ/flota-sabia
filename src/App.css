@@ -9,7 +9,8 @@
 .main-container {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: visible;
+  overflow-y: auto;
 }
 
 /* Para tablas y listas */
@@ -22,12 +23,14 @@
 .card-content {
   word-break: break-word;
   overflow-wrap: break-word;
+  overflow: visible;
 }
 
 /* Estilos para texto para mejor legibilidad */
 .text-content {
   max-width: 100%;
   overflow-wrap: break-word;
+  overflow: visible;
 }
 
 /* Compatibilidad con tema oscuro */
