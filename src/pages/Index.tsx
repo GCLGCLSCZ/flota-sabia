@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Car, DollarSign, Calendar, BarChart, Users, ArrowRight, Sun, Moon } from "lucide-react";
+import { Car, DollarSign, Calendar, BarChart, Users, ArrowRight, Sun, Moon, User } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -49,6 +49,13 @@ const Index = () => {
       icon: <Car className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/vehicles",
       stat: `${activeVehicles} activos`,
+    },
+    {
+      title: "Choferes",
+      description: "Gestiona tus conductores",
+      icon: <User className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
+      route: "/drivers",
+      stat: "Personal",
     },
     {
       title: "Pagos",
@@ -127,11 +134,8 @@ const Index = () => {
             <CardContent className="flex-grow p-4 md:p-6 pt-0">
               <div className="text-xl md:text-2xl font-semibold text-primary mt-2 dark:text-gray-300">{module.stat}</div>
             </CardContent>
-            <CardFooter className="p-4 md:p-6 pt-0">
-              <div className="w-full text-sm md:text-base dark:text-gray-300 flex items-center justify-between">
-                <span>Ir al módulo</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
+            <CardFooter className="p-4 md:p-6 pt-0 flex justify-end">
+              <ArrowRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
             </CardFooter>
           </Card>
         ))}
