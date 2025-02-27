@@ -1,40 +1,182 @@
 
-import { Link } from "react-router-dom";
-import { Car, Users, Calendar, DollarSign, Settings, UserSquare2 } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  Calendar,
+  DollarSign,
+  BarChart,
+  Settings,
+  Home,
+  Car,
+  Users,
+  PieChart,
+} from "lucide-react";
 
-const Sidebar = () => {
-  const menuItems = [
-    { icon: Car, label: "Vehículos", path: "/vehicles" },
-    { icon: Users, label: "Inversores", path: "/investors" },
-    { icon: UserSquare2, label: "Choferes", path: "/drivers" },
-    { icon: Calendar, label: "Calendario", path: "/calendar" },
-    { icon: DollarSign, label: "Pagos", path: "/payments" },
-    { icon: Settings, label: "Configuración", path: "/settings" },
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useEffect, useState } from "react";
+import { useMobile } from "@/hooks/use-mobile";
+
+type SidebarSection = {
+  title: string;
+  links: {
+    href: string;
+    title: string;
+    icon: React.ReactNode;
+  }[];
+};
+
+export default function Sidebar() {
+  const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const isMobile = useMobile();
+
+  // Si es móvil, cerramos el sidebar por defecto
+  useEffect(() => {
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    } else {
+      setIsSidebarOpen(true);
+    }
+  }, [isMobile]);
+
+  // Datos de navegación
+  const navigationSections: SidebarSection[] = [
+    {
+      title: "Visión General",
+      links: [
+        {
+          href: "/dashboard",
+          title: "Dashboard",
+          icon: <Home className="h-5 w-5" />,
+        },
+      ],
+    },
+    {
+      title: "Administración",
+      links: [
+        {
+          href: "/vehicles",
+          title: "Vehículos",
+          icon: <Car className="h-5 w-5" />,
+        },
+        {
+          href: "/payments",
+          title: "Pagos",
+          icon: <DollarSign className="h-5 w-5" />,
+        },
+        {
+          href: "/payment-analysis",
+          title: "Análisis de Pagos",
+          icon: <BarChart className="h-5 w-5" />,
+        },
+        {
+          href: "/calendar",
+          title: "Calendario",
+          icon: <Calendar className="h-5 w-5" />,
+        },
+        {
+          href: "/investors",
+          title: "Inversionistas",
+          icon: <Users className="h-5 w-5" />,
+        },
+      ],
+    },
+    {
+      title: "Sistema",
+      links: [
+        {
+          href: "/settings",
+          title: "Configuración",
+          icon: <Settings className="h-5 w-5" />,
+        },
+      ],
+    },
   ];
 
   return (
-    <div className="h-full w-64 bg-white border-r border-gray-200 px-3 py-4 flex flex-col animate-fade-in">
-      <div className="mb-8 px-4">
-        <Link to="/" className="block">
-          <h1 className="text-xl font-semibold text-gray-800 hover:text-primary transition-colors cursor-pointer">
-            FlotaSabia
-          </h1>
-        </Link>
-      </div>
-      <nav className="space-y-1 flex-1">
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className="flex items-center gap-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors group"
+    <>
+      <div
+        className={cn(
+          "h-screen fixed top-0 z-30 pt-16 transition-all bg-white border-r dark:bg-gray-950",
+          isSidebarOpen
+            ? "w-64 transform-none shadow-lg lg:shadow-none"
+            : "w-0 -translate-x-full lg:w-20 lg:translate-x-0"
+        )}
+      >
+        <div className="flex h-full flex-col gap-2 p-2">
+          <div
+            className={cn(
+              "flex flex-col gap-1",
+              !isSidebarOpen && "lg:items-center lg:gap-1"
+            )}
           >
-            <item.icon className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-medium">{item.label}</span>
-          </Link>
-        ))}
-      </nav>
-    </div>
+            {navigationSections.map((section, idx) => (
+              <div key={idx} className="px-2 pt-2">
+                {isSidebarOpen && (
+                  <h3 className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {section.title}
+                  </h3>
+                )}
+                {section.links.map((link, linkIdx) => (
+                  <div key={linkIdx}>
+                    {isSidebarOpen ? (
+                      <NavLink
+                        to={link.href}
+                        className={({ isActive }) =>
+                          cn(
+                            "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "transparent"
+                          )
+                        }
+                      >
+                        {link.icon}
+                        <span className="ml-3">{link.title}</span>
+                      </NavLink>
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <NavLink
+                              to={link.href}
+                              className={({ isActive }) =>
+                                cn(
+                                  "flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground",
+                                  isActive
+                                    ? "bg-accent text-accent-foreground"
+                                    : "transparent"
+                                )
+                              }
+                            >
+                              {link.icon}
+                            </NavLink>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            {link.title}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {isMobile && isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/50"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+    </>
   );
-};
-
-export default Sidebar;
+}
