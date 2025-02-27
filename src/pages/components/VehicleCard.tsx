@@ -25,9 +25,9 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   const totalInstallments = vehicle.totalInstallments || 0;
   const installmentAmount = vehicle.installmentAmount || 0;
   
-  // Calcular cuotas pagadas basado en el monto total pagado
+  // Calcular cuotas pagadas basado en el monto total pagado con mayor precisión
   const calculatedPaidInstallments = installmentAmount > 0 
-    ? Math.floor(totalPaidFromPayments / installmentAmount) 
+    ? totalPaidFromPayments / installmentAmount
     : vehicle.paidInstallments || 0;
   
   // Usar el valor calculado o el valor almacenado en el vehículo
