@@ -18,6 +18,7 @@ export interface Vehicle {
   paidInstallments?: number;
   installmentAmount?: number;
   totalPaid?: number;
+  nextMaintenance?: string;
 }
 
 export interface Maintenance {

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Building, Shield } from "lucide-react";
+import { User, Mail, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export const ProfileSettings = () => {
@@ -29,14 +29,6 @@ export const ProfileSettings = () => {
             type="email" 
             placeholder="tu@email.com" 
             defaultValue={user?.email} 
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="company">Empresa</Label>
-          <Input 
-            id="company" 
-            placeholder="Nombre de la empresa" 
-            defaultValue={user?.company} 
           />
         </div>
         <div className="flex items-center gap-2 p-2 bg-secondary rounded-lg">

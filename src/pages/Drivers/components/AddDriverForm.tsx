@@ -11,13 +11,14 @@ import { DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog
 const initialDriverState: Omit<Driver, "id"> = {
   name: "",
   phone: "",
+  ci: "",
   documentId: "",
   licenseNumber: "",
   licenseExpiry: "",
   address: "",
   emergencyContact: "",
   emergencyPhone: "",
-  status: "active",
+  status: "active"
 };
 
 export const AddDriverForm = () => {
@@ -62,6 +63,17 @@ export const AddDriverForm = () => {
               value={newDriver.phone}
               onChange={(e) =>
                 setNewDriver({ ...newDriver, phone: e.target.value })
+              }
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ci">Cédula de Identidad</Label>
+            <Input
+              id="ci"
+              value={newDriver.ci}
+              onChange={(e) =>
+                setNewDriver({ ...newDriver, ci: e.target.value })
               }
               required
             />
