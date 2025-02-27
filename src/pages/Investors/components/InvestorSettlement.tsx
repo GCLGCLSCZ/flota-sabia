@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Tool, WrenchIcon } from "lucide-react";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench } from "lucide-react";
 import { Vehicle, Investor, Discount, Maintenance, CardexItem } from "@/types";
 import "./settlement-print.css";
 
@@ -219,7 +219,7 @@ const InvestorSettlement = () => {
       const cardexCosts = cardexItems.reduce((sum, item) => sum + item.cost, 0);
       
       // Monto final después de todos los descuentos
-      const netAmount = netAmountBeforeDiscounts - totalDiscounts;
+      const netAmount = netAmountBeforeDiscounts - totalDiscounts - maintenanceCosts - cardexCosts;
       
       // Verificar si hay pagos ya realizados al inversionista en este período
       const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
@@ -433,7 +433,7 @@ const InvestorSettlement = () => {
         <Card className="print:shadow-none print:border-0">
           <CardHeader className="print:pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Tool className="h-5 w-5 text-orange-500" />
+              <Wrench className="h-5 w-5 text-orange-500" />
               Detalle de Mantenimientos
             </CardTitle>
           </CardHeader>
