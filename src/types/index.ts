@@ -25,6 +25,8 @@ export interface Maintenance {
   date: string;
   description: string;
   cost: number;
+  costMaterials: number;
+  salePrice: number;
   status: "pending" | "completed" | "cancelled";
 }
 

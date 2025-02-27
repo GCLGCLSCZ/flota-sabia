@@ -20,6 +20,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const [maintenance, setMaintenance] = useState<Omit<Maintenance, "id" | "status">>({
     date: format(new Date(), "yyyy-MM-dd"),
     description: "",
+    cost: 0,
     costMaterials: 0,
     salePrice: 0,
   });
@@ -45,6 +46,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setMaintenance({
       date: format(new Date(), "yyyy-MM-dd"),
       description: "",
+      cost: 0,
       costMaterials: 0,
       salePrice: 0,
     });
@@ -89,11 +91,6 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   {vehicle.driverPhone && (
                     <p><span className="font-medium">Teléfono del conductor:</span> {vehicle.driverPhone}</p>
                   )}
-                  <p><span className="font-medium">Último mantenimiento:</span> {
-                    vehicle.lastMaintenance ? 
-                    format(new Date(vehicle.lastMaintenance), "dd MMM yyyy", { locale: es }) : 
-                    "No registrado"
-                  }</p>
                 </div>
               </div>
             </div>
@@ -168,7 +165,8 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                       <tr>
                         <th className="p-2 text-left">Fecha</th>
                         <th className="p-2 text-left">Descripción</th>
-                        <th className="p-2 text-left">Costo</th>
+                        <th className="p-2 text-left">Costo Mat.</th>
+                        <th className="p-2 text-left">Costo Total</th>
                         <th className="p-2 text-left">Estado</th>
                       </tr>
                     </thead>
@@ -178,9 +176,10 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                           <td className="p-2">{format(new Date(maintenance.date), "dd MMM yyyy", { locale: es })}</td>
                           <td className="p-2">{maintenance.description}</td>
                           <td className="p-2">Bs {maintenance.costMaterials}</td>
+                          <td className="p-2">Bs {maintenance.cost}</td>
                           <td className="p-2">{
                             maintenance.status === "pending" ? "Pendiente" : 
-                            maintenance.status === "in-progress" ? "En Proceso" : "Completado"
+                            maintenance.status === "completed" ? "Completado" : "Cancelado"
                           }</td>
                         </tr>
                       ))}
@@ -222,6 +221,16 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                       value={maintenance.description}
                       onChange={(e) => setMaintenance({...maintenance, description: e.target.value})}
                       className="w-full p-2 text-sm border rounded h-20"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs">Costo Total (Bs)</label>
+                    <input 
+                      type="number" 
+                      value={maintenance.cost}
+                      onChange={(e) => setMaintenance({...maintenance, cost: Number(e.target.value)})}
+                      className="w-full p-2 text-sm border rounded"
                       required
                     />
                   </div>
