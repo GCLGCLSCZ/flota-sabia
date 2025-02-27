@@ -35,8 +35,8 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     ? calculatedPaidInstallments 
     : vehicle.paidInstallments || 0;
     
-  // Calcular cuotas restantes del total
-  const remainingInstallments = totalInstallments - paidInstallments;
+  // Calcular cuotas restantes del total (ahora con decimales)
+  const remainingInstallments = Number((totalInstallments - paidInstallments).toFixed(2));
   
   // Usar el valor calculado para el total pagado
   const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
@@ -129,7 +129,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
             <p className="text-xs text-muted-foreground dark:text-gray-400">
               Cuotas restantes
             </p>
-            <p className="font-medium">{remainingInstallments} / {totalInstallments}</p>
+            <p className="font-medium">{remainingInstallments.toFixed(2)} / {totalInstallments}</p>
           </div>
         </div>
         
