@@ -15,15 +15,20 @@ import Calendar from "./pages/Calendar";
 import Drivers from "./pages/Drivers";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import Index from "./pages/Index";
 import "./App.css";
 
 const App = () => {
+  // Agregamos esto para depuración
+  console.log("Rendering App component");
+
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <AppProvider>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
+            <Route path="index" element={<Index />} />
             <Route path="vehicles" element={<Vehicles />} />
             <Route path="payments" element={<Payments />} />
             <Route path="caja" element={<Caja />} />
