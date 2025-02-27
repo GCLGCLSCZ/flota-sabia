@@ -8,14 +8,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench } from "lucide-react";
-import { Vehicle, Investor, Discount, Maintenance, CardexItem } from "@/types";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle } from "lucide-react";
+import { Vehicle, Investor, Discount, Maintenance, CardexItem, Payment } from "@/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import "./settlement-print.css";
 
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, settings } = useApp();
+  const { investors, vehicles, payments, settings, addPayment } = useApp();
+  
+  // Estado para la funcionalidad de pago
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    transferNumber: "",
+    amount: 0
+  });
+  const [paymentRegistered, setPaymentRegistered] = useState(false);
+  const [recentPaymentId, setRecentPaymentId] = useState<string | null>(null);
   
   // Primero definimos selectedMonth antes de usarlo
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -179,6 +192,26 @@ const InvestorSettlement = () => {
       return isWithinInterval(itemDate, { start: monthStart, end: monthEnd });
     });
   };
+
+  // Calcular las cuotas pagadas hasta el mes seleccionado
+  const calculatePaidInstallments = (vehicle: Vehicle, monthStr: string) => {
+    const selectedMonthDate = parse(monthStr, "yyyy-MM", new Date());
+    const monthEnd = endOfMonth(selectedMonthDate);
+    
+    // Filtrar pagos hasta el final del mes seleccionado
+    const paidUntilMonth = payments
+      .filter(p => 
+        p.vehicleId === vehicle.id && 
+        p.status === "completed" && 
+        parseISO(p.date) <= monthEnd
+      )
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    
+    // Calcular cuotas pagadas
+    return vehicle.installmentAmount ? 
+      Math.floor(paidUntilMonth / vehicle.installmentAmount) : 
+      vehicle.paidInstallments || 0;
+  };
   
   // Calcular la rendición de cuentas para el mes seleccionado
   const settlementData = useMemo(() => {
@@ -226,14 +259,29 @@ const InvestorSettlement = () => {
       const monthStart = startOfMonth(selectedMonthDate);
       const monthEnd = endOfMonth(selectedMonthDate);
       
-      const paidToInvestor = payments
+      // Filtrar pagos que corresponden a este período
+      const periodPayments = payments
         .filter(p => 
           p.status === "completed" && 
           p.concept.includes(vehicle.plate) && 
           p.concept.toLowerCase().includes("inversionista") &&
           isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })
+        );
+      
+      const paidToInvestor = periodPayments.reduce((sum, p) => sum + p.amount, 0);
+      
+      // Calcular cuotas pagadas y restantes
+      const paidInstallments = calculatePaidInstallments(vehicle, selectedMonth);
+      const remainingInstallments = (vehicle.totalInstallments || 0) - paidInstallments;
+      
+      // Monto total pagado acumulado hasta el mes actual
+      const totalPaid = payments
+        .filter(p => 
+          p.vehicleId === vehicle.id && 
+          p.status === "completed" && 
+          parseISO(p.date) <= monthEnd
         )
-        .reduce((sum, p) => sum + p.amount, 0);
+        .reduce((sum, payment) => sum + payment.amount, 0);
       
       return {
         vehicleId: vehicle.id,
@@ -254,8 +302,14 @@ const InvestorSettlement = () => {
         cardexCosts,
         netAmount,
         paidToInvestor,
+        periodPayments,
         pendingAmount: netAmount - paidToInvestor,
-        status: paidToInvestor >= netAmount ? "pagado" : "pendiente"
+        status: paidToInvestor >= netAmount ? "pagado" : "pendiente",
+        // Información contractual adicional
+        paidInstallments,
+        remainingInstallments,
+        totalPaid,
+        contractTotalAmount: (vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0),
       };
     });
   }, [investorVehicles, selectedMonth, payments, settings]);
@@ -273,7 +327,10 @@ const InvestorSettlement = () => {
         cardexCosts: acc.cardexCosts + item.cardexCosts,
         netAmount: acc.netAmount + item.netAmount,
         paidToInvestor: acc.paidToInvestor + item.paidToInvestor,
-        pendingAmount: acc.pendingAmount + item.pendingAmount
+        pendingAmount: acc.pendingAmount + item.pendingAmount,
+        // Totales de información contractual
+        totalPaid: acc.totalPaid + item.totalPaid,
+        contractTotalAmount: acc.contractTotalAmount + item.contractTotalAmount
       };
     }, { 
       totalGenerated: 0, 
@@ -285,13 +342,86 @@ const InvestorSettlement = () => {
       cardexCosts: 0,
       netAmount: 0,
       paidToInvestor: 0,
-      pendingAmount: 0
+      pendingAmount: 0,
+      // Totales de información contractual
+      totalPaid: 0,
+      contractTotalAmount: 0
     });
   }, [settlementData]);
+  
+  // Buscar el último pago realizado en este período
+  const latestPayment = useMemo(() => {
+    if (!recentPaymentId) {
+      // Buscar pagos recientes para este período
+      const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
+      const monthStart = startOfMonth(selectedMonthDate);
+      const monthEnd = endOfMonth(selectedMonthDate);
+      
+      // Encontrar el pago más reciente
+      return payments
+        .filter(p => 
+          p.status === "completed" && 
+          p.concept.toLowerCase().includes(`rendición`) &&
+          p.concept.toLowerCase().includes(format(monthStart, "MMMM yyyy", { locale: es }).toLowerCase()) &&
+          isWithinInterval(parseISO(p.date), { start: monthStart, end: new Date() })
+        )
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    } else {
+      // Buscar el pago específico que acabamos de registrar
+      return payments.find(p => p.id === recentPaymentId);
+    }
+  }, [payments, selectedMonth, recentPaymentId]);
   
   // Manejar la impresión de la rendición
   const handlePrint = () => {
     window.print();
+  };
+  
+  // Manejar el registro de un nuevo pago
+  const handlePaymentSubmit = () => {
+    if (!investor) return;
+    
+    const monthLabel = format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM yyyy", { locale: es });
+    
+    const newPayment: Omit<Payment, "id"> = {
+      date: paymentInfo.date,
+      amount: paymentInfo.amount || totals.netAmount,
+      concept: `Pago a inversionista: ${investor.name} - Rendición ${monthLabel}`,
+      paymentMethod: "transfer",
+      status: "completed",
+      vehicleId: settlementData[0]?.vehicleId || "",
+      bankName: investor.bankName || "",
+      transferNumber: paymentInfo.transferNumber
+    };
+    
+    const success = addPayment(newPayment);
+    
+    if (success) {
+      // Buscar el ID del pago recién agregado
+      const newlyAddedPayment = payments
+        .filter(p => 
+          p.concept === newPayment.concept && 
+          p.transferNumber === newPayment.transferNumber
+        )
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      
+      if (newlyAddedPayment) {
+        setRecentPaymentId(newlyAddedPayment.id);
+      }
+      
+      setPaymentRegistered(true);
+      setShowPaymentDialog(false);
+    }
+  };
+  
+  // Abrir diálogo para registrar un pago
+  const openPaymentDialog = () => {
+    setPaymentInfo({
+      date: format(new Date(), "yyyy-MM-dd"),
+      transferNumber: "",
+      amount: totals.pendingAmount > 0 ? totals.pendingAmount : totals.netAmount
+    });
+    setShowPaymentDialog(true);
   };
   
   if (!investor) {
@@ -317,6 +447,13 @@ const InvestorSettlement = () => {
             <Printer className="h-4 w-4 mr-2" />
             Imprimir Rendición
           </Button>
+          
+          {totals.pendingAmount > 0 && !paymentRegistered && (
+            <Button onClick={openPaymentDialog} variant="default">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Registrar Pago
+            </Button>
+          )}
         </div>
       </div>
       
@@ -357,6 +494,76 @@ const InvestorSettlement = () => {
           </div>
         </div>
       </div>
+      
+      {/* Detalles del Contrato */}
+      <Card className="print:shadow-none print:border-0">
+        <CardHeader className="print:pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Resumen Contractual
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-3 border rounded-lg bg-muted/20">
+              <p className="text-sm text-muted-foreground">Monto Total Contrato</p>
+              <p className="text-lg font-bold">{totals.contractTotalAmount.toFixed(2)} Bs</p>
+            </div>
+            <div className="p-3 border rounded-lg bg-muted/20">
+              <p className="text-sm text-muted-foreground">Total Pagado Hasta la Fecha</p>
+              <p className="text-lg font-bold">{totals.totalPaid.toFixed(2)} Bs</p>
+            </div>
+            <div className="p-3 border rounded-lg bg-muted/20">
+              <p className="text-sm text-muted-foreground">Saldo Pendiente Total</p>
+              <p className="text-lg font-bold">{(totals.contractTotalAmount - totals.totalPaid).toFixed(2)} Bs</p>
+            </div>
+            <div className="p-3 border rounded-lg bg-muted/20">
+              <p className="text-sm text-muted-foreground">Porcentaje Completado</p>
+              <p className="text-lg font-bold">
+                {totals.contractTotalAmount > 0 
+                  ? Math.round((totals.totalPaid / totals.contractTotalAmount) * 100) 
+                  : 0}%
+              </p>
+            </div>
+          </div>
+          
+          {/* Tabla de Resumen por Vehículo */}
+          <div className="mt-4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vehículo</TableHead>
+                  <TableHead className="text-right">Total Cuotas</TableHead>
+                  <TableHead className="text-right">Cuotas Pagadas</TableHead>
+                  <TableHead className="text-right">Cuotas Restantes</TableHead>
+                  <TableHead className="text-right">Total Pagado</TableHead>
+                  <TableHead className="text-right">Saldo Pendiente</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {settlementData.map((item) => (
+                  <TableRow key={`contract-${item.vehicleId}`}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Car className="h-4 w-4" />
+                        <div>
+                          <div>{item.plate}</div>
+                          <div className="text-xs text-muted-foreground">{item.model}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">{Math.round(item.contractTotalAmount / item.dailyRate)}</TableCell>
+                    <TableCell className="text-right">{item.paidInstallments}</TableCell>
+                    <TableCell className="text-right">{item.remainingInstallments}</TableCell>
+                    <TableCell className="text-right">{item.totalPaid.toFixed(2)} Bs</TableCell>
+                    <TableCell className="text-right">{(item.contractTotalAmount - item.totalPaid).toFixed(2)} Bs</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
       
       <Card className="print:shadow-none print:border-0">
         <CardHeader className="print:pb-2">
@@ -592,6 +799,18 @@ const InvestorSettlement = () => {
               <p className={`text-2xl font-bold ${totals.paidToInvestor > 0 ? 'text-green-600' : ''}`}>
                 {totals.paidToInvestor.toFixed(2)} Bs
               </p>
+              
+              {/* Si existe un pago registrado para este período, mostrar detalles */}
+              {latestPayment && (
+                <div className="mt-2 text-xs">
+                  <p className="font-medium">Detalles del Pago:</p>
+                  <div className="mt-1 space-y-0.5">
+                    <p>Fecha: {format(new Date(latestPayment.date), "dd/MM/yyyy")}</p>
+                    {latestPayment.transferNumber && <p>Transferencia: {latestPayment.transferNumber}</p>}
+                    {latestPayment.bankName && <p>Banco: {latestPayment.bankName}</p>}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="p-4 border rounded-lg bg-muted/30">
               <p className="text-sm text-muted-foreground">Pendiente</p>
@@ -625,6 +844,26 @@ const InvestorSettlement = () => {
             )}
           </div>
           
+          {/* Datos del inversor */}
+          <div className="mt-4 p-4 border rounded-lg bg-muted/20">
+            <h3 className="text-base font-medium mb-2">Datos del Inversor</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm"><span className="font-medium">Nombre:</span> {investor.name}</p>
+                <p className="text-sm"><span className="font-medium">Contacto:</span> {investor.contact}</p>
+                <p className="text-sm"><span className="font-medium">Documento:</span> {investor.documentId}</p>
+              </div>
+              <div>
+                {investor.bankName && (
+                  <p className="text-sm"><span className="font-medium">Banco:</span> {investor.bankName}</p>
+                )}
+                {investor.bankAccount && (
+                  <p className="text-sm"><span className="font-medium">Cuenta:</span> {investor.bankAccount}</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
           <div className="mt-8 print:block hidden">
             <div className="grid grid-cols-2 gap-16">
               <div className="text-center">
@@ -642,6 +881,78 @@ const InvestorSettlement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Registro de Pago */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Registrar Pago al Inversionista</DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="payment-date" className="text-right">
+                Fecha
+              </Label>
+              <Input
+                id="payment-date"
+                type="date"
+                value={paymentInfo.date}
+                onChange={(e) => setPaymentInfo({...paymentInfo, date: e.target.value})}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="transfer-number" className="text-right">
+                N° Transferencia
+              </Label>
+              <Input
+                id="transfer-number"
+                value={paymentInfo.transferNumber}
+                onChange={(e) => setPaymentInfo({...paymentInfo, transferNumber: e.target.value})}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Monto (Bs)
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                value={paymentInfo.amount}
+                onChange={(e) => setPaymentInfo({...paymentInfo, amount: parseFloat(e.target.value)})}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="bg-muted/20 p-2 rounded mt-2">
+              <h4 className="text-sm font-medium mb-1">Datos Bancarios del Inversor</h4>
+              {investor.bankName ? (
+                <div className="text-sm space-y-1">
+                  <p><span className="font-medium">Banco:</span> {investor.bankName}</p>
+                  {investor.bankAccount && (
+                    <p><span className="font-medium">Cuenta:</span> {investor.bankAccount}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No hay datos bancarios registrados</p>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" onClick={handlePaymentSubmit}>
+              Registrar Pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
