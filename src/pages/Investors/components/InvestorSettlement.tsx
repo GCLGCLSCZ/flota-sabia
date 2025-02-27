@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
-import { format, parse, parseISO, startOfMonth, endOfMonth, isSunday, subMonths, differenceInDays, isWithinInterval } from "date-fns";
+import { format, parse, parseISO, startOfMonth, endOfMonth, isSunday, subMonths, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,12 @@ const InvestorSettlement = () => {
   const { id } = useParams<{ id: string }>();
   const { investors, vehicles, payments } = useApp();
   
+  // Primero definimos selectedMonth antes de usarlo
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const lastMonth = subMonths(new Date(), 1);
+    return format(lastMonth, "yyyy-MM");
+  });
+  
   // Establecer el título del documento para impresión
   useEffect(() => {
     const originalTitle = document.title;
@@ -29,11 +35,6 @@ const InvestorSettlement = () => {
       document.title = originalTitle;
     };
   }, [id, investors, selectedMonth]);
-  
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const lastMonth = subMonths(new Date(), 1);
-    return format(lastMonth, "yyyy-MM");
-  });
   
   // Encontrar el inversionista actual
   const investor = useMemo(() => {
