@@ -8,18 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle, Edit } from "lucide-react";
+import { ArrowLeft, Calendar, Car, FileText, Printer, Wifi, AlertTriangle, InfoIcon, Wrench, CheckCircle, Edit, Trash2 } from "lucide-react";
 import { Vehicle, Investor, Discount, Maintenance, CardexItem, Payment } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import "./settlement-print.css";
 
 const InvestorSettlement = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, settings, addPayment, updatePayment } = useApp();
+  const { investors, vehicles, payments, settings, addPayment, updatePayment, removePayment } = useApp();
   const { toast } = useToast();
   
   // Estado para la funcionalidad de pago
@@ -29,11 +30,16 @@ const InvestorSettlement = () => {
     id: "",
     date: format(new Date(), "yyyy-MM-dd"),
     transferNumber: "",
-    amount: 0
+    amount: 0,
+    status: "completed" as "completed" | "pending" | "analysing"
   });
   const [paymentRegistered, setPaymentRegistered] = useState(false);
   const [recentPaymentId, setRecentPaymentId] = useState<string | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0); // Estado para forzar la actualización
+  
+  // Estado para confirmar eliminación de pago
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
   
   // Primero definimos selectedMonth antes de usarlo
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -270,7 +276,7 @@ const InvestorSettlement = () => {
       // Filtrar pagos que corresponden a este período
       const periodPayments = payments
         .filter(p => 
-          p.status === "completed" && 
+          (p.status === "completed" || p.status === "analysing") && 
           (p.concept.includes(`inversionista: ${investor?.name}`) || 
            (p.concept.includes(vehicle.plate) && p.concept.toLowerCase().includes("inversionista"))) &&
           isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })
@@ -278,7 +284,15 @@ const InvestorSettlement = () => {
       
       console.log("Period payments for vehicle", vehicle.plate, ":", periodPayments);
       
-      const paidToInvestor = periodPayments.reduce((sum, p) => sum + p.amount, 0);
+      // Solo se considera como pagado lo que tiene status "completed"
+      const paidToInvestor = periodPayments
+        .filter(p => p.status === "completed")
+        .reduce((sum, p) => sum + p.amount, 0);
+      
+      // Pagos en análisis se muestran pero no se consideran como pagados
+      const analysingPayments = periodPayments
+        .filter(p => p.status === "analysing")
+        .reduce((sum, p) => sum + p.amount, 0);
       
       // Calcular cuotas pagadas y restantes
       const paidInstallments = calculatePaidInstallments(vehicle, selectedMonth);
@@ -312,6 +326,7 @@ const InvestorSettlement = () => {
         cardexCosts,
         netAmount,
         paidToInvestor,
+        analysingPayments,
         periodPayments,
         pendingAmount: netAmount - paidToInvestor,
         status: paidToInvestor >= netAmount ? "pagado" : "pendiente",
@@ -337,6 +352,7 @@ const InvestorSettlement = () => {
         cardexCosts: acc.cardexCosts + item.cardexCosts,
         netAmount: acc.netAmount + item.netAmount,
         paidToInvestor: acc.paidToInvestor + item.paidToInvestor,
+        analysingPayments: acc.analysingPayments + item.analysingPayments,
         pendingAmount: acc.pendingAmount + item.pendingAmount,
         // Totales de información contractual
         totalPaid: acc.totalPaid + item.totalPaid,
@@ -352,6 +368,7 @@ const InvestorSettlement = () => {
       cardexCosts: 0,
       netAmount: 0,
       paidToInvestor: 0,
+      analysingPayments: 0,
       pendingAmount: 0,
       // Totales de información contractual
       totalPaid: 0,
@@ -373,7 +390,7 @@ const InvestorSettlement = () => {
       // Encontrar el pago más reciente
       return payments
         .filter(p => 
-          p.status === "completed" && 
+          (p.status === "completed" || p.status === "analysing") && 
           p.concept.toLowerCase().includes(`rendición`) &&
           p.concept.toLowerCase().includes(format(monthStart, "MMMM yyyy", { locale: es }).toLowerCase()) &&
           isWithinInterval(parseISO(p.date), { start: monthStart, end: new Date() })
@@ -388,18 +405,35 @@ const InvestorSettlement = () => {
   };
   
   // Iniciar edición de un pago existente
-  const handleEditPayment = () => {
-    if (!latestPayment) return;
-    
+  const handleEditPayment = (payment: Payment) => {
     setPaymentInfo({
-      id: latestPayment.id,
-      date: latestPayment.date,
-      transferNumber: latestPayment.transferNumber || "",
-      amount: latestPayment.amount
+      id: payment.id,
+      date: payment.date,
+      transferNumber: payment.transferNumber || "",
+      amount: payment.amount,
+      status: payment.status as "completed" | "pending" | "analysing"
     });
     
     setIsEditingPayment(true);
     setShowPaymentDialog(true);
+  };
+  
+  // Manejar la eliminación de un pago
+  const handleDeletePayment = (paymentId: string) => {
+    setPaymentToDelete(paymentId);
+    setShowDeleteDialog(true);
+  };
+  
+  // Confirmar la eliminación de un pago
+  const confirmDeletePayment = () => {
+    if (paymentToDelete) {
+      removePayment(paymentToDelete);
+      setRecentPaymentId(null);
+      setPaymentRegistered(false);
+      setForceUpdate(prev => prev + 1);
+      setShowDeleteDialog(false);
+      setPaymentToDelete(null);
+    }
   };
   
   // Manejar el registro o actualización de un pago
@@ -415,7 +449,8 @@ const InvestorSettlement = () => {
       updatePayment(paymentInfo.id, {
         date: paymentInfo.date,
         amount: paymentInfo.amount,
-        transferNumber: paymentInfo.transferNumber
+        transferNumber: paymentInfo.transferNumber,
+        status: paymentInfo.status
       });
       
       setRecentPaymentId(paymentInfo.id);
@@ -434,7 +469,7 @@ const InvestorSettlement = () => {
         amount: paymentInfo.amount || totals.netAmount,
         concept: `Pago a inversionista: ${investor.name} - Rendición ${monthLabel}`,
         paymentMethod: "transfer",
-        status: "completed",
+        status: paymentInfo.status,
         vehicleId: settlementData[0]?.vehicleId || "",
         bankName: investor.bankName || "",
         transferNumber: paymentInfo.transferNumber
@@ -478,7 +513,8 @@ const InvestorSettlement = () => {
       id: "",
       date: format(new Date(), "yyyy-MM-dd"),
       transferNumber: "",
-      amount: totals.pendingAmount > 0 ? totals.pendingAmount : totals.netAmount
+      amount: totals.pendingAmount > 0 ? totals.pendingAmount : totals.netAmount,
+      status: "completed"
     });
     setIsEditingPayment(false);
     setShowPaymentDialog(true);
@@ -862,35 +898,101 @@ const InvestorSettlement = () => {
                     {totals.paidToInvestor.toFixed(2)} Bs
                   </p>
                 </div>
-                {latestPayment && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="px-2 print:hidden" 
-                    onClick={handleEditPayment}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
               
-              {/* Si existe un pago registrado para este período, mostrar detalles */}
-              {latestPayment && (
-                <div className="mt-2 text-xs">
-                  <p className="font-medium">Detalles del Pago:</p>
-                  <div className="mt-1 space-y-0.5">
-                    <p>Fecha: {format(new Date(latestPayment.date), "dd/MM/yyyy")}</p>
-                    {latestPayment.transferNumber && <p>Transferencia: {latestPayment.transferNumber}</p>}
-                    {latestPayment.bankName && <p>Banco: {latestPayment.bankName}</p>}
-                  </div>
+              {/* Lista de pagos registrados para este período */}
+              {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-medium">Pagos registrados:</p>
+                  {settlementData[0].periodPayments.map(payment => (
+                    <div key={payment.id} className="text-xs border-b pb-2 last:border-0">
+                      <div className="flex justify-between mb-0.5">
+                        <span className="font-medium">
+                          {format(new Date(payment.date), "dd/MM/yyyy")}
+                        </span>
+                        <span className={payment.status === "analysing" ? "text-amber-600" : "text-green-600"}>
+                          {payment.amount.toFixed(2)} Bs
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>
+                          {payment.transferNumber 
+                            ? `Trans. #${payment.transferNumber}`
+                            : "Efectivo"}
+                        </span>
+                        <span className="print:hidden">
+                          <button 
+                            className="text-blue-600 hover:text-blue-800 mr-2"
+                            onClick={() => handleEditPayment(payment)}
+                          >
+                            <Edit className="h-3 w-3 inline" />
+                          </button>
+                          <button 
+                            className="text-red-600 hover:text-red-800"
+                            onClick={() => handleDeletePayment(payment.id)}
+                          >
+                            <Trash2 className="h-3 w-3 inline" />
+                          </button>
+                        </span>
+                      </div>
+                      <div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                          payment.status === "completed" 
+                            ? "bg-green-100 text-green-800" 
+                            : payment.status === "analysing"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-gray-100"
+                        }`}>
+                          {payment.status === "completed" 
+                            ? "Completado" 
+                            : payment.status === "analysing"
+                              ? "En análisis"
+                              : "Pendiente"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+              
+              {totals.analysingPayments > 0 && (
+                <div className="mt-2 bg-amber-50 p-1.5 rounded text-xs text-amber-700">
+                  <p>Hay {totals.analysingPayments.toFixed(2)} Bs en pagos actualmente en análisis</p>
+                </div>
+              )}
+              
+              <div className="mt-3 print:hidden">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={openPaymentDialog}
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                  {settlementData[0]?.periodPayments && settlementData[0].periodPayments.length > 0 
+                    ? "Registrar otro pago" 
+                    : "Registrar pago"}
+                </Button>
+              </div>
             </div>
             <div className="p-4 border rounded-lg bg-muted/30">
               <p className="text-sm text-muted-foreground">Pendiente</p>
               <p className={`text-2xl font-bold ${totals.pendingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {totals.pendingAmount.toFixed(2)} Bs
               </p>
+              
+              {totals.analysingPayments > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground">Si se confirman los pagos en análisis:</p>
+                  <p className={`text-base font-medium ${
+                    (totals.pendingAmount - totals.analysingPayments) > 0 
+                      ? 'text-red-600' 
+                      : 'text-green-600'
+                  }`}>
+                    {(totals.pendingAmount - totals.analysingPayments).toFixed(2)} Bs
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           
@@ -1004,6 +1106,25 @@ const InvestorSettlement = () => {
               />
             </div>
             
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Estado
+              </Label>
+              <Select
+                value={paymentInfo.status}
+                onValueChange={(value: "completed" | "pending" | "analysing") => setPaymentInfo({...paymentInfo, status: value})}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completed">Completado</SelectItem>
+                  <SelectItem value="analysing">En análisis</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="bg-muted/20 p-2 rounded mt-2">
               <h4 className="text-sm font-medium mb-1">Datos Bancarios del Inversor</h4>
               {investor.bankName ? (
@@ -1032,6 +1153,24 @@ const InvestorSettlement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Diálogo de confirmación para eliminar pago */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Eliminarás permanentemente el pago seleccionado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePayment} className="bg-red-500 hover:bg-red-600">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

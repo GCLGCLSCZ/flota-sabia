@@ -67,7 +67,7 @@ export interface Payment {
   amount: number;
   concept: string;
   paymentMethod: "cash" | "transfer";
-  status: "completed" | "pending" | "cancelled";
+  status: "completed" | "pending" | "cancelled" | "analysing";
   vehicleId: string;
   receiptNumber?: string;
   bankName?: string;

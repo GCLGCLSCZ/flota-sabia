@@ -8,6 +8,7 @@ interface CRUDOptions<T> {
   validator?: (data: Partial<T>) => { isValid: boolean; errors: string[] };
   onAdd?: (newItem: T) => void;
   onUpdate?: (id: string, updatedItem: Partial<T>) => void;
+  onDelete?: (id: string) => void;
 }
 
 export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
@@ -81,10 +82,26 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     return true;
   };
 
+  const remove = (id: string) => {
+    setItems(prevItems => prevItems.filter(item => item.id !== id));
+
+    if (options.onDelete) {
+      options.onDelete(id);
+    }
+
+    toast({
+      title: "Elemento eliminado",
+      description: "El elemento ha sido eliminado exitosamente"
+    });
+
+    return true;
+  };
+
   return {
     items,
     setItems,
     add,
-    update
+    update,
+    remove
   };
 }

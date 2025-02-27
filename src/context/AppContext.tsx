@@ -17,13 +17,14 @@ interface AppContextType {
   settings: SystemSettings;
   updateSettings: (settings: Partial<SystemSettings>) => void;
   addVehicle: (vehicle: Omit<Vehicle, "id">) => boolean;
-  updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
+  updateVehicle: (id: string, vehicle: Partial<Vehicle>) => boolean;
   addPayment: (payment: Omit<Payment, "id">) => boolean;
-  updatePayment: (id: string, payment: Partial<Payment>) => void;
+  updatePayment: (id: string, payment: Partial<Payment>) => boolean;
+  removePayment: (id: string) => boolean;
   addInvestor: (investor: Omit<Investor, "id">) => boolean;
-  updateInvestor: (id: string, investor: Partial<Investor>) => void;
+  updateInvestor: (id: string, investor: Partial<Investor>) => boolean;
   addDriver: (driver: Omit<Driver, "id">) => boolean;
-  updateDriver: (id: string, driver: Partial<Driver>) => void;
+  updateDriver: (id: string, driver: Partial<Driver>) => boolean;
   validateVehicleData: (vehicle: Partial<Vehicle>) => { isValid: boolean; errors: string[] };
   validateInvestorData: (investor: Partial<Investor>) => { isValid: boolean; errors: string[] };
   validateDriverData: (driver: Partial<Driver>) => { isValid: boolean; errors: string[] };
@@ -54,7 +55,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     items: payments,
     setItems: setPayments,
     add: addPayment,
-    update: updatePayment
+    update: updatePayment,
+    remove: removePayment
   } = useCRUD<Payment>({
     storageKey: STORAGE_KEYS.PAYMENTS
   });
@@ -125,6 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateVehicle,
         addPayment,
         updatePayment,
+        removePayment,
         addInvestor,
         updateInvestor,
         addDriver,
