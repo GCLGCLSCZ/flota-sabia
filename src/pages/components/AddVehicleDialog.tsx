@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { Vehicle } from "@/types";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 interface AddVehicleDialogProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface AddVehicleDialogProps {
 
 const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
   const { addVehicle, investors, drivers } = useApp();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<Omit<Vehicle, "id">>({
     plate: "",
     brand: "",
@@ -56,6 +58,11 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
         driverPhone: selectedDriver.phone,
       });
     }
+  };
+
+  const goToInvestors = () => {
+    onClose(); // Cerrar el diálogo
+    navigate('/investors'); // Redirigir a la página de inversores
   };
 
   return (
@@ -121,9 +128,19 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
                 </SelectContent>
               </Select>
               {investors.length === 0 && (
-                <p className="text-sm text-red-500 mt-1">
-                  Debes agregar inversores antes de poder registrar un vehículo
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm text-red-500">
+                    Debes agregar inversores antes de poder registrar un vehículo
+                  </p>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm p-0 h-auto"
+                    onClick={goToInvestors}
+                  >
+                    Agregar inversor
+                  </Button>
+                </div>
               )}
             </div>
             <div className="space-y-2">
