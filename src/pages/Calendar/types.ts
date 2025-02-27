@@ -51,7 +51,7 @@ export interface NonWorkingDayDialogProps {
     toast: (props: {
       title?: string;
       description?: string;
-      action?: ToastAction;
+      action?: React.ReactElement<typeof ToastAction>;
       variant?: "default" | "destructive";
     }) => void;
   };
