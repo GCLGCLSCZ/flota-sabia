@@ -26,6 +26,7 @@ export const VehicleDetailsDialog = ({
   const [newMaintenance, setNewMaintenance] = useState({
     date: "",
     description: "",
+    cost: 0,
     costMaterials: 0,
     salePrice: 0,
   });
@@ -38,6 +39,7 @@ export const VehicleDetailsDialog = ({
     setNewMaintenance({
       date: "",
       description: "",
+      cost: 0,
       costMaterials: 0,
       salePrice: 0,
     });
@@ -102,9 +104,24 @@ export const VehicleDetailsDialog = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="maintenance-cost">Costo de Materiales (Bs)</Label>
+                  <Label htmlFor="maintenance-cost">Costo Total (Bs)</Label>
                   <Input
                     id="maintenance-cost"
+                    type="number"
+                    value={newMaintenance.cost}
+                    onChange={(e) =>
+                      setNewMaintenance({
+                        ...newMaintenance,
+                        cost: Number(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maintenance-materials">Costo de Materiales (Bs)</Label>
+                  <Input
+                    id="maintenance-materials"
                     type="number"
                     value={newMaintenance.costMaterials}
                     onChange={(e) =>
