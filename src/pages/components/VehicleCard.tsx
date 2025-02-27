@@ -14,11 +14,6 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     ? "border-l-4 border-l-primary"
     : "border-l-4 border-l-muted opacity-70";
 
-  // Cálculo de cuotas restantes
-  const totalInstallments = vehicle.totalInstallments || 0;
-  const paidInstallments = vehicle.paidInstallments || 0;
-  const remainingInstallments = totalInstallments - paidInstallments;
-  
   // Obtener los pagos realizados a este vehículo
   const vehiclePayments = payments.filter(p => p.vehicleId === vehicle.id);
   
@@ -27,8 +22,25 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     .filter(p => p.status === "completed")
     .reduce((sum, p) => sum + p.amount, 0);
   
+  // Cálculo de cuotas totales y pagadas
+  const totalInstallments = vehicle.totalInstallments || 0;
+  const installmentAmount = vehicle.installmentAmount || 0;
+  
+  // Calcular cuotas pagadas basado en el monto total pagado
+  const calculatedPaidInstallments = installmentAmount > 0 
+    ? Math.floor(totalPaidFromPayments / installmentAmount) 
+    : vehicle.paidInstallments || 0;
+  
   // Usar el valor calculado o el valor almacenado en el vehículo
-  const totalPaid = totalPaidFromPayments || (paidInstallments * (vehicle.installmentAmount || 0));
+  const paidInstallments = calculatedPaidInstallments > 0 
+    ? calculatedPaidInstallments 
+    : vehicle.paidInstallments || 0;
+    
+  // Calcular cuotas restantes
+  const remainingInstallments = totalInstallments - paidInstallments;
+  
+  // Usar el valor calculado para el total pagado
+  const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
 
   return (
     <Card className={`${cardClass} dark:bg-gray-800 dark:text-white dark:border-gray-700`}>
@@ -64,7 +76,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
             <p className="text-xs text-muted-foreground dark:text-gray-400">
               Cuota diaria
             </p>
-            <p className="font-medium">{vehicle.installmentAmount || 0} Bs</p>
+            <p className="font-medium">{installmentAmount} Bs</p>
           </div>
         </div>
         
