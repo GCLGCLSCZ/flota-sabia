@@ -3,9 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Car, Users, AlertCircle, DollarSign } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const { vehicles, investors, payments } = useApp();
+  const navigate = useNavigate();
 
   // Cálculo de estadísticas en tiempo real
   const statistics = useMemo(() => {
@@ -40,6 +42,7 @@ const Dashboard = () => {
       icon: Car,
       change: `${vehicles.length - statistics.vehicles} en mantenimiento`,
       color: "text-primary",
+      route: "/vehicles"
     },
     {
       label: "Inversores Activos",
@@ -47,6 +50,7 @@ const Dashboard = () => {
       icon: Users,
       change: `${investors.length > 0 ? (statistics.investors / investors.length * 100).toFixed(0) : 0}% activos`,
       color: "text-success",
+      route: "/investors"
     },
     {
       label: "Pagos Pendientes",
@@ -54,6 +58,7 @@ const Dashboard = () => {
       icon: AlertCircle,
       change: `${payments.filter(p => p.status === "completed").length} completados`,
       color: "text-warning",
+      route: "/payments"
     },
     {
       label: "Ingresos del Mes",
@@ -61,6 +66,7 @@ const Dashboard = () => {
       icon: DollarSign,
       change: "Mes actual",
       color: "text-success",
+      route: "/payment-analysis"
     },
   ];
 
@@ -102,11 +108,20 @@ const Dashboard = () => {
       }));
   }, [vehicles]);
 
+  // Función para navegar a la página correspondiente
+  const handleNavigate = (route: string) => {
+    navigate(route);
+  };
+
   return (
     <div className="w-full pb-8 zoom-safe custom-scrollbar">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((stat) => (
-          <Card key={stat.label} className="p-3 hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white">
+          <Card 
+            key={stat.label} 
+            className="p-3 hover:shadow-md transition-shadow cursor-pointer dark:bg-gray-800 dark:text-white"
+            onClick={() => handleNavigate(stat.route)}
+          >
             <div className="flex justify-between items-start space-x-2">
               <div className="w-3/4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">{stat.label}</p>
@@ -138,7 +153,8 @@ const Dashboard = () => {
               return (
                 <div
                   key={vehicle.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleNavigate("/payments")}
                 >
                   <div>
                     <p className="font-medium text-sm">{vehicle.plate}</p>
@@ -176,7 +192,8 @@ const Dashboard = () => {
               return (
                 <div
                   key={maintenance.plate}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleNavigate("/calendar")}
                 >
                   <div>
                     <p className="font-medium text-sm">{maintenance.plate}</p>
