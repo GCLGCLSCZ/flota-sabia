@@ -33,6 +33,7 @@ const InvestorSettlement = () => {
   });
   const [paymentRegistered, setPaymentRegistered] = useState(false);
   const [recentPaymentId, setRecentPaymentId] = useState<string | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0); // Estado para forzar la actualización
   
   // Primero definimos selectedMonth antes de usarlo
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -219,6 +220,9 @@ const InvestorSettlement = () => {
   
   // Calcular la rendición de cuentas para el mes seleccionado
   const settlementData = useMemo(() => {
+    // Añadido forceUpdate para que el memo se ejecute cuando cambie
+    console.log("Recalculando settlement data, forceUpdate:", forceUpdate);
+    
     if (!investorVehicles.length) return [];
     
     // Usar el valor de configuración para el costo de GPS
@@ -267,10 +271,12 @@ const InvestorSettlement = () => {
       const periodPayments = payments
         .filter(p => 
           p.status === "completed" && 
-          p.concept.includes(vehicle.plate) && 
-          p.concept.toLowerCase().includes("inversionista") &&
+          (p.concept.includes(`inversionista: ${investor?.name}`) || 
+           (p.concept.includes(vehicle.plate) && p.concept.toLowerCase().includes("inversionista"))) &&
           isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })
         );
+      
+      console.log("Period payments for vehicle", vehicle.plate, ":", periodPayments);
       
       const paidToInvestor = periodPayments.reduce((sum, p) => sum + p.amount, 0);
       
@@ -316,7 +322,7 @@ const InvestorSettlement = () => {
         contractTotalAmount: (vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0),
       };
     });
-  }, [investorVehicles, selectedMonth, payments, settings]);
+  }, [investorVehicles, selectedMonth, payments, settings, forceUpdate, investor?.name]);
   
   // Calcular totales
   const totals = useMemo(() => {
@@ -418,6 +424,9 @@ const InvestorSettlement = () => {
         title: "Pago actualizado",
         description: "El pago ha sido actualizado exitosamente"
       });
+      
+      // Forzar la actualización de los cálculos
+      setForceUpdate(prev => prev + 1);
     } else {
       // Registrar nuevo pago
       const newPayment: Omit<Payment, "id"> = {
@@ -435,22 +444,27 @@ const InvestorSettlement = () => {
       
       if (success) {
         // Buscar el ID del pago recién agregado
-        const newlyAddedPayment = payments
-          .filter(p => 
-            p.concept === newPayment.concept && 
-            p.transferNumber === newPayment.transferNumber
-          )
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-        
-        if (newlyAddedPayment) {
-          setRecentPaymentId(newlyAddedPayment.id);
-        }
-        
-        setPaymentRegistered(true);
-        toast({
-          title: "Pago registrado",
-          description: "El pago ha sido registrado exitosamente"
-        });
+        setTimeout(() => {
+          const newlyAddedPayment = payments
+            .filter(p => 
+              p.concept === newPayment.concept && 
+              p.transferNumber === newPayment.transferNumber
+            )
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          
+          if (newlyAddedPayment) {
+            setRecentPaymentId(newlyAddedPayment.id);
+          }
+          
+          setPaymentRegistered(true);
+          toast({
+            title: "Pago registrado",
+            description: "El pago ha sido registrado exitosamente"
+          });
+          
+          // Forzar la actualización de los cálculos
+          setForceUpdate(prev => prev + 1);
+        }, 100);
       }
     }
     
