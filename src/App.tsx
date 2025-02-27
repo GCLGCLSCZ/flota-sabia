@@ -17,6 +17,8 @@ import "./App.css";
 
 // Importamos la página de Drivers
 import Drivers from "@/pages/Drivers";
+// Importamos el componente de rendición de inversionistas
+import InvestorSettlement from "@/pages/Investors/components/InvestorSettlement";
 
 function App() {
   // Establecer el título de la aplicación
@@ -36,6 +38,7 @@ function App() {
             <Route path="payment-analysis" element={<PaymentAnalysis />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="investors" element={<Investors />} />
+            <Route path="investors/:id/settlement" element={<InvestorSettlement />} />
             <Route path="drivers" element={<Drivers />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />

@@ -18,10 +18,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, Car, CalendarClock } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Car, CalendarClock, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Investor } from "@/types";
 import { useApp } from "@/context/AppContext";
+import { Link } from "react-router-dom";
+import InvestorSettlementLink from "./Investors/components/InvestorSettlementLink";
 
 const Investors = () => {
   const { toast } = useToast();
@@ -170,6 +172,7 @@ const Investors = () => {
                 </TableCell>
                 <TableCell>{investor.lastPayment}</TableCell>
                 <TableCell className="text-right space-x-2">
+                  <InvestorSettlementLink investorId={investor.id} />
                   <Button
                     variant="ghost"
                     size="icon"
