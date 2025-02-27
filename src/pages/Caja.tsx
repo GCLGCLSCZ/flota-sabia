@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -14,10 +13,11 @@ import { DateRange } from "react-day-picker";
 import { Payment, Vehicle } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Filter, CalendarRange, List, Car, PieChart, BarChart } from "lucide-react";
+import { Calendar as CalendarIcon, Filter, CalendarRange, List, Car, PieChart, BarChart, ArrowDownSquare, ArrowUpSquare } from "lucide-react";
 
 type GroupBy = "vehicle" | "date" | "paymentMethod" | "none";
 type ViewMode = "daily" | "weekly" | "monthly" | "custom";
+type TransactionType = "ingreso" | "egreso";
 
 interface PaymentsByVehicle {
   vehicleId: string;
@@ -28,6 +28,8 @@ interface PaymentsByVehicle {
   payments: Payment[];
   companyEarnings: number;
   paidInstallments: number;
+  ingresos: number;
+  egresos: number;
 }
 
 interface PaymentsByDate {
@@ -38,6 +40,8 @@ interface PaymentsByDate {
   payments: Payment[];
   companyEarnings: number;
   paidInstallments: number;
+  ingresos: number;
+  egresos: number;
 }
 
 interface PaymentsByMethod {
@@ -47,9 +51,11 @@ interface PaymentsByMethod {
   payments: Payment[];
   companyEarnings: number;
   paidInstallments: number;
+  ingresos: number;
+  egresos: number;
 }
 
-const PaymentAnalysis = () => {
+const Caja = () => {
   const { payments, vehicles } = useApp();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -104,9 +110,43 @@ const PaymentAnalysis = () => {
     });
   }, [payments, dateRange, selectedVehicle]);
 
+  // Determine if a payment is an income or expense
+  const getTransactionType = (payment: Payment): TransactionType => {
+    // Pagos de inversionistas son egresos
+    if (payment.concept.toLowerCase().includes("inversionista")) {
+      return "egreso";
+    }
+    
+    // Compra de materiales o costos de mantenimiento son egresos
+    if (
+      payment.concept.toLowerCase().includes("material") ||
+      payment.concept.toLowerCase().includes("compra") ||
+      payment.concept.toLowerCase().includes("repuesto") ||
+      payment.concept.toLowerCase().includes("reparación") ||
+      payment.concept.toLowerCase().includes("mano de obra")
+    ) {
+      return "egreso";
+    }
+    
+    // Todo lo demás se considera ingreso (pagos regulares, etc.)
+    return "ingreso";
+  };
+
   // Calculate totals
-  const totalAmount = useMemo(() => {
-    return filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totals = useMemo(() => {
+    const ingresos = filteredPayments
+      .filter(payment => getTransactionType(payment) === "ingreso")
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    
+    const egresos = filteredPayments
+      .filter(payment => getTransactionType(payment) === "egreso")
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    
+    return {
+      total: ingresos - egresos,
+      ingresos,
+      egresos
+    };
   }, [filteredPayments]);
 
   // Calcular ganancias totales de la empresa y cuotas pagadas
@@ -148,21 +188,32 @@ const PaymentAnalysis = () => {
       const vehicle = vehicles.find(v => v.id === payment.vehicleId);
       if (!vehicle) return;
       
+      const transactionType = getTransactionType(payment);
+      const amount = payment.amount;
+      
       const existingGroup = groups.find(g => g.vehicleId === payment.vehicleId);
       if (existingGroup) {
-        existingGroup.totalAmount += payment.amount;
+        existingGroup.totalAmount += amount;
         existingGroup.count += 1;
         existingGroup.payments.push(payment);
+        
+        if (transactionType === "ingreso") {
+          existingGroup.ingresos += amount;
+        } else {
+          existingGroup.egresos += amount;
+        }
       } else {
         groups.push({
           vehicleId: payment.vehicleId,
           vehiclePlate: vehicle.plate,
           vehicleModel: vehicle.model,
-          totalAmount: payment.amount,
+          totalAmount: amount,
           count: 1,
           payments: [payment],
           companyEarnings: 0,
-          paidInstallments: 0
+          paidInstallments: 0,
+          ingresos: transactionType === "ingreso" ? amount : 0,
+          egresos: transactionType === "egreso" ? amount : 0
         });
       }
     });
@@ -171,7 +222,8 @@ const PaymentAnalysis = () => {
     groups.forEach(group => {
       const vehicle = vehicles.find(v => v.id === group.vehicleId);
       if (vehicle && vehicle.installmentAmount > 0) {
-        const paidInstallments = group.totalAmount / vehicle.installmentAmount;
+        // Solo considerar ingresos para calcular cuotas pagadas
+        const paidInstallments = group.ingresos / vehicle.installmentAmount;
         group.paidInstallments = Number(paidInstallments.toFixed(2));
         group.companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
       }
@@ -187,21 +239,31 @@ const PaymentAnalysis = () => {
     filteredPayments.forEach((payment) => {
       const date = payment.date.split('T')[0];
       const paymentDate = parseISO(payment.date);
+      const transactionType = getTransactionType(payment);
+      const amount = payment.amount;
       
       const existingGroup = groups.find(g => g.date === date);
       if (existingGroup) {
-        existingGroup.totalAmount += payment.amount;
+        existingGroup.totalAmount += amount;
         existingGroup.count += 1;
         existingGroup.payments.push(payment);
+        
+        if (transactionType === "ingreso") {
+          existingGroup.ingresos += amount;
+        } else {
+          existingGroup.egresos += amount;
+        }
       } else {
         groups.push({
           date,
           formattedDate: format(paymentDate, "dd 'de' MMMM, yyyy", { locale: es }),
-          totalAmount: payment.amount,
+          totalAmount: amount,
           count: 1,
           payments: [payment],
           companyEarnings: 0,
-          paidInstallments: 0
+          paidInstallments: 0,
+          ingresos: transactionType === "ingreso" ? amount : 0,
+          egresos: transactionType === "egreso" ? amount : 0
         });
       }
     });
@@ -215,7 +277,7 @@ const PaymentAnalysis = () => {
       const vehicleDailyPayments = new Map<string, number>();
       
       group.payments.forEach(payment => {
-        if (payment.status === "completed") {
+        if (payment.status === "completed" && getTransactionType(payment) === "ingreso") {
           const currentAmount = vehicleDailyPayments.get(payment.vehicleId) || 0;
           vehicleDailyPayments.set(payment.vehicleId, currentAmount + payment.amount);
         }
@@ -245,25 +307,35 @@ const PaymentAnalysis = () => {
     const cashPayments = filteredPayments.filter(p => p.paymentMethod === "cash");
     const transferPayments = filteredPayments.filter(p => p.paymentMethod === "transfer");
     
+    const cashIngresos = cashPayments.filter(p => getTransactionType(p) === "ingreso").reduce((sum, p) => sum + p.amount, 0);
+    const cashEgresos = cashPayments.filter(p => getTransactionType(p) === "egreso").reduce((sum, p) => sum + p.amount, 0);
+    
+    const transferIngresos = transferPayments.filter(p => getTransactionType(p) === "ingreso").reduce((sum, p) => sum + p.amount, 0);
+    const transferEgresos = transferPayments.filter(p => getTransactionType(p) === "egreso").reduce((sum, p) => sum + p.amount, 0);
+    
     if (cashPayments.length) {
       groups.push({
         method: "cash",
-        totalAmount: cashPayments.reduce((sum, p) => sum + p.amount, 0),
+        totalAmount: cashIngresos - cashEgresos,
         count: cashPayments.length,
         payments: cashPayments,
         companyEarnings: 0,
-        paidInstallments: 0
+        paidInstallments: 0,
+        ingresos: cashIngresos,
+        egresos: cashEgresos
       });
     }
     
     if (transferPayments.length) {
       groups.push({
         method: "transfer",
-        totalAmount: transferPayments.reduce((sum, p) => sum + p.amount, 0),
+        totalAmount: transferIngresos - transferEgresos,
         count: transferPayments.length,
         payments: transferPayments,
         companyEarnings: 0,
-        paidInstallments: 0
+        paidInstallments: 0,
+        ingresos: transferIngresos,
+        egresos: transferEgresos
       });
     }
     
@@ -272,7 +344,7 @@ const PaymentAnalysis = () => {
       const vehicleMethodPayments = new Map<string, number>();
       
       group.payments.forEach(payment => {
-        if (payment.status === "completed") {
+        if (payment.status === "completed" && getTransactionType(payment) === "ingreso") {
           const currentAmount = vehicleMethodPayments.get(payment.vehicleId) || 0;
           vehicleMethodPayments.set(payment.vehicleId, currentAmount + payment.amount);
         }
@@ -327,13 +399,19 @@ const PaymentAnalysis = () => {
     }
   };
 
+  const getTransactionTypeIcon = (type: TransactionType) => {
+    return type === "ingreso" 
+      ? <ArrowUpSquare className="h-4 w-4 text-green-600" /> 
+      : <ArrowDownSquare className="h-4 w-4 text-red-600" />;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-semibold">Análisis de Pagos</h1>
+          <h1 className="text-2xl font-semibold">Caja</h1>
           <p className="text-muted-foreground mt-1">
-            Analiza y filtra los pagos de los vehículos por diferentes criterios
+            Analiza los ingresos y egresos de la empresa
           </p>
         </div>
       </div>
@@ -429,22 +507,24 @@ const PaymentAnalysis = () => {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-muted/50">
               <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground">Total pagado</div>
-                <div className="text-2xl font-bold">{totalAmount.toFixed(2)} Bs</div>
+                <div className="text-sm text-muted-foreground">Ingresos</div>
+                <div className="text-2xl font-bold text-green-600">{totals.ingresos.toFixed(2)} Bs</div>
               </CardContent>
             </Card>
             
             <Card className="bg-muted/50">
               <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground">Cuotas pagadas</div>
-                <div className="text-2xl font-bold">{totalPaidInstallments}</div>
+                <div className="text-sm text-muted-foreground">Egresos</div>
+                <div className="text-2xl font-bold text-red-600">{totals.egresos.toFixed(2)} Bs</div>
               </CardContent>
             </Card>
             
-            <Card className="bg-green-50 dark:bg-green-900/20">
+            <Card className="bg-muted/50">
               <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground dark:text-gray-300">Ganancia de la empresa</div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalCompanyEarnings} Bs</div>
+                <div className="text-sm text-muted-foreground">Balance</div>
+                <div className={`text-2xl font-bold ${totals.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totals.total.toFixed(2)} Bs
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -480,20 +560,20 @@ const PaymentAnalysis = () => {
                       </div>
                       <div className="flex gap-4">
                         <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
+                          Ingresos: {group.ingresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
+                        <Badge variant="outline" className="text-base font-normal text-red-600">
+                          Egresos: {group.egresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
+                        <Badge variant="secondary" className={`text-base font-normal ${(group.ingresos - group.egresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Balance: {(group.ingresos - group.egresos).toFixed(2)} Bs
                         </Badge>
                       </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
+                      {group.count} transacciones registradas
                     </div>
                     <Table>
                       <TableHeader>
@@ -502,25 +582,37 @@ const PaymentAnalysis = () => {
                           <TableHead>Concepto</TableHead>
                           <TableHead>Método</TableHead>
                           <TableHead>Estado</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {group.payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy")}</TableCell>
-                            <TableCell>{payment.concept}</TableCell>
-                            <TableCell>{getPaymentMethodLabel(payment.paymentMethod)}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusBadgeColor(payment.status)}>
-                                {getPaymentStatusLabel(payment.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {payment.amount.toFixed(2)} Bs
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {group.payments.map((payment) => {
+                          const transactionType = getTransactionType(payment);
+                          return (
+                            <TableRow key={payment.id}>
+                              <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy")}</TableCell>
+                              <TableCell>{payment.concept}</TableCell>
+                              <TableCell>{getPaymentMethodLabel(payment.paymentMethod)}</TableCell>
+                              <TableCell>
+                                <Badge className={getStatusBadgeColor(payment.status)}>
+                                  {getPaymentStatusLabel(payment.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {getTransactionTypeIcon(transactionType)}
+                                  <span className={transactionType === "ingreso" ? "text-green-600" : "text-red-600"}>
+                                    {transactionType === "ingreso" ? "Ingreso" : "Egreso"}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${transactionType === "ingreso" ? "text-green-600" : "text-red-600"}`}>
+                                {payment.amount.toFixed(2)} Bs
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -530,7 +622,7 @@ const PaymentAnalysis = () => {
           ) : (
             <Card>
               <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
+                <p className="text-muted-foreground">No hay transacciones que coincidan con los filtros seleccionados.</p>
               </CardContent>
             </Card>
           )}
@@ -549,20 +641,20 @@ const PaymentAnalysis = () => {
                       </div>
                       <div className="flex gap-4">
                         <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
+                          Ingresos: {group.ingresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
+                        <Badge variant="outline" className="text-base font-normal text-red-600">
+                          Egresos: {group.egresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
+                        <Badge variant="secondary" className={`text-base font-normal ${(group.ingresos - group.egresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Balance: {(group.ingresos - group.egresos).toFixed(2)} Bs
                         </Badge>
                       </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
+                      {group.count} transacciones registradas
                     </div>
                     <Table>
                       <TableHeader>
@@ -571,12 +663,14 @@ const PaymentAnalysis = () => {
                           <TableHead>Concepto</TableHead>
                           <TableHead>Método</TableHead>
                           <TableHead>Estado</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {group.payments.map((payment) => {
                           const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
+                          const transactionType = getTransactionType(payment);
                           return (
                             <TableRow key={payment.id}>
                               <TableCell>
@@ -589,7 +683,15 @@ const PaymentAnalysis = () => {
                                   {getPaymentStatusLabel(payment.status)}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-right font-medium">
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {getTransactionTypeIcon(transactionType)}
+                                  <span className={transactionType === "ingreso" ? "text-green-600" : "text-red-600"}>
+                                    {transactionType === "ingreso" ? "Ingreso" : "Egreso"}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${transactionType === "ingreso" ? "text-green-600" : "text-red-600"}`}>
                                 {payment.amount.toFixed(2)} Bs
                               </TableCell>
                             </TableRow>
@@ -604,7 +706,7 @@ const PaymentAnalysis = () => {
           ) : (
             <Card>
               <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
+                <p className="text-muted-foreground">No hay transacciones que coincidan con los filtros seleccionados.</p>
               </CardContent>
             </Card>
           )}
@@ -623,20 +725,20 @@ const PaymentAnalysis = () => {
                       </div>
                       <div className="flex gap-4">
                         <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
+                          Ingresos: {group.ingresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
+                        <Badge variant="outline" className="text-base font-normal text-red-600">
+                          Egresos: {group.egresos.toFixed(2)} Bs
                         </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
+                        <Badge variant="secondary" className={`text-base font-normal ${(group.ingresos - group.egresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Balance: {(group.ingresos - group.egresos).toFixed(2)} Bs
                         </Badge>
                       </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
+                      {group.count} transacciones registradas
                     </div>
                     <Table>
                       <TableHeader>
@@ -645,12 +747,14 @@ const PaymentAnalysis = () => {
                           <TableHead>Vehículo</TableHead>
                           <TableHead>Concepto</TableHead>
                           <TableHead>Estado</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {group.payments.map((payment) => {
                           const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
+                          const transactionType = getTransactionType(payment);
                           return (
                             <TableRow key={payment.id}>
                               <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy")}</TableCell>
@@ -663,7 +767,15 @@ const PaymentAnalysis = () => {
                                   {getPaymentStatusLabel(payment.status)}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-right font-medium">
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {getTransactionTypeIcon(transactionType)}
+                                  <span className={transactionType === "ingreso" ? "text-green-600" : "text-red-600"}>
+                                    {transactionType === "ingreso" ? "Ingreso" : "Egreso"}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${transactionType === "ingreso" ? "text-green-600" : "text-red-600"}`}>
                                 {payment.amount.toFixed(2)} Bs
                               </TableCell>
                             </TableRow>
@@ -678,7 +790,7 @@ const PaymentAnalysis = () => {
           ) : (
             <Card>
               <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
+                <p className="text-muted-foreground">No hay transacciones que coincidan con los filtros seleccionados.</p>
               </CardContent>
             </Card>
           )}
@@ -688,4 +800,4 @@ const PaymentAnalysis = () => {
   );
 };
 
-export default PaymentAnalysis;
+export default Caja;

@@ -20,6 +20,7 @@ interface AppContextType {
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   addPayment: (payment: Omit<Payment, "id">) => boolean;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
+  deletePayment: (id: string) => void;
   addInvestor: (investor: Omit<Investor, "id">) => boolean;
   updateInvestor: (id: string, investor: Partial<Investor>) => void;
   addDriver: (driver: Omit<Driver, "id">) => boolean;
@@ -88,6 +89,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storageKey: 'settings'
   });
 
+  // Función para eliminar un pago (marcar como cancelado)
+  const deletePayment = (id: string) => {
+    updatePayment(id, { status: "cancelled" });
+  };
+
   // Asegurarse de que siempre haya una configuración disponible
   const settings = settingsArray.length > 0 ? settingsArray[0] : {
     id: 'default-settings',
@@ -125,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateVehicle,
         addPayment,
         updatePayment,
+        deletePayment,
         addInvestor,
         updateInvestor,
         addDriver,
