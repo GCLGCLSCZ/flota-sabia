@@ -4,10 +4,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Car, DollarSign, Calendar, BarChart, Users, ArrowRight } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const navigate = useNavigate();
   const { vehicles, payments } = useApp();
+  const isMobile = useIsMobile();
 
   // Calcular estadísticas básicas
   const activeVehicles = vehicles.filter(v => v.status === "active").length;
@@ -18,68 +20,68 @@ const Index = () => {
     {
       title: "Vehículos",
       description: "Administra tu flota de vehículos",
-      icon: <Car className="h-12 w-12 text-primary/80" />,
+      icon: <Car className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/vehicles",
       stat: `${activeVehicles} activos`,
     },
     {
       title: "Pagos",
       description: "Registra y consulta pagos",
-      icon: <DollarSign className="h-12 w-12 text-primary/80" />,
+      icon: <DollarSign className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/payments",
       stat: `${totalPayments} registros`,
     },
     {
       title: "Análisis de Pagos",
       description: "Visualiza y analiza tus ingresos",
-      icon: <BarChart className="h-12 w-12 text-primary/80" />,
+      icon: <BarChart className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/payment-analysis",
       stat: `$${totalAmount.toFixed(2)} total`,
     },
     {
       title: "Calendario",
       description: "Programa mantenimientos y eventos",
-      icon: <Calendar className="h-12 w-12 text-primary/80" />,
+      icon: <Calendar className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/calendar",
       stat: "Planificación",
     },
     {
       title: "Inversionistas",
       description: "Gestiona a los dueños de los vehículos",
-      icon: <Users className="h-12 w-12 text-primary/80" />,
+      icon: <Users className="h-8 w-8 md:h-12 md:w-12 text-primary/80" />,
       route: "/investors",
       stat: "Colaboradores",
     },
   ];
 
   return (
-    <div className="min-h-[80vh] flex flex-col">
-      <div className="text-center my-8">
-        <h1 className="text-3xl md:text-4xl font-bold mb-4">Sistema de Gestión de Flota</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+    <div className="w-full min-h-[calc(100vh-4rem)] flex flex-col p-4">
+      <div className="text-center my-4 md:my-8">
+        <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4">Sistema de Gestión de Flota</h1>
+        <p className="text-sm md:text-xl text-muted-foreground max-w-2xl mx-auto px-2">
           Administra tu flota de vehículos, controla pagos, programa mantenimientos y más.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 flex-grow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-4 flex-grow">
         {modules.map((module) => (
           <Card key={module.route} className="flex flex-col hover:shadow-md transition-shadow">
-            <CardHeader>
+            <CardHeader className="p-4 md:p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-xl">{module.title}</CardTitle>
-                  <CardDescription className="mt-2">{module.description}</CardDescription>
+                  <CardTitle className="text-lg md:text-xl">{module.title}</CardTitle>
+                  <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm">{module.description}</CardDescription>
                 </div>
                 <div>{module.icon}</div>
               </div>
             </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="text-2xl font-semibold text-primary mt-2">{module.stat}</div>
+            <CardContent className="flex-grow p-4 md:p-6 pt-0">
+              <div className="text-xl md:text-2xl font-semibold text-primary mt-2">{module.stat}</div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="p-4 md:p-6 pt-0">
               <Button 
                 variant="ghost" 
-                className="w-full justify-between" 
+                className="w-full justify-between text-sm md:text-base" 
                 onClick={() => navigate(module.route)}
               >
                 <span>Ir al módulo</span>
@@ -90,7 +92,7 @@ const Index = () => {
         ))}
       </div>
 
-      <div className="text-center text-muted-foreground mt-12 mb-6">
+      <div className="text-center text-muted-foreground text-xs md:text-sm mt-6 md:mt-12 mb-4 md:mb-6">
         <p>© {new Date().getFullYear()} Sistema de Gestión de Flota - Todos los derechos reservados</p>
       </div>
     </div>
