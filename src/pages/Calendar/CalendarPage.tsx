@@ -87,7 +87,7 @@ const CalendarPage = () => {
         setSelectedVehicle={setSelectedVehicle}
         vehicles={vehicles}
         updateVehicle={updateVehicle}
-        toast={toast}
+        toast={{ toast }}
         setSelectedDates={setSelectedDates}
       />
 
