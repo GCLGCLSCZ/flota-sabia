@@ -33,9 +33,11 @@ const Investors = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newInvestor, setNewInvestor] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     contact: "",
     documentId: "",
+    bankName: "",
     bankAccount: "",
   });
 
@@ -43,6 +45,7 @@ const Investors = () => {
     e.preventDefault();
     const success = addInvestor({
       ...newInvestor,
+      name: `${newInvestor.firstName} ${newInvestor.lastName}`,
       vehicleCount: 0,
       status: "active",
       lastPayment: new Date().toISOString(),
@@ -51,9 +54,11 @@ const Investors = () => {
     if (success) {
       setShowAddDialog(false);
       setNewInvestor({
-        name: "",
+        firstName: "",
+        lastName: "",
         contact: "",
         documentId: "",
+        bankName: "",
         bankAccount: "",
       });
     }
@@ -136,7 +141,8 @@ const Investors = () => {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Contacto</TableHead>
-              <TableHead>CUIT/RUT</TableHead>
+              <TableHead>NIT/CI</TableHead>
+              <TableHead>Banco</TableHead>
               <TableHead>Cuenta Bancaria</TableHead>
               <TableHead>Vehículos</TableHead>
               <TableHead>Estado</TableHead>
@@ -150,6 +156,7 @@ const Investors = () => {
                 <TableCell className="font-medium">{investor.name}</TableCell>
                 <TableCell>{investor.contact}</TableCell>
                 <TableCell>{investor.documentId}</TableCell>
+                <TableCell>{investor.bankName || "-"}</TableCell>
                 <TableCell>{investor.bankAccount}</TableCell>
                 <TableCell>{investor.vehicleCount}</TableCell>
                 <TableCell>
@@ -205,17 +212,31 @@ const Investors = () => {
           </DialogHeader>
           <form onSubmit={handleAddInvestor} className="space-y-4">
             <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
-                <Input
-                  id="name"
-                  placeholder="Ej: Juan Pérez"
-                  value={newInvestor.name}
-                  onChange={(e) =>
-                    setNewInvestor({ ...newInvestor, name: e.target.value })
-                  }
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Nombre</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="Ej: Juan"
+                    value={newInvestor.firstName}
+                    onChange={(e) =>
+                      setNewInvestor({ ...newInvestor, firstName: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Apellido</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Ej: Pérez"
+                    value={newInvestor.lastName}
+                    onChange={(e) =>
+                      setNewInvestor({ ...newInvestor, lastName: e.target.value })
+                    }
+                    required
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contact">Teléfono de Contacto</Label>
@@ -230,13 +251,25 @@ const Investors = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="documentId">CUIT/RUT</Label>
+                <Label htmlFor="documentId">NIT/CI</Label>
                 <Input
                   id="documentId"
                   placeholder="Ej: 1234567890"
                   value={newInvestor.documentId}
                   onChange={(e) =>
                     setNewInvestor({ ...newInvestor, documentId: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankName">Nombre del Banco</Label>
+                <Input
+                  id="bankName"
+                  placeholder="Ej: Banco Mercantil Santa Cruz"
+                  value={newInvestor.bankName}
+                  onChange={(e) =>
+                    setNewInvestor({ ...newInvestor, bankName: e.target.value })
                   }
                   required
                 />
@@ -303,7 +336,7 @@ const Investors = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-documentId">CUIT/RUT</Label>
+                <Label htmlFor="edit-documentId">NIT/CI</Label>
                 <Input
                   id="edit-documentId"
                   value={editingInvestor?.documentId || ""}
@@ -311,6 +344,21 @@ const Investors = () => {
                     setEditingInvestor(
                       editingInvestor
                         ? { ...editingInvestor, documentId: e.target.value }
+                        : null
+                    )
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-bankName">Nombre del Banco</Label>
+                <Input
+                  id="edit-bankName"
+                  value={editingInvestor?.bankName || ""}
+                  onChange={(e) =>
+                    setEditingInvestor(
+                      editingInvestor
+                        ? { ...editingInvestor, bankName: e.target.value }
                         : null
                     )
                   }

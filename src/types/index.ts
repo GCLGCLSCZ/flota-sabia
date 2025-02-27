@@ -65,6 +65,7 @@ export interface Investor {
   name: string;
   contact: string;
   documentId: string;
+  bankName?: string;
   bankAccount: string;
   vehicleCount: number;
   status: "active" | "inactive";
