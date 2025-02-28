@@ -27,7 +27,7 @@ const NonWorkingDayDialog = ({
   toast
 }: NonWorkingDayDialogProps) => {
   
-  const [showDaysHistory, setShowDaysHistory] = useState(false);
+  const [showDaysHistory, setShowDaysHistory] = useState(true); // Mostrar historial por defecto
   
   const handleAddNonWorkingDays = () => {
     if (!selectedDates?.from || !selectedDates?.to || (!selectedVehicle && !applyToAllVehicles)) {
@@ -128,6 +128,7 @@ const NonWorkingDayDialog = ({
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (!vehicle) return;
     
+    // Eliminar todos los días no laborables del vehículo
     updateVehicle(vehicleId, {
       daysNotWorked: []
     });
@@ -139,6 +140,7 @@ const NonWorkingDayDialog = ({
   };
 
   const handleDeleteAllNonWorkingDays = () => {
+    // Eliminar los días no laborables de todos los vehículos
     vehicles.forEach(vehicle => {
       if (vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0) {
         updateVehicle(vehicle.id, {
@@ -169,12 +171,12 @@ const NonWorkingDayDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Registrar Días No Laborables</DialogTitle>
+          <DialogTitle>Gestionar Días No Laborables</DialogTitle>
           <DialogDescription>
             {selectedDates?.from && selectedDates?.to ? (
               `Periodo seleccionado: del ${format(selectedDates.from, "dd/MM/yyyy", { locale: es })} al ${format(selectedDates.to, "dd/MM/yyyy", { locale: es })}`
             ) : (
-              "Selecciona el tipo y motivo de los días no laborables"
+              "Registra o elimina días no laborables para tus vehículos"
             )}
           </DialogDescription>
         </DialogHeader>

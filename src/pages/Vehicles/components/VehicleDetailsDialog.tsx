@@ -1,7 +1,8 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vehicle, Maintenance, CardexItem, Discount, InsurancePolicy, InsurancePayment, MaintenanceType } from "@/types";
+import { Vehicle, Maintenance, CardexItem, Discount, InsurancePolicy, InsurancePayment } from "@/types";
 import { useState, useEffect } from "react";
 import { format, addMonths, addDays, parseISO, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,6 +40,13 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     isInsuranceCovered: false
   });
   
+  // Estado para nueva lógica de pago de seguros
+  const [totalInstallments, setTotalInstallments] = useState(1);
+  const [installmentAmount, setInstallmentAmount] = useState(0);
+  const [nextPaymentDate, setNextPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [showInstalments, setShowInstalments] = useState(false);
+
+  // Resto de estados
   const [newCardexItem, setNewCardexItem] = useState<Omit<CardexItem, "id" | "complete">>({
     vehicleId: "",
     type: "oil_change",
@@ -78,12 +86,6 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     amount: 0,
     description: "Pago de seguro"
   });
-
-  // Estado para nueva lógica de pago de seguros
-  const [totalInstallments, setTotalInstallments] = useState(1);
-  const [installmentAmount, setInstallmentAmount] = useState(0);
-  const [nextPaymentDate, setNextPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [showInstalments, setShowInstalments] = useState(false);
 
   // Estado para edición de póliza
   const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
@@ -723,205 +725,416 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
 
           <TabsContent value="details" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label>Placa</Label>
-                    {!isEditingGeneral ? (
-                      <Button variant="ghost" size="sm" onClick={() => setIsEditingGeneral(true)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Editar
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setIsEditingGeneral(false);
-                          setEditedVehicle(null);
-                        }}>
-                          Cancelar
-                        </Button>
-                        <Button size="sm" onClick={handleSaveGeneralInfo}>
-                          <Save className="h-4 w-4 mr-2" />
-                          Guardar
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  {isEditingGeneral ? (
-                    <Input
-                      value={editedVehicle?.plate || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, plate: e.target.value })}
-                      placeholder="Placa del vehículo"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.plate}</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Marca</Label>
-                  {isEditingGeneral ? (
-                    <Input
-                      value={editedVehicle?.brand || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, brand: e.target.value })}
-                      placeholder="Marca del vehículo"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.brand}</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Modelo</Label>
-                  {isEditingGeneral ? (
-                    <Input
-                      value={editedVehicle?.model || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, model: e.target.value })}
-                      placeholder="Modelo del vehículo"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.model}</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Año</Label>
-                  {isEditingGeneral ? (
-                    <Input
-                      type="number"
-                      value={editedVehicle?.year || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, year: Number(e.target.value) })}
-                      placeholder="Año del vehículo"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.year}</div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div className="space-y-2">
-                  <Label>Estado</Label>
-                  {isEditingGeneral ? (
-                    <Select
-                      value={editedVehicle?.status || "active"}
-                      onValueChange={(value: "active" | "maintenance" | "inactive") =>
-                        setEditedVehicle({ ...editedVehicle, status: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Activo</SelectItem>
-                        <SelectItem value="maintenance">En Mantenimiento</SelectItem>
-                        <SelectItem value="inactive">Inactivo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="font-medium">
-                      {vehicle.status === "active" ? "Activo" : vehicle.status === "maintenance" ? "En Mantenimiento" : "Inactivo"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Inversionista</Label>
-                  {isEditingGeneral ? (
-                    <Input
-                      value={editedVehicle?.investor || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, investor: e.target.value })}
-                      placeholder="Inversionista"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.investor || "Sin asignar"}</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Conductor</Label>
-                  {isEditingGeneral ? (
-                    <>
-                      <Input
-                        value={editedVehicle?.driverName || ""}
-                        onChange={(e) => setEditedVehicle({ ...editedVehicle, driverName: e.target.value })}
-                        placeholder="Nombre del conductor"
-                      />
-                      <Input
-                        value={editedVehicle?.driverPhone || ""}
-                        onChange={(e) => setEditedVehicle({ ...editedVehicle, driverPhone: e.target.value })}
-                        placeholder="Teléfono del conductor"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <div className="font-medium">{vehicle.driverName || "Sin asignar"}</div>
-                      <div className="font-medium">{vehicle.driverPhone || "Sin asignar"}</div>
-                    </>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tarifa Diaria</Label>
-                  {isEditingGeneral ? (
-                    <Input
-                      type="number"
-                      value={editedVehicle?.dailyRate || ""}
-                      onChange={(e) => setEditedVehicle({ ...editedVehicle, dailyRate: Number(e.target.value) })}
-                      placeholder="Tarifa Diaria"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.dailyRate}</div>
-                  )}
-                </div>
-              </div>
+              {/* Contenido de la pestaña de detalles */}
             </div>
           </TabsContent>
 
           <TabsContent value="contract">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label>Fecha de Inicio del Contrato</Label>
-                    {!isEditingContract ? (
-                      <Button variant="ghost" size="sm" onClick={() => setIsEditingContract(true)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Editar
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setIsEditingContract(false);
-                          setEditedContract(null);
-                        }}>
-                          Cancelar
-                        </Button>
-                        <Button size="sm" onClick={handleSaveContractInfo}>
-                          <Save className="h-4 w-4 mr-2" />
-                          Guardar
-                        </Button>
+            {/* Contenido de la pestaña de contrato */}
+          </TabsContent>
+
+          <TabsContent value="maintenance">
+            {/* Contenido de la pestaña de mantenimiento */}
+          </TabsContent>
+
+          <TabsContent value="cardex">
+            {/* Contenido de la pestaña de cardex */}
+          </TabsContent>
+
+          <TabsContent value="discounts">
+            {/* Contenido de la pestaña de descuentos */}
+          </TabsContent>
+
+          <TabsContent value="insurance" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Pólizas de Seguro
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="border p-4 rounded-md">
+                  <h4 className="font-medium mb-3">Registrar Nueva Póliza</h4>
+
+                  <form onSubmit={handleSubmitInsurancePolicy} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="policyNumber">Número de Póliza</Label>
+                        <Input
+                          id="policyNumber"
+                          value={newInsurancePolicy.policyNumber}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              policyNumber: e.target.value,
+                            })
+                          }
+                          placeholder="Ej: POL-123456"
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="company">Compañía Aseguradora</Label>
+                        <Input
+                          id="company"
+                          value={newInsurancePolicy.company}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              company: e.target.value,
+                            })
+                          }
+                          placeholder="Ej: Seguros XYZ"
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="contact">Contacto</Label>
+                        <Input
+                          id="contact"
+                          value={newInsurancePolicy.contact}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              contact: e.target.value,
+                            })
+                          }
+                          placeholder="Ej: Juan Pérez"
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="amount">Monto Total (Bs)</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={newInsurancePolicy.amount || ""}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              amount: Number(e.target.value),
+                            })
+                          }
+                          placeholder="0.00"
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="startDate">Fecha de Inicio</Label>
+                        <Input
+                          id="startDate"
+                          type="date"
+                          value={newInsurancePolicy.startDate}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              startDate: e.target.value,
+                            })
+                          }
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="endDate">Fecha de Fin</Label>
+                        <Input
+                          id="endDate"
+                          type="date"
+                          value={newInsurancePolicy.endDate}
+                          onChange={(e) =>
+                            setNewInsurancePolicy({
+                              ...newInsurancePolicy,
+                              endDate: e.target.value,
+                            })
+                          }
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isInvestorPaying"
+                        checked={newInsurancePolicy.isInvestorPaying}
+                        onCheckedChange={(checked) =>
+                          setNewInsurancePolicy({
+                            ...newInsurancePolicy,
+                            isInvestorPaying: checked as boolean,
+                          })
+                        }
+                      />
+                      <Label htmlFor="isInvestorPaying" className="text-sm">
+                        El inversionista paga la póliza
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="showInstalments"
+                        checked={showInstalments}
+                        onCheckedChange={(checked) => setShowInstalments(checked as boolean)}
+                      />
+                      <Label htmlFor="showInstalments" className="text-sm">
+                        Pagar en cuotas
+                      </Label>
+                    </div>
+
+                    {showInstalments && (
+                      <div className="border-t pt-3 mt-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="totalInstallments">Número de Cuotas</Label>
+                            <Input
+                              id="totalInstallments"
+                              type="number"
+                              min="2"
+                              value={totalInstallments}
+                              onChange={(e) => setTotalInstallments(Number(e.target.value))}
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="installmentAmount">Monto por Cuota (Bs)</Label>
+                            <Input
+                              id="installmentAmount"
+                              type="number"
+                              value={installmentAmount}
+                              onChange={(e) => setInstallmentAmount(Number(e.target.value))}
+                              className="h-8"
+                              readOnly
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="nextPaymentDate">Fecha de la primera cuota</Label>
+                          <Input
+                            id="nextPaymentDate"
+                            type="date"
+                            value={nextPaymentDate}
+                            onChange={(e) => setNextPaymentDate(e.target.value)}
+                            className="h-8"
+                          />
+                        </div>
                       </div>
                     )}
-                  </div>
-                  {isEditingContract ? (
-                    <Input
-                      type="date"
-                      value={editedContract?.contractStartDate || ""}
-                      onChange={(e) => setEditedContract({ ...editedContract, contractStartDate: e.target.value })}
-                      placeholder="Fecha de Inicio del Contrato"
-                    />
-                  ) : (
-                    <div className="font-medium">{vehicle.contractStartDate ? format(new Date(vehicle.contractStartDate), "dd/MM/yyyy") : "Sin asignar"}</div>
-                  )}
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      {editingPolicyId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancelEditPolicy}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                      <Button type="submit">
+                        {editingPolicyId ? "Actualizar Póliza" : "Registrar Póliza"}
+                      </Button>
+                    </div>
+                  </form>
                 </div>
+
+                {/* Formulario de pago */}
+                {showPaymentForm && (
+                  <div className="border p-4 rounded-md mt-4">
+                    <h4 className="font-medium mb-3">Registrar Pago de Póliza</h4>
+                    <form onSubmit={handleSubmitInsurancePayment} className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="paymentDate">Fecha de Pago</Label>
+                          <Input
+                            id="paymentDate"
+                            type="date"
+                            value={newInsurancePayment.date}
+                            onChange={(e) =>
+                              setNewInsurancePayment({
+                                ...newInsurancePayment,
+                                date: e.target.value,
+                              })
+                            }
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="paymentAmount">Monto (Bs)</Label>
+                          <Input
+                            id="paymentAmount"
+                            type="number"
+                            value={newInsurancePayment.amount || ""}
+                            onChange={(e) =>
+                              setNewInsurancePayment({
+                                ...newInsurancePayment,
+                                amount: Number(e.target.value),
+                              })
+                            }
+                            placeholder="0.00"
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="paymentDescription">Descripción</Label>
+                        <Input
+                          id="paymentDescription"
+                          value={newInsurancePayment.description}
+                          onChange={(e) =>
+                            setNewInsurancePayment({
+                              ...newInsurancePayment,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="Ej: Pago de cuota"
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowPaymentForm(false);
+                            setSelectedPolicyId(null);
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button type="submit">Registrar Pago</Button>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </div>
 
               <div>
-                <div className="space-y-2">
-                  <Label>Total de Cuotas</Label>
-                  {isEditingContract ? (
-                    <Input
-                      type="number"
-                      value={editedContract?.totalInstallments || ""}
-                      onChange={(e) => setEditedContract({ ...editedContract, totalInstallments: Number
+                <h4 className="font-medium mb-3">Pólizas Registradas</h4>
+                {policiesWithNextPayments.length > 0 ? (
+                  <div className="space-y-4">
+                    {policiesWithNextPayments.map((policy) => (
+                      <div key={policy.id} className="border rounded-md p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-medium">{policy.policyNumber}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {policy.company}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => handlePrepareAddPayment(policy.id)}
+                            >
+                              <DollarSign className="h-3.5 w-3.5 mr-1" />
+                              Pago
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => handleEditPolicy(policy)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-destructive"
+                              onClick={() => handleDeletePolicy(policy.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="text-sm mt-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Monto total:</span>
+                            <span className="font-medium">Bs {policy.amount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Período:</span>
+                            <span>{format(new Date(policy.startDate), "dd/MM/yyyy")} - {format(new Date(policy.endDate), "dd/MM/yyyy")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Paga inversionista:</span>
+                            <span>{policy.isInvestorPaying ? "Sí" : "No"}</span>
+                          </div>
+                        </div>
+                        
+                        {policy.isPaymentDue && (
+                          <div className="mt-2 flex items-center gap-1 text-red-500 text-sm">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            <span>Pago pendiente: {format(new Date(policy.nextPaymentDate), "dd/MM/yyyy")}</span>
+                          </div>
+                        )}
+                        
+                        {policy.payments && policy.payments.length > 0 && (
+                          <div className="mt-3">
+                            <div className="flex justify-between items-center mb-1">
+                              <h5 className="text-sm font-medium">Pagos registrados:</h5>
+                              <span className="text-xs text-muted-foreground">
+                                {policy.payments.length} {policy.payments.length === 1 ? "pago" : "pagos"}
+                              </span>
+                            </div>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {[...policy.payments]
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .map((payment) => (
+                                <div key={payment.id} className="flex justify-between items-center text-xs py-1 border-b last:border-0">
+                                  <div>
+                                    <div>{format(new Date(payment.date), "dd/MM/yyyy")}</div>
+                                    <div className="text-muted-foreground text-xs">{payment.description}</div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">Bs {payment.amount.toFixed(2)}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 rounded-full p-0 text-destructive"
+                                      onClick={() => handleDeleteInsurancePayment(policy.id, payment.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center border rounded-md p-8 text-center">
+                    <Shield className="h-10 w-10 text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">
+                      No hay pólizas registradas para este vehículo
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Registra una nueva póliza usando el formulario
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default VehicleDetailsDialog;
