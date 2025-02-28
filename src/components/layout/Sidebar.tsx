@@ -11,9 +11,8 @@ import {
   Menu,
   XIcon,
   LayoutDashboard,
-  BellRing,
 } from "lucide-react";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 
@@ -24,7 +23,7 @@ type SidebarProps = {
 
 export default function Sidebar({ collapsed, className }: SidebarProps) {
   const location = useLocation();
-  const { isMobile } = useMobile();
+  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
