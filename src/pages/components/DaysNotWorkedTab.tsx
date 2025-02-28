@@ -10,6 +10,17 @@ import { X, CalendarOff, Calendar, Trash2, Edit, Check } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction
+} from "@/components/ui/alert-dialog";
+import { daysNotWorkedService } from "@/services/daysNotWorkedService";
 
 // Definir un tipo para los días no trabajados
 interface NonWorkDay {
@@ -38,6 +49,8 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
   // Estado para los días no trabajados
   const [nonWorkDaysData, setNonWorkDaysData] = useState<NonWorkDay[]>([]);
   const [nonWorkDayToEdit, setNonWorkDayToEdit] = useState<{ index: number, value: NonWorkDay } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   
   // Inicializar los datos de días no trabajados cuando cambia el vehículo
   useEffect(() => {
@@ -65,7 +78,7 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
     }));
   };
   
-  const handleAddNonWorkDay = () => {
+  const handleAddNonWorkDay = async () => {
     if (!newNonWorkDay.date) {
       toast({
         title: "Fecha requerida",
@@ -86,44 +99,52 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
       return;
     }
     
-    // Agregar el nuevo día no trabajado
-    const updatedDaysNotWorked = [...daysNotWorked, { 
-      date: newNonWorkDay.date, 
-      reason: newNonWorkDay.reason || "",
-      isSelected: false
-    }];
-    
-    setNonWorkDaysData(updatedDaysNotWorked);
-    
-    // Actualizar el vehículo - solo enviar las fechas
-    onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date))
-      .then((success) => {
-        if (success) {
-          toast({
-            title: "Día registrado",
-            description: "Se ha agregado un nuevo día no trabajado"
-          });
-          // Resetear el campo de fecha y razón
-          setNewNonWorkDay({ 
-            date: new Date().toISOString().split('T')[0],
-            reason: ""
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: "No se pudo agregar el día no trabajado",
-            variant: "destructive"
-          });
-        }
-      })
-      .catch(err => {
+    try {
+      setLoading(true);
+      
+      // Agregar el nuevo día no trabajado
+      const updatedDaysNotWorked = [...daysNotWorked, { 
+        date: newNonWorkDay.date, 
+        reason: newNonWorkDay.reason || "",
+        isSelected: false
+      }];
+      
+      setNonWorkDaysData(updatedDaysNotWorked);
+      
+      // Actualizar el vehículo - solo enviar las fechas
+      const success = await onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date));
+      
+      if (success) {
+        toast({
+          title: "Día registrado",
+          description: "Se ha agregado un nuevo día no trabajado"
+        });
+        // Resetear el campo de fecha y razón
+        setNewNonWorkDay({ 
+          date: new Date().toISOString().split('T')[0],
+          reason: ""
+        });
+      } else {
         toast({
           title: "Error",
           description: "No se pudo agregar el día no trabajado",
           variant: "destructive"
         });
-        console.error("Error al agregar día no trabajado:", err);
+        // Revertir cambios locales si hubo error
+        setNonWorkDaysData(daysNotWorked);
+      }
+    } catch (err) {
+      console.error("Error al agregar día no trabajado:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo agregar el día no trabajado",
+        variant: "destructive"
       });
+      // Revertir cambios locales si hubo error
+      setNonWorkDaysData(daysNotWorked);
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleToggleSelectNonWorkDay = (index: number) => {
@@ -141,43 +162,56 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
     });
   };
   
-  const handleSaveEditedNonWorkDay = () => {
+  const handleSaveEditedNonWorkDay = async () => {
     if (!nonWorkDayToEdit) return;
     
-    const { index, value } = nonWorkDayToEdit;
-    const updatedDays = [...nonWorkDaysData];
-    updatedDays[index] = value;
-    
-    setNonWorkDaysData(updatedDays);
-    setNonWorkDayToEdit(null);
-    
-    // Actualizar en base de datos - solo enviar las fechas
-    onUpdateDaysNotWorked(vehicleId, updatedDays.map(day => day.date))
-      .then((success) => {
-        if (success) {
-          toast({
-            title: "Día actualizado",
-            description: "Se ha actualizado la información del día no trabajado"
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: "No se pudo actualizar la información",
-            variant: "destructive"
-          });
-        }
-      })
-      .catch(err => {
+    try {
+      setLoading(true);
+      
+      const { index, value } = nonWorkDayToEdit;
+      const originalDays = [...nonWorkDaysData];
+      const updatedDays = [...nonWorkDaysData];
+      updatedDays[index] = value;
+      
+      setNonWorkDaysData(updatedDays);
+      setNonWorkDayToEdit(null);
+      
+      // Actualizar en base de datos - solo enviar las fechas
+      const success = await onUpdateDaysNotWorked(vehicleId, updatedDays.map(day => day.date));
+      
+      if (success) {
+        toast({
+          title: "Día actualizado",
+          description: "Se ha actualizado la información del día no trabajado"
+        });
+      } else {
         toast({
           title: "Error",
           description: "No se pudo actualizar la información",
           variant: "destructive"
         });
-        console.error("Error al actualizar día no trabajado:", err);
+        // Revertir cambios locales si hubo error
+        setNonWorkDaysData(originalDays);
+      }
+    } catch (err) {
+      console.error("Error al actualizar día no trabajado:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la información",
+        variant: "destructive"
       });
+      // Revertir cambios si hubo error
+      if (nonWorkDayToEdit) {
+        const originalDays = [...nonWorkDaysData];
+        setNonWorkDaysData(originalDays);
+        setNonWorkDayToEdit(null);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const handleRemoveSelectedNonWorkDays = () => {
+  const handleRemoveSelectedNonWorkDays = async () => {
     const selectedDays = nonWorkDaysData.filter(day => day.isSelected);
     if (selectedDays.length === 0) {
       toast({
@@ -188,44 +222,72 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
       return;
     }
     
-    const updatedDays = nonWorkDaysData.filter(day => !day.isSelected);
-    setNonWorkDaysData(updatedDays);
-    
-    // Actualizar en base de datos - solo enviar las fechas
-    onUpdateDaysNotWorked(vehicleId, updatedDays.map(day => day.date))
-      .then((success) => {
-        if (success) {
-          toast({
-            title: "Días eliminados",
-            description: `Se han eliminado ${selectedDays.length} día(s) no trabajado(s)`
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: "No se pudieron eliminar los días seleccionados",
-            variant: "destructive"
-          });
-        }
-      })
-      .catch(err => {
+    try {
+      setLoading(true);
+      
+      const originalDays = [...nonWorkDaysData];
+      const updatedDays = nonWorkDaysData.filter(day => !day.isSelected);
+      
+      setNonWorkDaysData(updatedDays);
+      
+      // Actualizar en base de datos - solo enviar las fechas
+      const success = await onUpdateDaysNotWorked(vehicleId, updatedDays.map(day => day.date));
+      
+      if (success) {
+        toast({
+          title: "Días eliminados",
+          description: `Se han eliminado ${selectedDays.length} día(s) no trabajado(s)`
+        });
+      } else {
         toast({
           title: "Error",
           description: "No se pudieron eliminar los días seleccionados",
           variant: "destructive"
         });
-        console.error("Error al eliminar días no trabajados:", err);
+        // Revertir cambios locales si hubo error
+        setNonWorkDaysData(originalDays);
+      }
+    } catch (err) {
+      console.error("Error al eliminar días no trabajados:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar los días seleccionados",
+        variant: "destructive"
       });
+      // Revertir cambios locales si hubo error
+      const originalDays = [...nonWorkDaysData];
+      setNonWorkDaysData(originalDays);
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const handleRemoveNonWorkDay = (dateToRemove: string) => {
-    const updatedDaysNotWorked = nonWorkDaysData.filter(day => day.date !== dateToRemove);
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
     
-    setNonWorkDaysData(updatedDaysNotWorked);
-    
-    // Actualizar en base de datos - solo enviar las fechas
-    onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date))
-      .then((success) => {
-        if (success) {
+    try {
+      setLoading(true);
+      
+      const dateToRemove = confirmDelete;
+      const originalDays = [...nonWorkDaysData];
+      const updatedDaysNotWorked = nonWorkDaysData.filter(day => day.date !== dateToRemove);
+      
+      // Primero actualizamos la interfaz
+      setNonWorkDaysData(updatedDaysNotWorked);
+      
+      // Ahora intentamos eliminar usando el método específico
+      const success = await daysNotWorkedService.removeDay(vehicleId, dateToRemove);
+      
+      if (success) {
+        toast({
+          title: "Día eliminado",
+          description: "Se ha eliminado el día no trabajado"
+        });
+      } else {
+        // Si falla, intentamos con el método general
+        const backupSuccess = await onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date));
+        
+        if (backupSuccess) {
           toast({
             title: "Día eliminado",
             description: "Se ha eliminado el día no trabajado"
@@ -236,16 +298,24 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
             description: "No se pudo eliminar el día no trabajado",
             variant: "destructive"
           });
+          // Revertir cambios locales si hubo error
+          setNonWorkDaysData(originalDays);
         }
-      })
-      .catch(err => {
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el día no trabajado",
-          variant: "destructive"
-        });
-        console.error("Error al eliminar día no trabajado:", err);
+      }
+    } catch (err) {
+      console.error("Error al eliminar día no trabajado:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el día no trabajado",
+        variant: "destructive"
       });
+      // Revertir cambios locales si hubo error
+      const originalDays = [...nonWorkDaysData];
+      setNonWorkDaysData(originalDays);
+    } finally {
+      setLoading(false);
+      setConfirmDelete(null);
+    }
   };
   
   const handleCalendarSelect = (date: Date | undefined) => {
@@ -284,10 +354,11 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                     value={newNonWorkDay.date}
                     onChange={(e) => handleNewNonWorkDayChange('date', e.target.value)}
                     className="flex-1"
+                    disabled={loading}
                   />
                   <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="icon">
+                      <Button variant="outline" size="icon" disabled={loading}>
                         <Calendar className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
@@ -310,6 +381,7 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                   placeholder="Ej: Feriado, Mantenimiento, etc." 
                   value={newNonWorkDay.reason || ""}
                   onChange={(e) => handleNewNonWorkDayChange('reason', e.target.value)}
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -317,8 +389,9 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
               type="button"
               onClick={handleAddNonWorkDay}
               className="w-full md:w-auto md:self-end"
+              disabled={loading}
             >
-              Agregar Día
+              {loading ? "Agregando..." : "Agregar Día"}
             </Button>
           </div>
         </CardContent>
@@ -335,6 +408,7 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                   size="sm" 
                   onClick={handleRemoveSelectedNonWorkDays}
                   className="flex items-center"
+                  disabled={loading}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Eliminar ({selectedCount})
@@ -359,6 +433,7 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                         onCheckedChange={() => handleToggleSelectNonWorkDay(index)} 
                         id={`day-${index}`} 
                         className="translate-y-1"
+                        disabled={loading}
                       />
                     </div>
                     <div className="flex-1">
@@ -373,12 +448,14 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                                 value: { ...nonWorkDayToEdit.value, date: e.target.value }
                               })}
                               className="w-full"
+                              disabled={loading}
                             />
                             <Button 
                               variant="ghost" 
                               size="icon"
                               onClick={handleSaveEditedNonWorkDay}
                               className="h-10 w-10 p-0"
+                              disabled={loading}
                             >
                               <Check className="h-4 w-4 text-green-500" />
                             </Button>
@@ -391,6 +468,7 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                               index,
                               value: { ...nonWorkDayToEdit.value, reason: e.target.value }
                             })}
+                            disabled={loading}
                           />
                         </div>
                       ) : (
@@ -412,14 +490,16 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
                               size="sm"
                               onClick={() => handleEditNonWorkDay(index)}
                               className="h-8 w-8 p-0"
+                              disabled={loading}
                             >
                               <Edit className="h-3.5 w-3.5 text-muted-foreground" />
                             </Button>
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => handleRemoveNonWorkDay(day.date)}
+                              onClick={() => setConfirmDelete(day.date)}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                              disabled={loading}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -437,6 +517,28 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
           )}
         </CardContent>
       </Card>
+
+      {/* Diálogo de confirmación para eliminar */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar día no trabajado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el día seleccionado de los registros.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

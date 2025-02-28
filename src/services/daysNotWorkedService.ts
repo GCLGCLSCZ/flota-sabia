@@ -8,6 +8,11 @@ export const daysNotWorkedService = {
   // Obtener todos los días no trabajados para un vehículo
   async getByVehicleId(vehicleId: string): Promise<string[]> {
     try {
+      if (!supabase) {
+        console.error("El cliente Supabase no está inicializado");
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('days_not_worked')
         .select('date')
@@ -28,6 +33,12 @@ export const daysNotWorkedService = {
   // Actualizar todos los días no trabajados para un vehículo
   async updateDaysNotWorked(vehicleId: string, dates: string[]): Promise<boolean> {
     try {
+      if (!supabase) {
+        console.error("El cliente Supabase no está inicializado");
+        return false;
+      }
+
+      console.log("Eliminando días existentes para vehículo:", vehicleId);
       // 1. Eliminar todos los días existentes
       const { error: deleteError } = await supabase
         .from('days_not_worked')
@@ -41,6 +52,7 @@ export const daysNotWorkedService = {
       
       // 2. Si hay nuevas fechas, insertarlas
       if (dates && dates.length > 0) {
+        console.log("Insertando nuevas fechas:", dates.length);
         const dataToInsert = dates.map(date => ({
           vehicle_id: vehicleId,
           date: date
@@ -72,6 +84,12 @@ export const daysNotWorkedService = {
   // Eliminar un día específico
   async removeDay(vehicleId: string, date: string): Promise<boolean> {
     try {
+      if (!supabase) {
+        console.error("El cliente Supabase no está inicializado");
+        return false;
+      }
+
+      console.log("Eliminando día específico:", { vehicleId, date });
       const { error } = await supabase
         .from('days_not_worked')
         .delete()
