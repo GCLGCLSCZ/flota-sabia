@@ -18,3 +18,15 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+// Hook adicional para manejar el estado de apertura en móvil
+export function useMobileOpen() {
+  const [mobileOpen, setMobileOpen] = React.useState(false)
+  const isMobile = useIsMobile()
+  
+  return {
+    isMobile,
+    mobileOpen,
+    setMobileOpen
+  }
+}
