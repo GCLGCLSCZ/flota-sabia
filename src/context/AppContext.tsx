@@ -374,69 +374,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       if (success) {
         // Actualizar mantenimientos si se proporcionaron
-        if (maintenanceHistory !== undefined) {
+        if (maintenanceHistory) {
           // Primero eliminamos los existentes para evitar duplicados
           await supabase.from('maintenance').delete().eq('vehicle_id', id);
           
           // Luego agregamos los nuevos
-          if (maintenanceHistory && maintenanceHistory.length > 0) {
-            for (const maintenance of maintenanceHistory) {
-              const maintenanceData = {
-                ...maintenance,
-                vehicleId: id
-              };
-              await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
-            }
+          for (const maintenance of maintenanceHistory) {
+            const maintenanceData = {
+              ...maintenance,
+              vehicleId: id
+            };
+            await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
           }
         }
         
         // Actualizar cardex si se proporcionó
-        if (cardex !== undefined) {
+        if (cardex) {
           // Primero eliminamos los existentes
           await supabase.from('cardex').delete().eq('vehicle_id', id);
           
           // Luego agregamos los nuevos
-          if (cardex && cardex.length > 0) {
-            for (const item of cardex) {
-              const cardexData = {
-                ...item,
-                vehicleId: id
-              };
-              await supabase.from('cardex').insert(cardexToDb(cardexData));
-            }
+          for (const item of cardex) {
+            const cardexData = {
+              ...item,
+              vehicleId: id
+            };
+            await supabase.from('cardex').insert(cardexToDb(cardexData));
           }
         }
         
         // Actualizar descuentos si se proporcionaron
-        if (discounts !== undefined) {
+        if (discounts) {
           // Primero eliminamos los existentes
           await supabase.from('discounts').delete().eq('vehicle_id', id);
           
           // Luego agregamos los nuevos
-          if (discounts && discounts.length > 0) {
-            for (const discount of discounts) {
-              const discountData = {
-                ...discount,
-                vehicleId: id
-              };
-              await supabase.from('discounts').insert(discountToDb(discountData));
-            }
+          for (const discount of discounts) {
+            const discountData = {
+              ...discount,
+              vehicleId: id
+            };
+            await supabase.from('discounts').insert(discountToDb(discountData));
           }
         }
         
         // Actualizar días no trabajados si se proporcionaron
-        if (daysNotWorked !== undefined) {
+        if (daysNotWorked) {
           // Primero eliminamos los existentes
           await supabase.from('days_not_worked').delete().eq('vehicle_id', id);
           
           // Luego agregamos los nuevos
-          if (daysNotWorked && daysNotWorked.length > 0) {
-            for (const date of daysNotWorked) {
-              await supabase.from('days_not_worked').insert({
-                vehicle_id: id,
-                date
-              });
-            }
+          for (const date of daysNotWorked) {
+            await supabase.from('days_not_worked').insert({
+              vehicle_id: id,
+              date
+            });
           }
         }
         

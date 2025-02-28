@@ -10,10 +10,10 @@ export const VehiclesHeader = ({ onAddClick }) => {
 
   return (
     <div className="flex flex-col space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight dark:text-white">Vehículos</h1>
-          <p className="text-muted-foreground dark:text-gray-400">
+          <h1 className="text-2xl font-bold tracking-tight">Vehículos</h1>
+          <p className="text-muted-foreground">
             Gestiona tu flota de vehículos y conductores.
           </p>
         </div>
