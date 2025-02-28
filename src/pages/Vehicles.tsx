@@ -91,14 +91,21 @@ const VehiclesPage = () => {
   };
 
   const handleUpdateDaysNotWorked = (vehicleId: string, daysNotWorked: string[]) => {
+    console.log("Actualizando días no trabajados:", vehicleId, daysNotWorked);
+    
     return updateVehicle(vehicleId, { daysNotWorked })
       .then(() => {
         // Después de actualizar, refrescar los datos
+        console.log("Días no trabajados actualizados, refrescando datos");
         return refreshData().then(() => {
           // Actualizar el vehículo seleccionado después de que los datos han sido refrescados
+          console.log("Datos refrescados, actualizando vehículo seleccionado");
           const updatedVehicle = vehicles.find(v => v.id === vehicleId);
           if (updatedVehicle) {
+            console.log("Vehículo encontrado, actualizando selección", updatedVehicle);
             setSelectedVehicle(updatedVehicle);
+          } else {
+            console.log("No se encontró el vehículo con ID:", vehicleId);
           }
           return true;
         });
