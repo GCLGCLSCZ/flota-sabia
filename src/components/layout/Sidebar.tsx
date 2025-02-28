@@ -3,7 +3,7 @@ import { LucideIcon, Home, Car, CreditCard, Users, Clipboard, Calendar, Settings
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -46,7 +46,7 @@ const SidebarItem = ({ icon: Icon, label, href, active, onClick }: SidebarItemPr
 };
 
 export const Sidebar = () => {
-  const { isMobile, setMobileOpen } = useMobile();
+  const { isMobile, setMobileOpen } = useIsMobile();
   const pathname = useLocation().pathname;
 
   const handleClick = () => {
