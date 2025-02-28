@@ -13,4 +13,8 @@ export default defineConfig({
   },
   // GitHub Pages configuration
   base: './', // Set base to relative path
+  // Server configuration
+  server: {
+    port: 8080
+  }
 })
