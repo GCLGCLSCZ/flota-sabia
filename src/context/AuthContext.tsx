@@ -21,18 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: "Administrador",
       email: email,
       role: "admin",
-      permissions: [
-        "read:vehicles",
-        "write:vehicles",
-        "read:payments",
-        "write:payments",
-        "read:investors",
-        "write:investors",
-        "read:drivers",
-        "write:drivers",
-        "read:settings",
-        "write:settings"
-      ]
+      permissions: {
+        canEditVehicles: true,
+        canEditPayments: true,
+        canEditDrivers: true,
+        canEditInvestors: true
+      }
     };
     setUser(mockUser);
   };
@@ -43,8 +37,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = (action: string, resource: string): boolean => {
     if (!user) return false;
-    const permission = `${action}:${resource}` as UserPermissions;
-    return user.permissions.includes(permission);
+    
+    // Comprobar los permisos basados en el recurso
+    switch (resource) {
+      case "vehicles":
+        return user.permissions.canEditVehicles;
+      case "payments":
+        return user.permissions.canEditPayments;
+      case "drivers":
+        return user.permissions.canEditDrivers;
+      case "investors":
+        return user.permissions.canEditInvestors;
+      default:
+        return false;
+    }
   };
 
   return (
