@@ -67,11 +67,13 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   
   // Inicializar los datos de días no trabajados cuando cambia el vehículo
   useEffect(() => {
-    if (vehicle && vehicle.daysNotWorked) {
-      // Si son solo strings, convertirlos a objetos
+    if (vehicle && vehicle.daysNotWorked && Array.isArray(vehicle.daysNotWorked)) {
+      // Convertir las fechas a objetos NonWorkDay
       const formattedDays = vehicle.daysNotWorked.map(day => {
+        // Asegurarse de que 'day' sea tratado como una cadena
+        const dateStr = String(day);
         return { 
-          date: typeof day === 'string' ? day : day.toString(), 
+          date: dateStr, 
           isSelected: false 
         };
       });
