@@ -41,22 +41,9 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   // Usar el valor calculado para el total pagado
   const totalPaid = totalPaidFromPayments || (paidInstallments * installmentAmount);
 
-  // Calcular la ganancia total de la empresa basada en la comisión diaria
+  // Calcular la ganancia de la empresa basada en las rentas pagadas * comisión diaria
+  // La comisión diaria es por cuota pagada, no un acumulado arbitrario
   const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
-  
-  // Obtener las tarifas de GPS desde la configuración
-  const gpsMonthlyFee = settings?.gpsMonthlyFee || 0;
-  
-  // Calcular descuentos por mantenimiento
-  const maintenanceDiscounts = vehicle.maintenanceHistory 
-    ? vehicle.maintenanceHistory
-        .filter(m => m.status === "completed")
-        .reduce((sum, m) => sum + m.cost, 0)
-    : 0;
-  
-  // Calcular descuentos totales (GPS + mantenimiento)
-  const gpsDiscounts = gpsMonthlyFee * (paidInstallments / 30); // Aproximación basada en días pagados
-  const totalDiscounts = Number(gpsDiscounts.toFixed(2)) + maintenanceDiscounts;
   
   // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
   const calculateOverdueInstallments = () => {
@@ -100,7 +87,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   
   const overdueInstallments = calculateOverdueInstallments();
   
-  // Calcular la deuda total (cuotas atrasadas + descuentos)
+  // Calcular la deuda total (cuotas atrasadas * monto de cuota)
   const totalDebt = (overdueInstallments * installmentAmount);
 
   // Obtener fecha del último pago
@@ -137,23 +124,23 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
       <CardContent className="p-4 pt-0 text-sm space-y-2 overflow-visible">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Comisión empresa</p>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Comisión diaria</p>
             <p className="font-medium">{vehicle.dailyRate} Bs</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Ganancia empresa
+              Cuota diaria
             </p>
-            <p className="font-medium text-success">{companyEarnings} Bs</p>
+            <p className="font-medium">{installmentAmount} Bs</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Cuota diaria
+              Cuotas pagadas
             </p>
-            <p className="font-medium">{installmentAmount} Bs</p>
+            <p className="font-medium">{paidInstallments.toFixed(2)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
@@ -181,18 +168,20 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Descuentos (GPS + Mant.)
-            </p>
-            <p className="font-medium text-amber-600">
-              {totalDiscounts.toFixed(0)} Bs
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">
               Deuda actual
             </p>
             <p className={`font-medium ${totalDebt > 0 ? "text-destructive" : ""}`}>
               {totalDebt.toFixed(0)} Bs
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground dark:text-gray-400">
+              Último pago
+            </p>
+            <p className="font-medium">
+              {lastPayment 
+                ? format(new Date(lastPayment.date), "dd/MM/yyyy") 
+                : "Sin pagos"}
             </p>
           </div>
         </div>
@@ -206,12 +195,12 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground dark:text-gray-400">
-              Último pago
+              Fecha de contrato
             </p>
             <p className="font-medium">
-              {lastPayment 
-                ? format(new Date(lastPayment.date), "dd/MM/yyyy") 
-                : "Sin pagos"}
+              {vehicle.contractStartDate 
+                ? format(new Date(vehicle.contractStartDate), "dd/MM/yyyy") 
+                : "No registrada"}
             </p>
           </div>
         </div>

@@ -388,6 +388,13 @@ ${vehicleData.map(data =>
     window.open(whatsappUrl, '_blank');
   };
 
+  // Obtener el nombre del mes de la rendición
+  const getPeriodMonthName = () => {
+    if (!startDate) return "";
+    const date = new Date(startDate);
+    return format(date, "MMMM yyyy", { locale: es });
+  };
+
   return (
     <div className="space-y-6 max-w-[1000px] mx-auto pb-10" id="settlement-print">
       <div className="flex items-center justify-between mb-4 print:hidden">
@@ -435,6 +442,8 @@ ${vehicleData.map(data =>
               Liquidación de Inversionista
             </CardTitle>
             <CardDescription className="print:text-center print:text-base">
+              <span className="font-medium">Rendición de {getPeriodMonthName()}</span>
+              <br />
               Período: {format(new Date(startDate), "PPP", { locale: es })} - {format(new Date(endDate), "PPP", { locale: es })}
             </CardDescription>
           </CardHeader>
