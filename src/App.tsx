@@ -5,7 +5,6 @@ import Dashboard from "@/pages/Dashboard";
 import Vehicles from "@/pages/Vehicles";
 import Payments from "@/pages/Payments";
 import PaymentAnalysis from "@/pages/PaymentAnalysis";
-import Calendar from "@/pages/Calendar";
 import Investors from "@/pages/Investors";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
@@ -36,7 +35,6 @@ function App() {
             <Route path="vehicles" element={<Vehicles />} />
             <Route path="payments" element={<Payments />} />
             <Route path="payment-analysis" element={<PaymentAnalysis />} />
-            <Route path="calendar" element={<Calendar />} />
             <Route path="investors" element={<Investors />} />
             <Route path="investors/:id/settlement" element={<InvestorSettlement />} />
             <Route path="drivers" element={<Drivers />} />

@@ -1,229 +1,163 @@
 
-import { NavLink, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Link, useLocation } from "react-router-dom";
 import {
-  Calendar,
-  DollarSign,
-  BarChart,
-  Settings,
   Home,
   Car,
   Users,
-  PieChart,
+  User2,
+  DollarSign,
+  Settings,
   Menu,
-  User,
+  XIcon,
+  LayoutDashboard,
+  BellRing,
 } from "lucide-react";
+import { useMobile } from "@/hooks/use-mobile";
+import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
 
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useEffect, useState, useRef } from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
-
-type SidebarSection = {
-  title: string;
-  links: {
-    href: string;
-    title: string;
-    icon: React.ReactNode;
-  }[];
+type SidebarProps = {
+  collapsed?: boolean;
+  className?: string;
 };
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, className }: SidebarProps) {
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isMobile = useIsMobile();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const { isMobile } = useMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Si es móvil, manejamos de otra forma
   useEffect(() => {
-    if (!isMobile) {
-      // En escritorio, activamos el comportamiento de hover
-      setIsSidebarOpen(false);
-    }
-  }, [isMobile]);
+    setSidebarOpen(false);
+  }, [location]);
 
-  // Función para manejar el hover en el área sensible
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsSidebarOpen(true);
-  };
-
-  // Función para manejar cuando el mouse sale
-  const handleMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    timeoutRef.current = setTimeout(() => {
-      setIsSidebarOpen(false);
-    }, 300);
-  };
-
-  // Click fuera para cerrar en móvil
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (isMobile && isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isMobile, isSidebarOpen]);
-
-  // Limpiar timeout al desmontar
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Datos de navegación
-  const navigationSections: SidebarSection[] = [
-    {
-      title: "Visión General",
-      links: [
-        {
-          href: "/dashboard",
-          title: "Dashboard",
-          icon: <Home className="h-5 w-5" />,
-        },
-      ],
-    },
-    {
-      title: "Administración",
-      links: [
-        {
-          href: "/vehicles",
-          title: "Vehículos",
-          icon: <Car className="h-5 w-5" />,
-        },
-        {
-          href: "/drivers",
-          title: "Choferes",
-          icon: <User className="h-5 w-5" />,
-        },
-        {
-          href: "/payments",
-          title: "Pagos",
-          icon: <DollarSign className="h-5 w-5" />,
-        },
-        {
-          href: "/payment-analysis",
-          title: "Análisis de Pagos",
-          icon: <BarChart className="h-5 w-5" />,
-        },
-        {
-          href: "/calendar",
-          title: "Calendario",
-          icon: <Calendar className="h-5 w-5" />,
-        },
-        {
-          href: "/investors",
-          title: "Inversionistas",
-          icon: <Users className="h-5 w-5" />,
-        },
-      ],
-    },
-    {
-      title: "Sistema",
-      links: [
-        {
-          href: "/settings",
-          title: "Configuración",
-          icon: <Settings className="h-5 w-5" />,
-        },
-      ],
-    },
-  ];
-
-  return (
-    <>
-      {/* Área sensible al hover para la detección */}
-      <div 
-        className="fixed top-0 left-0 h-full w-4 z-40 cursor-pointer"
-        onMouseEnter={handleMouseEnter}
-      >
-        {/* Mini indicador de menú */}
-        {!isSidebarOpen && !isMobile && (
-          <div className="absolute top-16 left-1 bg-white dark:bg-gray-800 p-1 rounded-full shadow-md opacity-30 hover:opacity-100 transition-opacity">
-            <Menu className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-          </div>
-        )}
-      </div>
-
-      {/* Botón para abrir menú en móvil */}
-      {isMobile && !isSidebarOpen && (
-        <button 
-          className="fixed top-16 left-2 z-40 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md"
-          onClick={() => setIsSidebarOpen(true)}
+  if (isMobile) {
+    return (
+      <>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-4 left-4 z-50"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
         >
-          <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-        </button>
-      )}
+          <Menu className="h-5 w-5" />
+        </Button>
 
-      {/* Sidebar */}
-      <div
-        ref={sidebarRef}
-        className={cn(
-          "h-screen fixed top-0 z-30 pt-16 transition-all bg-white border-r dark:bg-gray-950 custom-scrollbar",
-          isSidebarOpen
-            ? "w-64 transform-none shadow-lg lg:shadow-none"
-            : "w-0 -translate-x-full"
-        )}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div className="flex h-full flex-col gap-2 p-2">
-          <div
-            className="flex flex-col gap-1"
-          >
-            {navigationSections.map((section, idx) => (
-              <div key={idx} className="px-2 pt-2">
-                <h3 className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {section.title}
-                </h3>
-                {section.links.map((link, linkIdx) => (
-                  <NavLink
-                    key={linkIdx}
-                    to={link.href}
-                    className={({ isActive }) =>
-                      cn(
-                        "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                        isActive
-                          ? "bg-accent text-accent-foreground"
-                          : "transparent"
-                      )
-                    }
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40">
+            <div className="fixed inset-y-0 left-0 w-64 bg-background border-r p-4 shadow-lg z-50">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Menu</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <XIcon className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {menuItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      "flex items-center py-3 px-3 rounded-md hover:bg-muted transition-colors",
+                      location.pathname === item.path &&
+                        "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
                   >
-                    {link.icon}
-                    <span className="ml-3">{link.title}</span>
-                  </NavLink>
+                    <item.icon className="h-5 w-5 mr-3" />
+                    <span>{item.name}</span>
+                  </Link>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "pb-12 border-r",
+        collapsed ? "w-14" : "w-64",
+        className
+      )}
+    >
+      <div className="space-y-4 py-4">
+        <div className="px-4 py-2">
+          <h2 className={cn("text-lg font-semibold", collapsed && "hidden")}>
+            Dashboard
+          </h2>
+        </div>
+        <div className="px-2">
+          <div className="space-y-1">
+            {menuItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center py-2 px-2 rounded-md hover:bg-muted transition-colors",
+                  location.pathname.startsWith(item.pathPrefix || item.path) &&
+                    "bg-primary text-primary-foreground hover:bg-primary/90",
+                  collapsed ? "justify-center" : ""
+                )}
+              >
+                <item.icon
+                  className={cn("h-5 w-5", !collapsed && "mr-2")}
+                />
+                <span className={cn(collapsed && "hidden")}>{item.name}</span>
+              </Link>
             ))}
           </div>
         </div>
       </div>
-      
-      {/* Overlay para móvil */}
-      {isMobile && isSidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black/50"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }
+
+const menuItems = [
+  {
+    name: "Inicio",
+    path: "/",
+    icon: Home,
+  },
+  {
+    name: "Dashboard",
+    path: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Vehículos",
+    path: "/vehicles",
+    pathPrefix: "/vehicles",
+    icon: Car,
+  },
+  {
+    name: "Conductores",
+    path: "/drivers",
+    pathPrefix: "/drivers",
+    icon: User2,
+  },
+  {
+    name: "Inversionistas",
+    path: "/investors",
+    pathPrefix: "/investors",
+    icon: Users,
+  },
+  {
+    name: "Pagos",
+    path: "/payments",
+    pathPrefix: "/payments",
+    icon: DollarSign,
+  },
+  {
+    name: "Configuración",
+    path: "/settings",
+    pathPrefix: "/settings",
+    icon: Settings,
+  },
+];
