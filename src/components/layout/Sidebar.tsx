@@ -126,6 +126,11 @@ export default function Sidebar() {
           icon: <BarChart className="h-5 w-5" />,
         },
         {
+          href: "/calendar",
+          title: "Calendario",
+          icon: <Calendar className="h-5 w-5" />,
+        },
+        {
           href: "/investors",
           title: "Inversionistas",
           icon: <Users className="h-5 w-5" />,

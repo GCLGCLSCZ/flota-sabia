@@ -17,15 +17,6 @@ export type DiscountFrequency = "monthly" | "quarterly" | "biannual" | "annual";
 // Tipos de cardex
 export type CardexType = "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
 
-// Tipos para días no laborables
-export type NonWorkingDayType = "holiday" | "workshop" | "recovered" | "other";
-
-// Tipo para detalle de día no laborable
-export interface NonWorkingDayDetail {
-  type: NonWorkingDayType;
-  details: string;
-}
-
 // Tipo para usuarios y permisos (necesarios para AuthContext)
 export type UserRole = "admin" | "staff" | "viewer";
 export interface UserPermissions {
@@ -86,7 +77,6 @@ export interface Vehicle {
   cardex?: CardexItem[];
   discounts?: Discount[];
   daysNotWorked?: string[];
-  nonWorkingDaysDetails?: Record<string, NonWorkingDayDetail>;
   insurancePolicies?: InsurancePolicy[];
 }
 
