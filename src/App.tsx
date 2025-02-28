@@ -12,6 +12,7 @@ import VehiclesPage from './pages/Vehicles';
 import NonWorkDaysPage from './pages/NonWorkDays';
 import PaymentsPage from './pages/Payments';
 import InvestorsPage from './pages/Investors';
+import InvestorSettlement from './pages/Investors/components/InvestorSettlement';
 import DriversPage from './pages/Drivers/DriversPage';
 import SettingsPage from './pages/Settings';
 import NotFound from './pages/NotFound';
@@ -40,6 +41,7 @@ function App() {
               <Route path="nonworkdays" element={<NonWorkDaysPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="investors" element={<InvestorsPage />} />
+              <Route path="investors/:investorId/settlement" element={<InvestorSettlement />} />
               <Route path="drivers" element={<DriversPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />
