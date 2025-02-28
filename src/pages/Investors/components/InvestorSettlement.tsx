@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const InvestorSettlement = () => {
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, addPayment, updateInvestor } = useApp();
+  const { investors, vehicles, payments, addPayment, updateInvestor, settings } = useApp();
   const { toast } = useToast();
   const [investor, setInvestor] = useState<Investor | null>(null);
   const [startDate, setStartDate] = useState("");
@@ -58,6 +58,9 @@ const InvestorSettlement = () => {
     );
   }
 
+  // Obtener la tarifa mensual de GPS
+  const gpsMonthlyFee = settings?.gpsMonthlyFee || 0;
+  
   // Filtrar vehículos del inversionista
   const investorVehicles = vehicles.filter(
     (vehicle) => vehicle.investor === investor.name
@@ -97,11 +100,31 @@ const InvestorSettlement = () => {
         0
       );
 
+      // Calcular descuentos por mantenimiento en el período
+      const maintenanceDiscounts = vehicle.maintenanceHistory 
+        ? vehicle.maintenanceHistory
+            .filter(m => 
+              m.status === "completed" && 
+              new Date(m.date) >= new Date(startDate) &&
+              new Date(m.date) <= new Date(endDate)
+            )
+            .reduce((sum, m) => sum + m.cost, 0)
+        : 0;
+      
+      // Calcular días del período
+      const periodDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Calcular descuento de GPS para el período
+      const gpsDiscount = (gpsMonthlyFee * periodDays) / 30;
+      
+      // Descuentos totales
+      const totalDiscounts = maintenanceDiscounts + gpsDiscount;
+
       // Cálculo del porcentaje del inversionista (70% por defecto si no se especifica)
       const investorPercentage = 0.7; // Asumimos 70% para el inversionista
 
-      // Monto que corresponde al inversionista
-      const investorAmount = periodIncome * investorPercentage;
+      // Monto que corresponde al inversionista (ingresos menos descuentos)
+      const investorAmount = (periodIncome - totalDiscounts) * investorPercentage;
 
       // Saldo por pagar al inversionista
       const balanceDue = investorAmount - periodPayments;
@@ -110,6 +133,9 @@ const InvestorSettlement = () => {
         vehicle,
         periodIncome,
         periodPayments,
+        maintenanceDiscounts,
+        gpsDiscount,
+        totalDiscounts,
         investorAmount,
         balanceDue
       };
@@ -125,9 +151,12 @@ const InvestorSettlement = () => {
       acc.investorAmount += data.investorAmount;
       acc.paid += data.periodPayments;
       acc.balance += data.balanceDue;
+      acc.maintenanceDiscounts += data.maintenanceDiscounts;
+      acc.gpsDiscounts += data.gpsDiscount;
+      acc.totalDiscounts += data.totalDiscounts;
       return acc;
     },
-    { income: 0, investorAmount: 0, paid: 0, balance: 0 }
+    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0 }
   );
 
   // Calcular pagos totales históricos al inversionista
@@ -337,6 +366,7 @@ const InvestorSettlement = () => {
                   <TableRow>
                     <TableHead>Vehículo</TableHead>
                     <TableHead className="text-right">Ingresos</TableHead>
+                    <TableHead className="text-right">Descuentos</TableHead>
                     <TableHead className="text-right">Corresponde</TableHead>
                     <TableHead className="text-right">Pagado</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
@@ -347,6 +377,12 @@ const InvestorSettlement = () => {
                     <TableRow key={data.vehicle.id}>
                       <TableCell>{data.vehicle.plate} - {data.vehicle.model}</TableCell>
                       <TableCell className="text-right">Bs {data.periodIncome.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        Bs {data.totalDiscounts.toFixed(2)}
+                        <div className="text-xs text-muted-foreground">
+                          Mant: Bs {data.maintenanceDiscounts.toFixed(2)} | GPS: Bs {data.gpsDiscount.toFixed(2)}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">Bs {data.investorAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">Bs {data.periodPayments.toFixed(2)}</TableCell>
                       <TableCell className={`text-right ${data.balanceDue > 0 ? "text-red-500" : ""}`}>
@@ -363,6 +399,18 @@ const InvestorSettlement = () => {
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Ingresos totales:</span>
                   <span>Bs {totals.income.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">Descuentos totales:</span>
+                  <span>Bs {totals.totalDiscounts.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
+                  <span>Mantenimiento:</span>
+                  <span>Bs {totals.maintenanceDiscounts.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
+                  <span>GPS:</span>
+                  <span>Bs {totals.gpsDiscounts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Corresponde al inversionista:</span>
