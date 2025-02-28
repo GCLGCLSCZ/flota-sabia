@@ -1,4 +1,10 @@
 
+/**
+ * Componente que muestra los días en que un vehículo no ha trabajado.
+ * Útil para realizar seguimiento de días sin actividad y calcular correctamente los ingresos.
+ * 
+ * @param daysNotWorked - Array de fechas en formato string que representa los días no trabajados
+ */
 interface VehicleNonWorkingDaysProps {
   daysNotWorked: string[];
 }

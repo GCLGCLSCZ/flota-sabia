@@ -8,6 +8,19 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { clearAllStoredData, STORAGE_KEYS } from "@/context/storage";
 
+/**
+ * Componente para limpiar completamente los datos de la aplicación.
+ * 
+ * Funcionalidad:
+ * - Elimina todos los datos almacenados en localStorage
+ * - Elimina todos los datos en Supabase (si está configurado)
+ * - Verifica que la aplicación siga funcionando correctamente después de la limpieza
+ * 
+ * Este componente es útil para:
+ * - Restablecer la aplicación a su estado inicial
+ * - Solucionar problemas de datos corruptos
+ * - Preparar la aplicación para un nuevo conjunto de datos
+ */
 const DataCleanup = () => {
   const { toast } = useToast();
   const { refreshData } = useApp();

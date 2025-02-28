@@ -9,6 +9,15 @@ import VehicleDriverInfo from "./VehicleDriverInfo";
 import VehicleNonWorkingDays from "./VehicleNonWorkingDays";
 import { useVehicleCardData } from "./useVehicleCardData";
 
+/**
+ * Componente que muestra la información de un vehículo en forma de tarjeta.
+ * Incluye:
+ * - Información básica del vehículo (placa, marca, modelo)
+ * - Estado de pagos e ingresos
+ * - Información del conductor asignado
+ * - Días no trabajados
+ * - Botones para acciones (ver detalles, editar, eliminar)
+ */
 interface VehicleCardProps {
   vehicle: Vehicle;
   onEdit: (vehicle: Vehicle) => void;
@@ -17,6 +26,7 @@ interface VehicleCardProps {
 }
 
 const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }: VehicleCardProps) => {
+  // Obtiene datos calculados sobre el vehículo (pagos, cuotas, ingresos, etc.)
   const {
     isActive,
     cardClass,

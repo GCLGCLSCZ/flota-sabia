@@ -3,6 +3,20 @@ import { useApp } from "@/context/AppContext";
 import { Vehicle } from "@/types";
 import { differenceInDays, format, isAfter, isSunday, isValid, parseISO } from "date-fns";
 
+/**
+ * Hook personalizado que calcula y proporciona datos financieros y de estado para un vehículo.
+ * 
+ * Realiza los siguientes cálculos:
+ * - Estado del vehículo (activo/inactivo)
+ * - Cuotas pagadas y pendientes
+ * - Total pagado hasta la fecha
+ * - Cuotas atrasadas y deuda total
+ * - Ingresos generados
+ * - Último pago registrado
+ * 
+ * @param vehicle - Objeto con la información del vehículo
+ * @returns Objeto con todos los datos calculados para mostrar en la tarjeta del vehículo
+ */
 export const useVehicleCardData = (vehicle: Vehicle) => {
   const { payments } = useApp();
   const isActive = vehicle.status === "active";
@@ -41,7 +55,10 @@ export const useVehicleCardData = (vehicle: Vehicle) => {
   // Calcular la ganancia de la empresa basada en las rentas pagadas * comisión diaria
   const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
   
-  // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
+  /**
+   * Calcula las cuotas atrasadas excluyendo domingos y días marcados como no laborables
+   * Es importante para determinar si hay retrasos en los pagos del vehículo.
+   */
   const calculateOverdueInstallments = () => {
     if (!vehicle.contractStartDate) return 0;
     
