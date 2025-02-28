@@ -1,52 +1,46 @@
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "@/components/layout/Layout";
-import Dashboard from "@/pages/Dashboard";
-import Vehicles from "@/pages/Vehicles";
-import Payments from "@/pages/Payments";
-import PaymentAnalysis from "@/pages/PaymentAnalysis";
-import Calendar from "@/pages/Calendar";
-import Investors from "@/pages/Investors";
-import Settings from "@/pages/Settings";
-import NotFound from "@/pages/NotFound";
-import Index from "@/pages/Index";
-import { AppProvider } from "@/context/AppContext";
-import { Toaster } from "@/components/ui/toaster";
-import { useEffect } from "react";
-import "./App.css";
-
-// Importamos la página de Drivers
-import Drivers from "@/pages/Drivers";
-// Importamos el componente de rendición de inversionistas
-import InvestorSettlement from "@/pages/Investors/components/InvestorSettlement";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "./components/ui/toaster";
+import Layout from "./components/layout/Layout";
+import DashboardPage from "./pages/Dashboard";
+import VehiclesPage from "./pages/Vehicles";
+import DriversPage from "./pages/Drivers";
+import InvestorsPage from "./pages/Investors";
+import PaymentsPage from "./pages/Payments";
+import PaymentAnalysisPage from "./pages/PaymentAnalysis";
+import SettingsPage from "./pages/Settings";
+import NotFound from "./pages/NotFound";
+import Index from "./pages/Index";
+import { AppProvider } from "./context/AppContext";
+import { AuthProvider } from "./context/AuthContext";
+import InvestorSettlement from "./pages/Investors/components/InvestorSettlement";
 
 function App() {
-  // Establecer el título de la aplicación
-  useEffect(() => {
-    document.title = "Sistema de Gestión de Flota";
-  }, []);
-
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Index />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="vehicles" element={<Vehicles />} />
-            <Route path="payments" element={<Payments />} />
-            <Route path="payment-analysis" element={<PaymentAnalysis />} />
-            <Route path="calendar" element={<Calendar />} />
-            <Route path="investors" element={<Investors />} />
-            <Route path="investors/:id/settlement" element={<InvestorSettlement />} />
-            <Route path="drivers" element={<Drivers />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-      <Toaster />
-    </AppProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <AuthProvider>
+        <AppProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Index />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="vehicles" element={<VehiclesPage />} />
+                <Route path="drivers" element={<DriversPage />} />
+                <Route path="payments" element={<PaymentsPage />} />
+                <Route path="payment-analysis" element={<PaymentAnalysisPage />} />
+                <Route path="investors" element={<InvestorsPage />} />
+                <Route path="investors/settlement/:id" element={<InvestorSettlement />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </Router>
+          <Toaster />
+        </AppProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
