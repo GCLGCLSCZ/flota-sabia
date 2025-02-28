@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/AppContext";
-import { Vehicle, Maintenance } from "@/types";
+import { Vehicle, Maintenance, MaintenanceType } from "@/types";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -37,7 +37,7 @@ const VehicleDetailsDialog = ({
     costMaterials: 0,
     costLabor: 0,
     salePrice: 0,
-    type: "mechanical" as const,
+    type: "mechanical" as MaintenanceType,
     proformaNumber: "",
     isInsuranceCovered: false,
   });
@@ -75,7 +75,17 @@ const VehicleDetailsDialog = ({
       return;
     }
 
-    onAddMaintenance && onAddMaintenance(vehicle.id, maintenanceForm);
+    // Calcular costo total
+    const cost = maintenanceForm.costMaterials + maintenanceForm.costLabor;
+
+    // Crear objeto de mantenimiento incluyendo vehicleId y cost
+    const maintenanceData: Omit<Maintenance, "id" | "status"> = {
+      ...maintenanceForm,
+      vehicleId: vehicle.id,
+      cost
+    };
+
+    onAddMaintenance && onAddMaintenance(vehicle.id, maintenanceData);
 
     // Reset form
     setMaintenanceForm({
@@ -355,7 +365,7 @@ const VehicleDetailsDialog = ({
                         onChange={(e) =>
                           setMaintenanceForm({
                             ...maintenanceForm,
-                            type: e.target.value as "mechanical" | "body_paint",
+                            type: e.target.value as MaintenanceType,
                           })
                         }
                       >
