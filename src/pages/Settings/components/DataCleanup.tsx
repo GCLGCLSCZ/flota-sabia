@@ -6,7 +6,7 @@ import { Trash, RotateCw, Check, AlertCircle } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { STORAGE_KEYS } from "@/context/storage";
+import { clearAllStoredData, STORAGE_KEYS } from "@/context/storage";
 
 const DataCleanup = () => {
   const { toast } = useToast();
@@ -16,37 +16,48 @@ const DataCleanup = () => {
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Función para limpiar localStorage
+  // Función para limpiar completamente localStorage
   const clearLocalStorage = () => {
-    // Limpiar todos los datos almacenados en localStorage
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
-    
-    // También limpiar otros posibles datos
-    localStorage.removeItem('settings');
-    localStorage.removeItem('maintenance');
-    localStorage.removeItem('cardex');
-    localStorage.removeItem('discounts');
-    localStorage.removeItem('free_days');
-    
-    // Limpiar cualquier otro dato que pueda estar en localStorage
-    const keysToPreserve = ['theme', 'chakra-ui-color-mode']; // Claves que NO queremos borrar
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && !keysToPreserve.includes(key) && key.startsWith('app_')) {
+    try {
+      console.log("Limpiando localStorage...");
+      
+      // Limpiamos manualmente todas las claves conocidas
+      Object.values(STORAGE_KEYS).forEach(key => {
+        console.log(`Eliminando clave: ${key}`);
         localStorage.removeItem(key);
+      });
+      
+      // También limpiamos otros datos que pueden estar en localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('app_')) {
+          console.log(`Eliminando clave adicional: ${key}`);
+          localStorage.removeItem(key);
+        }
       }
+      
+      // Usando la función auxiliar para limpiar todo
+      clearAllStoredData();
+      
+      console.log("localStorage limpiado completamente");
+      return true;
+    } catch (err) {
+      console.error("Error al limpiar localStorage:", err);
+      return false;
     }
   };
 
-  // Función para limpiar datos en Supabase
+  // Función para limpiar datos en Supabase de manera más agresiva
   const clearSupabaseData = async () => {
-    if (!supabase) return; // Si no hay instancia de Supabase, no hacer nada
+    if (!supabase) {
+      console.log("Supabase no está disponible");
+      return true;
+    }
     
     try {
-      // Borrar datos de las tablas principales
+      console.log("Limpiando datos de Supabase...");
+      
+      // Lista de tablas para limpiar
       const tables = [
         'vehicles',
         'payments',
@@ -55,58 +66,66 @@ const DataCleanup = () => {
         'maintenance',
         'cardex',
         'discounts',
-        'free_days',
+        'days_not_worked',
         'settings',
-        'days_not_worked'
+        'free_days'
       ];
       
-      // Borrar datos de cada tabla con un método más robusto
+      // Eliminamos agresivamente los datos de cada tabla
       for (const table of tables) {
         try {
-          // Primero intentamos obtener todos los registros para verificar si la tabla existe
-          const { data, error: fetchError } = await supabase
-            .from(table)
-            .select('id')
-            .limit(1);
-            
-          if (fetchError && fetchError.code === '42P01') {
-            // Si la tabla no existe, ignoramos el error y continuamos
-            console.log(`Tabla ${table} no existe, continuando...`);
-            continue;
-          }
+          console.log(`Eliminando datos de tabla: ${table}`);
           
-          // Si la tabla existe, procedemos a eliminar todos los registros
+          // Método 1: Eliminar usando delete
           const { error: deleteError } = await supabase
             .from(table)
             .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Truco más seguro para borrar todos los registros
+            .not('id', 'is', null);
           
           if (deleteError) {
-            console.error(`Error al limpiar tabla ${table}:`, deleteError);
-          } else {
-            console.log(`Datos de tabla ${table} eliminados correctamente`);
+            console.log(`Error con método 1 para tabla ${table}:`, deleteError);
+            
+            // Método 2: Intento alternativo si falla el primero
+            const { error: rpcError } = await supabase.rpc('truncate_table', { table_name: table });
+            
+            if (rpcError) {
+              console.log(`Error con método 2 para tabla ${table}:`, rpcError);
+              
+              // Método 3: Usando SQL directo como último recurso
+              const { error: sqlError } = await supabase.from(table).delete();
+              
+              if (sqlError) {
+                console.log(`No se pudo limpiar tabla ${table}:`, sqlError);
+              }
+            }
           }
+          
+          console.log(`Tabla ${table} procesada`);
         } catch (tableError) {
           console.error(`Error procesando tabla ${table}:`, tableError);
         }
       }
+      
+      console.log("Datos de Supabase limpiados completamente");
+      return true;
     } catch (err) {
-      console.error('Error al limpiar datos de Supabase:', err);
-      throw err;
+      console.error("Error al limpiar datos de Supabase:", err);
+      return false;
     }
   };
 
   // Función para verificar que la aplicación esté funcionando correctamente
   const verifyAppFunctionality = async () => {
     try {
-      // Refrescar los datos para asegurarse de que todo está limpio
+      console.log("Verificando funcionalidad de la aplicación...");
+      
+      // Refrescar los datos para asegurar que todo está limpio
       await refreshData();
       
-      // Aquí podríamos agregar más verificaciones si fuera necesario
-      
+      console.log("Verificación completada con éxito");
       return true;
     } catch (err) {
-      console.error('Error en la verificación de funcionalidad:', err);
+      console.error("Error en la verificación de funcionalidad:", err);
       throw err;
     }
   };
@@ -122,10 +141,18 @@ const DataCleanup = () => {
     
     try {
       // Primero limpiar localStorage
-      clearLocalStorage();
+      const localStorageClean = clearLocalStorage();
+      
+      if (!localStorageClean) {
+        throw new Error("Error al limpiar localStorage");
+      }
       
       // Luego limpiar Supabase si está disponible
-      await clearSupabaseData();
+      const supabaseClean = await clearSupabaseData();
+      
+      if (!supabaseClean) {
+        throw new Error("Error al limpiar Supabase");
+      }
       
       // Marcar la limpieza como completada
       setCleanupComplete(true);

@@ -2,30 +2,62 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Vehicle, Maintenance, InsurancePolicy, InsurancePayment } from "@/types";
+import { Vehicle, Maintenance } from "@/types";
 import { VehiclesHeader } from "./components/VehiclesHeader";
 import { VehicleList } from "./components/VehicleList";
 import AddVehicleDialog from "./components/AddVehicleDialog";
 import EditVehicleDialog from "./components/EditVehicleDialog";
 import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
+import { supabase } from "@/lib/supabase";
 
 const VehiclesPage = () => {
-  const { updateVehicle, vehicles } = useApp();
+  const { updateVehicle, vehicles, refreshData } = useApp();
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
-  const handleDelete = (vehicleId: string) => {
-    updateVehicle(vehicleId, { status: "inactive" });
-    setDeletingVehicle(null);
-    toast({
-      title: "Vehículo eliminado",
-      description: "El vehículo ha sido eliminado exitosamente",
-      variant: "destructive",
-    });
+  const handleDelete = async (vehicleId: string) => {
+    try {
+      // Cambiar el estado a inactivo (soft delete)
+      await updateVehicle(vehicleId, { status: "inactive" });
+      
+      // Si tenemos supabase, intentamos una eliminación más completa
+      if (supabase) {
+        // Intentar eliminar los registros relacionados
+        await Promise.all([
+          supabase.from('maintenance').delete().eq('vehicle_id', vehicleId),
+          supabase.from('cardex').delete().eq('vehicle_id', vehicleId),
+          supabase.from('discounts').delete().eq('vehicle_id', vehicleId),
+          supabase.from('days_not_worked').delete().eq('vehicle_id', vehicleId)
+        ]);
+        
+        // Intentar eliminar el vehículo por completo
+        await supabase.from('vehicles').delete().eq('id', vehicleId);
+        
+        // Refrescar datos
+        await refreshData();
+      }
+      
+      // Cerrar el diálogo y mostrar mensaje
+      setDeletingVehicle(null);
+      
+      toast({
+        title: "Vehículo eliminado",
+        description: "El vehículo ha sido eliminado exitosamente",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error al eliminar vehículo:", error);
+      
+      toast({
+        title: "Error al eliminar",
+        description: "No se pudo eliminar el vehículo. Intente nuevamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddMaintenance = (

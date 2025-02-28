@@ -13,25 +13,61 @@ export const STORAGE_KEYS = {
 };
 
 export const getStoredData = <T>(key: string): T[] => {
-  const stored = localStorage.getItem(key);
-  return stored ? JSON.parse(stored) : [];
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error(`Error obteniendo datos de ${key}:`, error);
+    return [];
+  }
 };
 
 export const setStoredData = <T>(key: string, data: T[]): void => {
-  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error(`Error guardando datos en ${key}:`, error);
+  }
+};
+
+export const removeStoredData = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error(`Error eliminando datos de ${key}:`, error);
+  }
 };
 
 export const clearAllStoredData = (): void => {
-  // Limpiar todas las claves definidas
-  Object.values(STORAGE_KEYS).forEach(key => {
-    localStorage.removeItem(key);
-  });
+  console.log("Ejecutando limpieza completa de datos almacenados");
   
-  // También buscar y limpiar otras claves que empiecen con app_
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('app_')) {
-      localStorage.removeItem(key);
+  try {
+    // Primera pasada: Limpiar todas las claves definidas en STORAGE_KEYS
+    Object.values(STORAGE_KEYS).forEach(key => {
+      console.log(`Eliminando clave conocida: ${key}`);
+      removeStoredData(key);
+    });
+    
+    // Segunda pasada: Buscar y limpiar otras claves que empiecen con app_
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('app_')) {
+        keysToRemove.push(key);
+      }
     }
+    
+    // Eliminar las claves encontradas
+    keysToRemove.forEach(key => {
+      console.log(`Eliminando clave adicional: ${key}`);
+      removeStoredData(key);
+    });
+    
+    // También limpiamos settings si existe
+    removeStoredData('settings');
+    
+    console.log("Limpieza de datos completada");
+  } catch (error) {
+    console.error("Error durante la limpieza de datos:", error);
   }
 };

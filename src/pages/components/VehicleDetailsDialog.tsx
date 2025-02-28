@@ -1,648 +1,407 @@
 
 import { useState } from "react";
-import { X, PlusCircle, Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import { Vehicle, Maintenance } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon, Check, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { Vehicle, Maintenance, MaintenanceType } from "@/types";
+import { useToast } from "@/hooks/use-toast";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
   onClose: () => void;
-  onAddMaintenance?: (vehicleId: string, maintenance: Omit<Maintenance, "id" | "status">) => void;
+  onAddMaintenance: (vehicleId: string, maintenance: Omit<Maintenance, "id" | "status">) => void;
 }
 
-const VehicleDetailsDialog = ({
-  vehicle,
-  onClose,
-  onAddMaintenance,
-}: VehicleDetailsDialogProps) => {
+const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
   const { toast } = useToast();
-  const { updateVehicle, addFreeDay, removeFreeDay, refreshData } = useApp();
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    date: new Date().toISOString().split("T")[0],
+  const { addFreeDay, removeFreeDay } = useApp();
+  const [maintenanceData, setMaintenanceData] = useState<Omit<Maintenance, "id" | "vehicleId" | "status">>({
+    date: format(new Date(), "yyyy-MM-dd"),
     description: "",
+    cost: 0,
     costMaterials: 0,
     costLabor: 0,
     salePrice: 0,
-    type: "mechanical" as MaintenanceType,
-    proformaNumber: "",
-    isInsuranceCovered: false,
   });
-  
-  const [newFreeDay, setNewFreeDay] = useState("");
-  const [addingFreeDay, setAddingFreeDay] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   if (!vehicle) return null;
 
-  // Verificar si freeDays es un array válido
-  const safeFreeDays = Array.isArray(vehicle.freeDays) ? vehicle.freeDays : [];
-  
-  // Ordenar días libres por fecha (más recientes primero)
-  const sortedFreeDays = [...safeFreeDays].sort((a, b) => {
-    return new Date(b).getTime() - new Date(a).getTime();
-  });
-
-  const handleMaintenanceSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!vehicle) return;
-
-    if (!maintenanceForm.description) {
-      toast({
-        title: "Error",
-        description: "La descripción es obligatoria",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (maintenanceForm.costMaterials < 0 || maintenanceForm.costLabor < 0) {
-      toast({
-        title: "Error",
-        description: "Los costos no pueden ser negativos",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Calcular costo total
-    const cost = maintenanceForm.costMaterials + maintenanceForm.costLabor;
-
-    // Crear objeto de mantenimiento incluyendo vehicleId y cost
-    const maintenanceData: Omit<Maintenance, "id" | "status"> = {
-      ...maintenanceForm,
-      vehicleId: vehicle.id,
-      cost
-    };
-
-    onAddMaintenance && onAddMaintenance(vehicle.id, maintenanceData);
-
-    // Reset form
-    setMaintenanceForm({
-      date: new Date().toISOString().split("T")[0],
-      description: "",
-      costMaterials: 0,
-      costLabor: 0,
-      salePrice: 0,
-      type: "mechanical",
-      proformaNumber: "",
-      isInsuranceCovered: false,
-    });
+  // Función para verificar si una fecha está en la lista de días no trabajados
+  const isDateNotWorked = (date: Date) => {
+    const formattedDate = format(date, "yyyy-MM-dd");
+    return vehicle.daysNotWorked?.includes(formattedDate) || 
+           vehicle.freeDays?.includes(formattedDate) || 
+           false;
   };
 
-  const handleAddFreeDay = async () => {
-    if (!newFreeDay || !vehicle || isSubmitting) return;
+  // Manejar agregar/quitar un día no trabajado
+  const handleToggleFreeDay = async (date: Date) => {
+    const formattedDate = format(date, "yyyy-MM-dd");
     
-    // Validar formato de fecha
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-    if (!datePattern.test(newFreeDay)) {
-      toast({
-        title: "Formato incorrecto",
-        description: "La fecha debe tener el formato YYYY-MM-DD (ej: 2023-05-15)",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Validar que la fecha sea válida
-    try {
-      const testDate = new Date(newFreeDay);
-      if (isNaN(testDate.getTime())) {
-        throw new Error("Fecha inválida");
-      }
-    } catch (error) {
-      toast({
-        title: "Fecha inválida",
-        description: "La fecha ingresada no es válida",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Usar la función específica para añadir días libres
-      const success = await addFreeDay(vehicle.id, newFreeDay);
-      
+    if (isDateNotWorked(date)) {
+      // Si ya está marcado como no trabajado, lo quitamos
+      const success = await removeFreeDay(vehicle.id, formattedDate);
       if (success) {
-        // Actualizar UI y mostrar mensaje de éxito
-        const formattedDate = format(parseISO(newFreeDay), "d 'de' MMMM 'de' yyyy", { locale: es });
         toast({
-          title: "Jornada libre agregada",
-          description: `Se ha registrado el ${formattedDate} como jornada libre.`,
-        });
-        
-        // Refrescar los datos para actualizar la UI
-        await refreshData();
-        
-        // Restablecer el estado
-        setNewFreeDay("");
-        setAddingFreeDay(false);
-      } else {
-        toast({
-          title: "Error",
-          description: "Esta fecha ya está registrada o hubo un problema al registrarla",
-          variant: "destructive",
+          title: "Día actualizado",
+          description: `El día ${formattedDate} ha sido marcado como trabajado.`,
         });
       }
-    } catch (error) {
-      console.error("Error al agregar jornada libre:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo agregar la jornada libre",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // Si no está marcado, lo agregamos como no trabajado
+      const success = await addFreeDay(vehicle.id, formattedDate);
+      if (success) {
+        toast({
+          title: "Día actualizado",
+          description: `El día ${formattedDate} ha sido marcado como no trabajado.`,
+        });
+      }
     }
   };
 
-  const handleRemoveFreeDay = async (dateToRemove: string) => {
-    if (!vehicle || isSubmitting) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Usar la función específica para eliminar días libres
-      const success = await removeFreeDay(vehicle.id, dateToRemove);
-      
-      if (success) {
-        try {
-          // Mostrar mensaje de éxito
-          const formattedDate = format(parseISO(dateToRemove), "d 'de' MMMM 'de' yyyy", { locale: es });
-          toast({
-            title: "Jornada libre eliminada",
-            description: `Se ha eliminado el ${formattedDate} de las jornadas libres.`,
-          });
-        } catch (error) {
-          toast({
-            title: "Jornada libre eliminada",
-            description: "La jornada libre ha sido eliminada correctamente.",
-          });
-        }
-        
-        // Refrescar los datos para actualizar la UI
-        await refreshData();
-      } else {
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar la jornada libre",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error al eliminar jornada libre:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la jornada libre",
-        variant: "destructive",
+  const handleSubmitMaintenance = () => {
+    if (vehicle?.id) {
+      onAddMaintenance(vehicle.id, maintenanceData);
+      setMaintenanceData({
+        date: format(new Date(), "yyyy-MM-dd"),
+        description: "",
+        cost: 0,
+        costMaterials: 0,
+        costLabor: 0,
+        salePrice: 0,
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={Boolean(vehicle)} onOpenChange={() => onClose()} modal>
-      <DialogContent className="max-w-[95vw] h-[90vh] overflow-y-auto flex flex-col p-0">
-        <DialogHeader className="bg-background sticky top-0 z-10 p-4 border-b">
-          <div className="flex justify-between items-center">
-            <DialogTitle className="text-xl">
-              Detalles del Vehículo: {vehicle.plate}
-            </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
+    <Dialog open={!!vehicle} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Detalles del Vehículo: {vehicle.plate}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-grow overflow-auto p-4">
-          <Tabs defaultValue="info" className="w-full">
-            <TabsList className="mb-4 flex flex-wrap">
-              <TabsTrigger value="info">Información</TabsTrigger>
-              <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
-              <TabsTrigger value="freedays">Jornada Libre</TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="info" className="w-full">
+          <TabsList className="grid grid-cols-4 mb-4">
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
+            <TabsTrigger value="days">Días No Trabajados</TabsTrigger>
+            <TabsTrigger value="cardex">Cardex</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="info" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Información del Vehículo</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label>Placa</Label>
-                        <p className="font-medium">{vehicle.plate}</p>
-                      </div>
-                      <div>
-                        <Label>Modelo</Label>
-                        <p className="font-medium">{vehicle.brand} {vehicle.model}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label>Año</Label>
-                        <p className="font-medium">{vehicle.year}</p>
-                      </div>
-                      <div>
-                        <Label>Estado</Label>
-                        <p className={`font-medium ${
-                          vehicle.status === "active" ? "text-success" : 
-                          vehicle.status === "maintenance" ? "text-warning" : 
-                          "text-destructive"
-                        }`}>
-                          {vehicle.status === "active" ? "Activo" : 
-                           vehicle.status === "maintenance" ? "En mantenimiento" : 
-                           "Inactivo"}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Inversionista</Label>
-                      <p className="font-medium">{vehicle.investor}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+          <TabsContent value="info" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Datos del Vehículo</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium mb-1">Placa:</p>
+                  <p>{vehicle.plate}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Marca:</p>
+                  <p>{vehicle.brand}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Modelo:</p>
+                  <p>{vehicle.model}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Año:</p>
+                  <p>{vehicle.year}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Estado:</p>
+                  <p>{vehicle.status}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Inversionista:</p>
+                  <p>{vehicle.investor}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Tarifa Diaria:</p>
+                  <p>{vehicle.dailyRate}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Conductor:</p>
+                  <p>{vehicle.driverName}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Teléfono del Conductor:</p>
+                  <p>{vehicle.driverPhone}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Conductor</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div>
-                      <Label>Nombre</Label>
-                      <p className="font-medium">{vehicle.driverName || "No asignado"}</p>
-                    </div>
-                    <div>
-                      <Label>Teléfono</Label>
-                      <p className="font-medium">{vehicle.driverPhone || "No registrado"}</p>
-                    </div>
-                    <div>
-                      <Label>Fecha de contrato</Label>
-                      <p className="font-medium">
-                        {vehicle.contractStartDate 
-                          ? format(new Date(vehicle.contractStartDate), "dd/MM/yyyy") 
-                          : "No registrada"}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Información Financiera</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label>Comisión diaria</Label>
-                      <p className="font-medium">{vehicle.dailyRate} Bs</p>
-                    </div>
-                    <div>
-                      <Label>Cuota diaria</Label>
-                      <p className="font-medium">{vehicle.installmentAmount || 0} Bs</p>
-                    </div>
-                    <div>
-                      <Label>Total cuotas</Label>
-                      <p className="font-medium">{vehicle.totalInstallments || 0}</p>
-                    </div>
-                    <div>
-                      <Label>Cuotas pagadas</Label>
-                      <p className="font-medium">{vehicle.paidInstallments?.toFixed(2) || 0}</p>
-                    </div>
+          <TabsContent value="maintenance" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Registro de Mantenimiento</CardTitle>
+                <CardDescription>Historial de mantenimientos realizados</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {vehicle.maintenanceHistory && vehicle.maintenanceHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {vehicle.maintenanceHistory.map((maintenance) => (
+                      <div key={maintenance.id} className="border p-3 rounded-lg">
+                        <div className="flex justify-between">
+                          <p className="font-medium">{maintenance.description}</p>
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">
+                            {maintenance.status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Fecha: {maintenance.date}</p>
+                        <p className="text-sm">Costo Total: Bs {maintenance.cost}</p>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          <p>Materiales: Bs {maintenance.costMaterials}</p>
+                          <p>Mano de obra: Bs {maintenance.costLabor}</p>
+                          <p>Precio de venta: Bs {maintenance.salePrice}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                ) : (
+                  <p className="text-muted-foreground">No hay registros de mantenimiento</p>
+                )}
+              </CardContent>
+            </Card>
 
-            <TabsContent value="maintenance" className="space-y-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Historial de Mantenimiento</CardTitle>
-                  <CardDescription>
-                    Registros de mantenimiento del vehículo
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {vehicle.maintenanceHistory && vehicle.maintenanceHistory.length > 0 ? (
-                    <div className="space-y-4">
-                      {vehicle.maintenanceHistory.map((maintenance) => (
-                        <div
-                          key={maintenance.id}
-                          className="border p-3 rounded-md space-y-2"
-                        >
-                          <div className="flex justify-between">
-                            <div className="font-medium">
-                              {format(new Date(maintenance.date), "dd/MM/yyyy")}
-                            </div>
-                            <div className={`text-xs px-2 py-1 rounded-full ${
-                              maintenance.status === "completed" ? "bg-success/20 text-success" : 
-                              maintenance.status === "pending" ? "bg-warning/20 text-warning" : 
-                              "bg-destructive/20 text-destructive"
-                            }`}>
-                              {maintenance.status === "completed" ? "Completado" : 
-                               maintenance.status === "pending" ? "Pendiente" : 
-                               "Cancelado"}
-                            </div>
-                          </div>
-                          <p className="text-sm">{maintenance.description}</p>
-                          <div className="grid grid-cols-2 text-sm gap-2">
-                            <div>
-                              <Label>Costo Materiales</Label>
-                              <p>{maintenance.costMaterials} Bs</p>
-                            </div>
-                            <div>
-                              <Label>Costo Mano de Obra</Label>
-                              <p>{maintenance.costLabor} Bs</p>
-                            </div>
-                            <div>
-                              <Label>Costo Total</Label>
-                              <p className="font-medium">{maintenance.cost} Bs</p>
-                            </div>
-                            <div>
-                              <Label>Precio de Venta</Label>
-                              <p>{maintenance.salePrice} Bs</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No hay registros de mantenimiento para este vehículo.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Nuevo Mantenimiento</CardTitle>
+                <CardDescription>Registrar un nuevo mantenimiento</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-date">Fecha</Label>
+                    <Input
+                      id="maintenance-date"
+                      type="date"
+                      value={maintenanceData.date}
+                      onChange={(e) =>
+                        setMaintenanceData({ ...maintenanceData, date: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-type">Tipo</Label>
+                    <select
+                      id="maintenance-type"
+                      className="w-full p-2 border rounded-md"
+                      value={maintenanceData.type || "mechanical"}
+                      onChange={(e) =>
+                        setMaintenanceData({
+                          ...maintenanceData,
+                          type: e.target.value as any,
+                        })
+                      }
+                    >
+                      <option value="mechanical">Mecánico</option>
+                      <option value="body_paint">Carrocería/Pintura</option>
+                    </select>
+                  </div>
+                </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Registrar Mantenimiento</CardTitle>
-                  <CardDescription>
-                    Añade un nuevo registro de mantenimiento
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleMaintenanceSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="date">Fecha</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={maintenanceForm.date}
-                          onChange={(e) =>
-                            setMaintenanceForm({
-                              ...maintenanceForm,
-                              date: e.target.value,
-                            })
+                <div className="space-y-2">
+                  <Label htmlFor="maintenance-description">Descripción</Label>
+                  <Input
+                    id="maintenance-description"
+                    value={maintenanceData.description}
+                    onChange={(e) =>
+                      setMaintenanceData({
+                        ...maintenanceData,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-cost-materials">Costo Materiales</Label>
+                    <Input
+                      id="maintenance-cost-materials"
+                      type="number"
+                      value={maintenanceData.costMaterials}
+                      onChange={(e) =>
+                        setMaintenanceData({
+                          ...maintenanceData,
+                          costMaterials: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-cost-labor">Costo Mano de Obra</Label>
+                    <Input
+                      id="maintenance-cost-labor"
+                      type="number"
+                      value={maintenanceData.costLabor}
+                      onChange={(e) =>
+                        setMaintenanceData({
+                          ...maintenanceData,
+                          costLabor: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-sale-price">Precio de Venta</Label>
+                    <Input
+                      id="maintenance-sale-price"
+                      type="number"
+                      value={maintenanceData.salePrice}
+                      onChange={(e) =>
+                        setMaintenanceData({
+                          ...maintenanceData,
+                          salePrice: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <Button className="w-full" onClick={handleSubmitMaintenance}>
+                  Guardar Mantenimiento
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="days" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Días No Trabajados</CardTitle>
+                <CardDescription>
+                  Selecciona las fechas en las que el vehículo no trabajó
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col items-center space-y-4">
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? (
+                          format(selectedDate, "PPP")
+                        ) : (
+                          <span>Selecciona una fecha</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          if (date) {
+                            handleToggleFreeDay(date);
                           }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Tipo</Label>
-                        <select
-                          id="type"
-                          className="w-full px-3 py-2 border border-input rounded-md"
-                          value={maintenanceForm.type}
-                          onChange={(e) =>
-                            setMaintenanceForm({
-                              ...maintenanceForm,
-                              type: e.target.value as MaintenanceType,
-                            })
-                          }
-                        >
-                          <option value="mechanical">Mecánico</option>
-                          <option value="body_paint">Carrocería/Pintura</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Descripción</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Detalle del mantenimiento realizado"
-                        value={maintenanceForm.description}
-                        onChange={(e) =>
-                          setMaintenanceForm({
-                            ...maintenanceForm,
-                            description: e.target.value,
-                          })
-                        }
+                        }}
+                        modifiers={{
+                          notWorked: (date) => isDateNotWorked(date)
+                        }}
+                        modifiersClassNames={{
+                          notWorked: "bg-red-100 text-red-900"
+                        }}
                       />
-                    </div>
+                    </PopoverContent>
+                  </Popover>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="costMaterials">Costo Materiales (Bs)</Label>
-                        <Input
-                          id="costMaterials"
-                          type="number"
-                          min="0"
-                          value={maintenanceForm.costMaterials}
-                          onChange={(e) =>
-                            setMaintenanceForm({
-                              ...maintenanceForm,
-                              costMaterials: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="costLabor">Costo Mano de Obra (Bs)</Label>
-                        <Input
-                          id="costLabor"
-                          type="number"
-                          min="0"
-                          value={maintenanceForm.costLabor}
-                          onChange={(e) =>
-                            setMaintenanceForm({
-                              ...maintenanceForm,
-                              costLabor: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="salePrice">Precio de Venta (Bs)</Label>
-                        <Input
-                          id="salePrice"
-                          type="number"
-                          min="0"
-                          value={maintenanceForm.salePrice}
-                          onChange={(e) =>
-                            setMaintenanceForm({
-                              ...maintenanceForm,
-                              salePrice: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <Button type="submit">Guardar Mantenimiento</Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="freedays" className="space-y-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Jornadas Libres</CardTitle>
-                  <CardDescription>
-                    Registra los días en los que el vehículo no trabajará y no se contabilizarán para el cálculo de cuotas
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Lista de jornadas libres */}
-                  {sortedFreeDays.length > 0 ? (
-                    <div className="space-y-2">
-                      <Label>Jornadas libres registradas ({sortedFreeDays.length})</Label>
-                      <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {sortedFreeDays.map((day, index) => {
-                            // Convertir a formato legible
-                            let displayDate;
-                            try {
-                              displayDate = format(parseISO(day), "dd/MM/yyyy");
-                            } catch (e) {
-                              displayDate = "Fecha inválida";
-                              console.error("Error al formatear fecha:", day);
-                            }
-                            
-                            return (
-                              <div 
-                                key={index} 
-                                className="flex justify-between items-center border p-2 rounded bg-muted/30"
-                              >
-                                <span>{displayDate}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
-                                  onClick={() => handleRemoveFreeDay(day)}
-                                  className="h-8 w-8 text-destructive"
-                                  disabled={isSubmitting}
-                                >
-                                  {isSubmitting ? (
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      No hay jornadas libres registradas.
-                    </div>
-                  )}
-
-                  {/* Formulario para agregar nuevas jornadas libres */}
-                  <Separator />
-                  
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Agregar Jornada Libre</h3>
-                    
-                    {addingFreeDay ? (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="freeDate">Fecha (YYYY-MM-DD)</Label>
-                          <div className="flex space-x-2">
-                            <Input
-                              id="freeDate"
-                              type="text"
-                              placeholder="Ej: 2023-05-15"
-                              value={newFreeDay}
-                              onChange={(e) => setNewFreeDay(e.target.value)}
-                              className="flex-1"
-                            />
-                            <Button 
-                              type="button" 
-                              variant="outline"
-                              onClick={() => setNewFreeDay(new Date().toISOString().split('T')[0])}
-                              title="Usar fecha actual"
+                  <div className="w-full">
+                    <h3 className="font-medium mb-2">Días marcados como no trabajados:</h3>
+                    {(vehicle.daysNotWorked || vehicle.freeDays || []).length > 0 ? (
+                      <div className="grid grid-cols-4 gap-2">
+                        {(vehicle.daysNotWorked || vehicle.freeDays || []).map((date) => (
+                          <div
+                            key={date}
+                            className="flex items-center justify-between bg-red-100 text-red-900 p-2 rounded-md"
+                          >
+                            <span>{date}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => {
+                                const dateObj = new Date(date);
+                                handleToggleFreeDay(dateObj);
+                              }}
                             >
-                              Hoy
+                              <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            Ingresa la fecha en formato YYYY-MM-DD. No hay restricciones en las fechas que puedes elegir.
-                          </p>
-                        </div>
-                        
-                        <div className="flex justify-end space-x-2">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => {
-                              setAddingFreeDay(false);
-                              setNewFreeDay("");
-                            }}
-                            disabled={isSubmitting}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            onClick={handleAddFreeDay}
-                            disabled={!newFreeDay || isSubmitting}
-                          >
-                            {isSubmitting ? (
-                              <>
-                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                Guardando...
-                              </>
-                            ) : (
-                              "Guardar"
-                            )}
-                          </Button>
-                        </div>
+                        ))}
                       </div>
                     ) : (
-                      <Button 
-                        onClick={() => setAddingFreeDay(true)}
-                        className="w-full"
-                        disabled={isSubmitting}
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Añadir Jornada Libre
-                      </Button>
+                      <p className="text-muted-foreground">No hay días marcados como no trabajados</p>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <DialogFooter className="sticky bottom-0 w-full bg-background p-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cerrar
-          </Button>
-        </DialogFooter>
+          <TabsContent value="cardex" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cardex del Vehículo</CardTitle>
+                <CardDescription>Registro de servicios y repuestos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {vehicle.cardex && vehicle.cardex.length > 0 ? (
+                  <div className="space-y-2">
+                    {vehicle.cardex.map((item) => (
+                      <div key={item.id} className="border p-3 rounded-lg">
+                        <div className="flex justify-between">
+                          <p className="font-medium">{item.description}</p>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs ${
+                              item.complete
+                                ? "bg-green-100 text-green-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {item.complete ? "Completado" : "Pendiente"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Tipo: {item.type}</p>
+                        <p className="text-sm text-muted-foreground">Fecha: {item.date}</p>
+                        {item.nextScheduledDate && (
+                          <p className="text-sm text-muted-foreground">
+                            Próximo servicio: {item.nextScheduledDate}
+                          </p>
+                        )}
+                        <p className="text-sm">Costo: Bs {item.cost}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No hay registros de cardex</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
 };
 
 export default VehicleDetailsDialog;
+
