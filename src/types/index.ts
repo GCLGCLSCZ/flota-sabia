@@ -22,6 +22,7 @@ export interface Vehicle {
   monthlyEarnings?: number;
   cardex?: CardexItem[];
   discounts?: Discount[];
+  vehicleId?: string; // Para relaciones
 }
 
 export interface Maintenance {
@@ -36,6 +37,7 @@ export interface Maintenance {
   type?: "mechanical" | "body_paint";
   proformaNumber?: string;
   isInsuranceCovered?: boolean;
+  vehicleId?: string; // Para relaciones
 }
 
 export interface CardexItem {
@@ -48,6 +50,7 @@ export interface CardexItem {
   nextServiceKilometers?: number;
   cost: number;
   complete: boolean;
+  vehicleId?: string; // Para relaciones
 }
 
 export interface Discount {
@@ -59,6 +62,7 @@ export interface Discount {
   applyToMonths: string[]; // Lista de meses en formato 'YYYY-MM' a los que se aplica
   recurring: boolean;
   frequency?: "monthly" | "quarterly" | "biannual" | "annual";
+  vehicleId?: string; // Para relaciones
 }
 
 export interface Payment {
