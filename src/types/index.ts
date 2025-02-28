@@ -14,9 +14,6 @@ export type MaintenanceStatus = "pending" | "completed" | "cancelled";
 export type DiscountType = "insurance" | "repair" | "maintenance" | "other";
 export type DiscountFrequency = "monthly" | "quarterly" | "biannual" | "annual";
 
-// Tipos de cardex
-export type CardexType = "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
-
 // Tipo para usuarios y permisos (necesarios para AuthContext)
 export type UserRole = "admin" | "staff" | "viewer";
 export interface UserPermissions {
@@ -74,7 +71,6 @@ export interface Vehicle {
   nextMaintenance?: string;
   monthlyEarnings?: number;
   maintenanceHistory?: Maintenance[];
-  cardex?: CardexItem[];
   discounts?: Discount[];
   daysNotWorked?: string[];
   insurancePolicies?: InsurancePolicy[];
@@ -150,20 +146,6 @@ export interface Maintenance {
   type?: MaintenanceType;
   proformaNumber?: string;
   isInsuranceCovered?: boolean;
-}
-
-// Definición de item de cardex
-export interface CardexItem {
-  id: string;
-  type: CardexType;
-  date: string;
-  description: string;
-  nextScheduledDate?: string;
-  kilometersAtService?: number;
-  nextServiceKilometers?: number;
-  cost: number;
-  complete: boolean;
-  vehicleId: string; // Agregar para relación con vehículo
 }
 
 // Definición de descuento
