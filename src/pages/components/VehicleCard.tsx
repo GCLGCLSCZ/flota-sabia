@@ -234,7 +234,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
         <Button
           variant="outline"
           size="sm"
-          className="text-xs text-destructive hover:bg-destructive/10 dark:text-red-400 dark:hover:bg-gray-700"
+          className="text-xs text-xs text-destructive hover:bg-destructive/10 dark:text-red-400 dark:hover:bg-gray-700"
           onClick={onDelete}
         >
           <Trash2 className="h-3.5 w-3.5" />
