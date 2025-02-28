@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare } from "lucide-react";
+import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare, Loader2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useApp } from "@/context/AppContext";
@@ -40,11 +40,13 @@ const Payments = () => {
   const [showCustomBank, setShowCustomBank] = useState(false);
   
   // Usar el contexto de la aplicación para obtener los vehículos y pagos
-  const { vehicles, payments, addPayment } = useApp();
+  const { vehicles, payments, addPayment, loading } = useApp();
 
   const generateReceiptNumber = () => {
+    if (!payments.length) return "REC-001";
+    
     const lastReceipt = payments
-      .map(p => parseInt(p.receiptNumber.split('-')[1]))
+      .map(p => p.receiptNumber ? parseInt(p.receiptNumber.split('-')[1]) : 0)
       .sort((a, b) => b - a)[0] || 0;
     return `REC-${String(lastReceipt + 1).padStart(3, '0')}`;
   };
@@ -158,6 +160,17 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
     }
   };
 
+  // Si está cargando, mostrar indicador de carga
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+        <h2 className="text-xl font-medium">Cargando datos de pagos...</h2>
+        <p className="text-muted-foreground mt-2">Por favor espera mientras se cargan los datos.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -179,38 +192,55 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
             <CardTitle className="text-lg">Resumen de Pagos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {vehicles.map((vehicle) => {
-              const vehiclePayments = payments.filter(
-                (p) => p.vehicleId === vehicle.id
-              );
-              const totalPaid = vehiclePayments
-                .filter((p) => p.status === "completed")
-                .reduce((sum, p) => sum + p.amount, 0);
-              const pendingPayments = vehiclePayments.filter(
-                (p) => p.status === "pending"
-              ).length;
-
-              return (
-                <div
-                  key={vehicle.id}
-                  className="p-4 rounded-lg border space-y-2"
+            {vehicles.length === 0 ? (
+              <div className="p-4 text-center">
+                <p className="text-muted-foreground">No hay vehículos registrados</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2"
+                  onClick={() => toast({
+                    title: "Información",
+                    description: "Para registrar pagos, primero debes registrar vehículos"
+                  })}
                 >
-                  <div className="flex items-center gap-2">
-                    <Car className="h-4 w-4" />
-                    <span className="font-medium">
-                      {vehicle.plate} - {vehicle.model}
-                    </span>
+                  <Car className="mr-2 h-4 w-4" />
+                  Ir a Vehículos
+                </Button>
+              </div>
+            ) : (
+              vehicles.map((vehicle) => {
+                const vehiclePayments = payments.filter(
+                  (p) => p.vehicleId === vehicle.id
+                );
+                const totalPaid = vehiclePayments
+                  .filter((p) => p.status === "completed")
+                  .reduce((sum, p) => sum + p.amount, 0);
+                const pendingPayments = vehiclePayments.filter(
+                  (p) => p.status === "pending"
+                ).length;
+
+                return (
+                  <div
+                    key={vehicle.id}
+                    className="p-4 rounded-lg border space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Car className="h-4 w-4" />
+                      <span className="font-medium">
+                        {vehicle.plate} - {vehicle.model}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Conductor: {vehicle.driverName}</p>
+                      <p>Teléfono: {vehicle.driverPhone}</p>
+                      <p>Tarifa diaria: ${vehicle.dailyRate}</p>
+                      <p>Total pagado: ${totalPaid}</p>
+                      <p>Pagos pendientes: {pendingPayments}</p>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p>Conductor: {vehicle.driverName}</p>
-                    <p>Teléfono: {vehicle.driverPhone}</p>
-                    <p>Tarifa diaria: ${vehicle.dailyRate}</p>
-                    <p>Total pagado: ${totalPaid}</p>
-                    <p>Pagos pendientes: {pendingPayments}</p>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </CardContent>
         </Card>
 
@@ -219,64 +249,77 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
             <CardTitle className="text-lg">Historial de Pagos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {payments.map((payment) => {
-                const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
-                return (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between p-4 rounded-lg border"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        <span className="font-medium">
-                          {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Vehículo no encontrado"}
-                        </span>
+            {payments.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-muted-foreground mb-3">No hay pagos registrados</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowNewPaymentDialog(true)}
+                >
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Registrar primer pago
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment) => {
+                  const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
+                  return (
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between p-4 rounded-lg border"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4" />
+                          <span className="font-medium">
+                            {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Vehículo no encontrado"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {payment.concept}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(payment.date), "dd/MM/yyyy")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Recibo #{payment.receiptNumber} - 
+                          {payment.paymentMethod === "cash" ? "Efectivo" : `Transferencia ${payment.bankName}`}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {payment.concept}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(payment.date), "dd/MM/yyyy")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Recibo #{payment.receiptNumber} - 
-                        {payment.paymentMethod === "cash" ? "Efectivo" : `Transferencia ${payment.bankName}`}
-                      </p>
-                    </div>
-                    <div className="text-right space-y-2">
-                      <p className="font-medium">${payment.amount}</p>
-                      <span
-                        className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusColor(
-                          payment.status
-                        )}`}
-                      >
-                        {getStatusText(payment.status)}
-                      </span>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePrintReceipt(payment)}
+                      <div className="text-right space-y-2">
+                        <p className="font-medium">${payment.amount}</p>
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusColor(
+                            payment.status
+                          )}`}
                         >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        {vehicle && (
+                          {getStatusText(payment.status)}
+                        </span>
+                        <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleWhatsAppReceipt(payment, vehicle)}
+                            onClick={() => handlePrintReceipt(payment)}
                           >
-                            <MessageSquare className="h-4 w-4" />
+                            <Printer className="h-4 w-4" />
                           </Button>
-                        )}
+                          {vehicle && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleWhatsAppReceipt(payment, vehicle)}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

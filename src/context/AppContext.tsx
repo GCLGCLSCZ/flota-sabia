@@ -57,8 +57,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [fullVehicles, setFullVehicles] = useState<Vehicle[]>([]);
   
-  // Flag para determinar si usamos Supabase
-  const useSupabase = Boolean(import.meta.env.VITE_SUPABASE_URL);
+  // Flag para determinar si usamos Supabase - verificamos que el cliente existe
+  const useSupabase = Boolean(supabase);
 
   const {
     items: vehicles,
@@ -192,12 +192,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (useSupabase) {
       const fetchDaysNotWorked = async () => {
-        const { data, error } = await supabase
-          .from('days_not_worked')
-          .select('*');
-        
-        if (!error && data) {
-          setDaysNotWorked(data);
+        try {
+          const { data, error } = await supabase
+            .from('days_not_worked')
+            .select('*');
+          
+          if (!error && data) {
+            setDaysNotWorked(data);
+          }
+        } catch (err) {
+          console.error("Error fetching days not worked:", err);
         }
       };
       
@@ -283,61 +287,146 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return addVehicleBase(vehicleData);
     }
 
-    // Extraer datos relacionados
-    const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
-    
-    // Primero agregar el vehículo base
-    const success = await addVehicleBase(baseVehicleData);
-    
-    if (success) {
-      // Buscar el ID del vehículo recién agregado
-      const { data } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('plate', baseVehicleData.plate)
-        .single();
+    try {
+      // Extraer datos relacionados
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
       
-      if (data?.id) {
-        const vehicleId = data.id;
+      // Primero agregar el vehículo base
+      const success = await addVehicleBase(baseVehicleData);
+      
+      if (success) {
+        // Buscar el ID del vehículo recién agregado
+        const { data } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('plate', baseVehicleData.plate)
+          .single();
         
-        // Agregar mantenimientos si existen
-        if (maintenanceHistory && maintenanceHistory.length > 0) {
+        if (data?.id) {
+          const vehicleId = data.id;
+          
+          // Agregar mantenimientos si existen
+          if (maintenanceHistory && maintenanceHistory.length > 0) {
+            for (const maintenance of maintenanceHistory) {
+              const maintenanceData = {
+                ...maintenance,
+                vehicleId
+              };
+              await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
+            }
+          }
+          
+          // Agregar cardex si existe
+          if (cardex && cardex.length > 0) {
+            for (const item of cardex) {
+              const cardexData = {
+                ...item,
+                vehicleId
+              };
+              await supabase.from('cardex').insert(cardexToDb(cardexData));
+            }
+          }
+          
+          // Agregar descuentos si existen
+          if (discounts && discounts.length > 0) {
+            for (const discount of discounts) {
+              const discountData = {
+                ...discount,
+                vehicleId
+              };
+              await supabase.from('discounts').insert(discountToDb(discountData));
+            }
+          }
+          
+          // Agregar días no trabajados si existen
+          if (daysNotWorked && daysNotWorked.length > 0) {
+            for (const date of daysNotWorked) {
+              await supabase.from('days_not_worked').insert({
+                vehicle_id: vehicleId,
+                date
+              });
+            }
+          }
+          
+          // Refrescar datos
+          await refreshData();
+        }
+      }
+      
+      return success;
+    } catch (err) {
+      console.error("Error adding vehicle with relationships:", err);
+      return false;
+    }
+  };
+
+  const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>) => {
+    if (!useSupabase) {
+      return updateVehicleBase(id, vehicleData);
+    }
+
+    try {
+      // Extraer datos relacionados
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
+      
+      // Actualizar el vehículo base
+      const success = await updateVehicleBase(id, baseVehicleData);
+      
+      if (success) {
+        // Actualizar mantenimientos si se proporcionaron
+        if (maintenanceHistory) {
+          // Primero eliminamos los existentes para evitar duplicados
+          await supabase.from('maintenance').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
           for (const maintenance of maintenanceHistory) {
             const maintenanceData = {
               ...maintenance,
-              vehicleId
+              vehicleId: id
             };
             await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
           }
         }
         
-        // Agregar cardex si existe
-        if (cardex && cardex.length > 0) {
+        // Actualizar cardex si se proporcionó
+        if (cardex) {
+          // Primero eliminamos los existentes
+          await supabase.from('cardex').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
           for (const item of cardex) {
             const cardexData = {
               ...item,
-              vehicleId
+              vehicleId: id
             };
             await supabase.from('cardex').insert(cardexToDb(cardexData));
           }
         }
         
-        // Agregar descuentos si existen
-        if (discounts && discounts.length > 0) {
+        // Actualizar descuentos si se proporcionaron
+        if (discounts) {
+          // Primero eliminamos los existentes
+          await supabase.from('discounts').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
           for (const discount of discounts) {
             const discountData = {
               ...discount,
-              vehicleId
+              vehicleId: id
             };
             await supabase.from('discounts').insert(discountToDb(discountData));
           }
         }
         
-        // Agregar días no trabajados si existen
-        if (daysNotWorked && daysNotWorked.length > 0) {
+        // Actualizar días no trabajados si se proporcionaron
+        if (daysNotWorked) {
+          // Primero eliminamos los existentes
+          await supabase.from('days_not_worked').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
           for (const date of daysNotWorked) {
             await supabase.from('days_not_worked').insert({
-              vehicle_id: vehicleId,
+              vehicle_id: id,
               date
             });
           }
@@ -346,87 +435,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Refrescar datos
         await refreshData();
       }
+      
+      return success;
+    } catch (err) {
+      console.error("Error updating vehicle with relationships:", err);
+      return false;
     }
-    
-    return success;
-  };
-
-  const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>) => {
-    if (!useSupabase) {
-      return updateVehicleBase(id, vehicleData);
-    }
-
-    // Extraer datos relacionados
-    const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
-    
-    // Actualizar el vehículo base
-    const success = await updateVehicleBase(id, baseVehicleData);
-    
-    if (success) {
-      // Actualizar mantenimientos si se proporcionaron
-      if (maintenanceHistory) {
-        // Primero eliminamos los existentes para evitar duplicados
-        await supabase.from('maintenance').delete().eq('vehicle_id', id);
-        
-        // Luego agregamos los nuevos
-        for (const maintenance of maintenanceHistory) {
-          const maintenanceData = {
-            ...maintenance,
-            vehicleId: id
-          };
-          await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
-        }
-      }
-      
-      // Actualizar cardex si se proporcionó
-      if (cardex) {
-        // Primero eliminamos los existentes
-        await supabase.from('cardex').delete().eq('vehicle_id', id);
-        
-        // Luego agregamos los nuevos
-        for (const item of cardex) {
-          const cardexData = {
-            ...item,
-            vehicleId: id
-          };
-          await supabase.from('cardex').insert(cardexToDb(cardexData));
-        }
-      }
-      
-      // Actualizar descuentos si se proporcionaron
-      if (discounts) {
-        // Primero eliminamos los existentes
-        await supabase.from('discounts').delete().eq('vehicle_id', id);
-        
-        // Luego agregamos los nuevos
-        for (const discount of discounts) {
-          const discountData = {
-            ...discount,
-            vehicleId: id
-          };
-          await supabase.from('discounts').insert(discountToDb(discountData));
-        }
-      }
-      
-      // Actualizar días no trabajados si se proporcionaron
-      if (daysNotWorked) {
-        // Primero eliminamos los existentes
-        await supabase.from('days_not_worked').delete().eq('vehicle_id', id);
-        
-        // Luego agregamos los nuevos
-        for (const date of daysNotWorked) {
-          await supabase.from('days_not_worked').insert({
-            vehicle_id: id,
-            date
-          });
-        }
-      }
-      
-      // Refrescar datos
-      await refreshData();
-    }
-    
-    return success;
   };
 
   // Refrescar todos los datos
@@ -434,20 +448,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     
     if (useSupabase) {
-      await Promise.all([
-        refreshVehicles(),
-        refreshPayments(),
-        refreshInvestors(),
-        refreshDrivers(),
-        refreshSettings(),
-        refreshMaintenance(),
-        refreshCardex(),
-        refreshDiscounts(),
-        (async () => {
-          const { data } = await supabase.from('days_not_worked').select('*');
-          if (data) setDaysNotWorked(data);
-        })()
-      ]);
+      try {
+        await Promise.all([
+          refreshVehicles(),
+          refreshPayments(),
+          refreshInvestors(),
+          refreshDrivers(),
+          refreshSettings(),
+          refreshMaintenance(),
+          refreshCardex(),
+          refreshDiscounts(),
+          (async () => {
+            const { data } = await supabase.from('days_not_worked').select('*');
+            if (data) setDaysNotWorked(data);
+          })()
+        ]);
+      } catch (err) {
+        console.error("Error refreshing data:", err);
+      }
     }
     
     setLoading(false);

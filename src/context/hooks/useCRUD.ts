@@ -22,23 +22,26 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Verificamos si realmente podemos usar Supabase
+  const canUseSupabase = options.useSupabase && supabase && options.tableName;
+
   // Carga inicial de datos
   useEffect(() => {
-    if (options.useSupabase && options.tableName) {
+    if (canUseSupabase) {
       fetchItems();
     }
-  }, [options.useSupabase, options.tableName]);
+  }, [canUseSupabase]);
 
   // Cuando usamos localStorage, sincronizamos los cambios
   useEffect(() => {
-    if (!options.useSupabase) {
+    if (!canUseSupabase) {
       setStoredData(options.storageKey, items);
     }
-  }, [items, options.storageKey, options.useSupabase]);
+  }, [items, options.storageKey, canUseSupabase]);
 
   // Función para obtener los datos de Supabase
   const fetchItems = useCallback(async () => {
-    if (!options.useSupabase || !options.tableName) return;
+    if (!canUseSupabase) return;
 
     setLoading(true);
     setError(null);
@@ -69,7 +72,7 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     } finally {
       setLoading(false);
     }
-  }, [options.tableName, options.useSupabase, options.transformFromDb, toast]);
+  }, [options.tableName, canUseSupabase, options.transformFromDb, toast]);
 
   // Añadir un nuevo elemento
   const add = async (itemData: Omit<T, "id">) => {
@@ -87,7 +90,7 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     }
 
     // Si usamos Supabase
-    if (options.useSupabase && options.tableName) {
+    if (canUseSupabase) {
       setLoading(true);
 
       try {
@@ -173,7 +176,7 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
     }
 
     // Si usamos Supabase
-    if (options.useSupabase && options.tableName) {
+    if (canUseSupabase) {
       setLoading(true);
 
       try {
@@ -246,7 +249,7 @@ export function useCRUD<T extends { id: string }>(options: CRUDOptions<T>) {
   // Eliminar un elemento
   const remove = async (id: string) => {
     // Si usamos Supabase
-    if (options.useSupabase && options.tableName) {
+    if (canUseSupabase) {
       setLoading(true);
 
       try {
