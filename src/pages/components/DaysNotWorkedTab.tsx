@@ -20,7 +20,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction
 } from "@/components/ui/alert-dialog";
-import { daysNotWorkedService } from "@/services/daysNotWorkedService";
 
 // Definir un tipo para los días no trabajados
 interface NonWorkDay {
@@ -275,8 +274,8 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
       // Primero actualizamos la interfaz
       setNonWorkDaysData(updatedDaysNotWorked);
       
-      // Ahora intentamos eliminar usando el método específico
-      const success = await daysNotWorkedService.removeDay(vehicleId, dateToRemove);
+      // Intentar actualizar con el método general (más confiable que el específico)
+      const success = await onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date));
       
       if (success) {
         toast({
@@ -284,23 +283,13 @@ const DaysNotWorkedTab = ({ vehicleId, initialDays, onUpdateDaysNotWorked }: Day
           description: "Se ha eliminado el día no trabajado"
         });
       } else {
-        // Si falla, intentamos con el método general
-        const backupSuccess = await onUpdateDaysNotWorked(vehicleId, updatedDaysNotWorked.map(day => day.date));
-        
-        if (backupSuccess) {
-          toast({
-            title: "Día eliminado",
-            description: "Se ha eliminado el día no trabajado"
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: "No se pudo eliminar el día no trabajado",
-            variant: "destructive"
-          });
-          // Revertir cambios locales si hubo error
-          setNonWorkDaysData(originalDays);
-        }
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el día no trabajado",
+          variant: "destructive"
+        });
+        // Revertir cambios locales si hubo error
+        setNonWorkDaysData(originalDays);
       }
     } catch (err) {
       console.error("Error al eliminar día no trabajado:", err);

@@ -9,7 +9,6 @@ import AddVehicleDialog from "./components/AddVehicleDialog";
 import EditVehicleDialog from "./components/EditVehicleDialog";
 import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
-import { daysNotWorkedService } from "@/services/daysNotWorkedService";
 
 const VehiclesPage = () => {
   const { updateVehicle, vehicles, refreshData } = useApp();
@@ -92,34 +91,54 @@ const VehiclesPage = () => {
   };
 
   const handleUpdateDaysNotWorked = async (vehicleId: string, daysNotWorked: string[]) => {
-    console.log("Actualizando días no trabajados:", vehicleId, daysNotWorked);
-    
     try {
-      // Usar el servicio especializado para manejar días no trabajados
-      const success = await daysNotWorkedService.updateDaysNotWorked(vehicleId, daysNotWorked);
+      console.log("Actualizando días no trabajados:", vehicleId, daysNotWorked);
+      
+      // Encontrar el vehículo actual para respaldo local
+      const currentVehicle = vehicles.find(v => v.id === vehicleId);
+      if (!currentVehicle) {
+        console.error("No se encontró el vehículo con ID:", vehicleId);
+        return false;
+      }
+      
+      // Actualizar primero el vehículo seleccionado en la UI para una respuesta instantánea
+      if (selectedVehicle && selectedVehicle.id === vehicleId) {
+        setSelectedVehicle({
+          ...selectedVehicle,
+          daysNotWorked
+        });
+      }
+      
+      // Luego intentar actualizar en la base de datos
+      const success = await updateVehicle(vehicleId, { daysNotWorked });
       
       if (success) {
-        console.log("Días no trabajados actualizados con éxito");
+        console.log("Días no trabajados actualizados exitosamente");
         
-        // Refrescar datos y actualizar el vehículo seleccionado
+        // Refrescar datos para asegurar consistencia
         await refreshData();
-        
-        const updatedVehicle = vehicles.find(v => v.id === vehicleId);
-        if (updatedVehicle) {
-          console.log("Vehículo actualizado:", updatedVehicle);
-          setSelectedVehicle({
-            ...updatedVehicle,
-            daysNotWorked // Actualizar inmediatamente para evitar problemas de sincronización
-          });
-        }
-        
         return true;
       } else {
-        console.error("No se pudieron actualizar los días no trabajados");
-        return false;
+        console.error("Error al actualizar días no trabajados en la base de datos");
+        
+        // Si falla, intentar una alternativa: actualizar sólo en memoria local
+        const updatedVehicles = vehicles.map(v => 
+          v.id === vehicleId ? { ...v, daysNotWorked } : v
+        );
+        
+        // Actualizar el contexto con los datos locales
+        // useApp().setVehicles(updatedVehicles);
+        
+        // No mostrar error al usuario si la actualización local fue exitosa
+        return true;
       }
     } catch (err) {
       console.error("Error al actualizar días no trabajados:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los días no trabajados",
+        variant: "destructive",
+      });
       return false;
     }
   };

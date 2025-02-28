@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 /**
  * Servicio para manejar operaciones CRUD de días no trabajados
+ * Con manejo local de errores y configurado para continuar incluso si Supabase falla
  */
 export const daysNotWorkedService = {
   // Obtener todos los días no trabajados para un vehículo
