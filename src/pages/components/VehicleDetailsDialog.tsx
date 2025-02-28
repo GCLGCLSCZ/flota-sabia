@@ -30,7 +30,7 @@ const VehicleDetailsDialog = ({
   onAddMaintenance,
 }: VehicleDetailsDialogProps) => {
   const { toast } = useToast();
-  const { updateVehicle } = useApp();
+  const { updateVehicle, addDayNotWorked, removeDayNotWorked, refreshData } = useApp();
   const [maintenanceForm, setMaintenanceForm] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
@@ -45,13 +45,25 @@ const VehicleDetailsDialog = ({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [newNonWorkDay, setNewNonWorkDay] = useState<Date | undefined>(undefined);
   const [addingNonWorkDay, setAddingNonWorkDay] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!vehicle) return null;
 
-  // Convertir los días no trabajados a objetos Date
-  const nonWorkDays = (vehicle.daysNotWorked || [])
-    .filter(day => day)
-    .map(day => parseISO(day));
+  // Verificar si daysNotWorked es un array válido
+  const safeNotWorkedDays = Array.isArray(vehicle.daysNotWorked) ? vehicle.daysNotWorked : [];
+  
+  // Convertir los días no trabajados a objetos Date, asegurando que cada día sea válido
+  const nonWorkDays = safeNotWorkedDays
+    .filter(day => day && typeof day === 'string')
+    .map(day => {
+      try {
+        return parseISO(day);
+      } catch (e) {
+        console.error("Error parseando fecha:", day, e);
+        return null;
+      }
+    })
+    .filter(Boolean) as Date[];
 
   const handleMaintenanceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,66 +112,88 @@ const VehicleDetailsDialog = ({
     });
   };
 
-  const handleAddNonWorkDay = () => {
-    if (!newNonWorkDay || !vehicle) return;
+  const handleAddNonWorkDay = async () => {
+    if (!newNonWorkDay || !vehicle || isSubmitting) return;
     
-    // Obtener el array actual de días no trabajados o un array vacío si no existe
-    const currentDays = vehicle.daysNotWorked || [];
+    setIsSubmitting(true);
     
-    // Formatear la fecha al formato ISO (YYYY-MM-DD)
-    const formattedDate = newNonWorkDay.toISOString().split('T')[0];
-    
-    // Verificar si la fecha ya existe
-    if (currentDays.includes(formattedDate)) {
+    try {
+      // Formatear la fecha al formato ISO (YYYY-MM-DD)
+      const formattedDate = newNonWorkDay.toISOString().split('T')[0];
+      
+      // Usar la nueva función específica para añadir días no trabajados
+      const success = await addDayNotWorked(vehicle.id, formattedDate);
+      
+      if (success) {
+        // Actualizar UI y mostrar mensaje de éxito
+        toast({
+          title: "Día no trabajado agregado",
+          description: `Se ha registrado el ${format(newNonWorkDay, "d 'de' MMMM 'de' yyyy", { locale: es })} como día no trabajado.`,
+        });
+        
+        // Refrescar los datos para actualizar la UI
+        await refreshData();
+        
+        // Restablecer el estado
+        setNewNonWorkDay(undefined);
+        setAddingNonWorkDay(false);
+      } else {
+        toast({
+          title: "Error",
+          description: "Esta fecha ya está registrada o hubo un problema al registrarla",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error al agregar día no trabajado:", error);
       toast({
         title: "Error",
-        description: "Esta fecha ya está registrada como día no trabajado",
+        description: "No se pudo agregar el día no trabajado",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Crear un nuevo array con la fecha añadida
-    const updatedDays = [...currentDays, formattedDate];
-    
-    // Actualizar el vehículo
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDays,
-    });
-    
-    // Actualizar UI y mostrar mensaje de éxito
-    toast({
-      title: "Día no trabajado agregado",
-      description: `Se ha registrado el ${format(newNonWorkDay, "d 'de' MMMM 'de' yyyy", { locale: es })} como día no trabajado.`,
-    });
-    
-    // Restablecer el estado
-    setNewNonWorkDay(undefined);
-    setAddingNonWorkDay(false);
   };
 
-  const handleRemoveNonWorkDay = (dateToRemove: Date) => {
-    if (!vehicle) return;
+  const handleRemoveNonWorkDay = async (dateToRemove: Date) => {
+    if (!vehicle || isSubmitting) return;
     
-    // Obtener el array actual de días no trabajados
-    const currentDays = vehicle.daysNotWorked || [];
+    setIsSubmitting(true);
     
-    // Formatear la fecha a eliminar
-    const formattedDateToRemove = dateToRemove.toISOString().split('T')[0];
-    
-    // Filtrar para eliminar la fecha
-    const updatedDays = currentDays.filter(day => day !== formattedDateToRemove);
-    
-    // Actualizar el vehículo
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDays,
-    });
-    
-    // Mostrar mensaje de éxito
-    toast({
-      title: "Día eliminado",
-      description: `Se ha eliminado el ${format(dateToRemove, "d 'de' MMMM 'de' yyyy", { locale: es })} de los días no trabajados.`,
-    });
+    try {
+      // Formatear la fecha a eliminar
+      const formattedDateToRemove = dateToRemove.toISOString().split('T')[0];
+      
+      // Usar la nueva función específica para eliminar días no trabajados
+      const success = await removeDayNotWorked(vehicle.id, formattedDateToRemove);
+      
+      if (success) {
+        // Mostrar mensaje de éxito
+        toast({
+          title: "Día eliminado",
+          description: `Se ha eliminado el ${format(dateToRemove, "d 'de' MMMM 'de' yyyy", { locale: es })} de los días no trabajados.`,
+        });
+        
+        // Refrescar los datos para actualizar la UI
+        await refreshData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el día no trabajado",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error al eliminar día no trabajado:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el día no trabajado",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -458,7 +492,7 @@ const VehicleDetailsDialog = ({
                 {/* Lista de días no trabajados */}
                 {nonWorkDays.length > 0 ? (
                   <div className="space-y-2">
-                    <Label>Días registrados</Label>
+                    <Label>Días registrados ({nonWorkDays.length})</Label>
                     <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {nonWorkDays.map((day, index) => (
@@ -472,8 +506,13 @@ const VehicleDetailsDialog = ({
                               size="icon"
                               onClick={() => handleRemoveNonWorkDay(day)}
                               className="h-8 w-8 text-destructive"
+                              disabled={isSubmitting}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {isSubmitting ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         ))}
@@ -538,14 +577,22 @@ const VehicleDetailsDialog = ({
                             setAddingNonWorkDay(false);
                             setNewNonWorkDay(undefined);
                           }}
+                          disabled={isSubmitting}
                         >
                           Cancelar
                         </Button>
                         <Button
                           onClick={handleAddNonWorkDay}
-                          disabled={!newNonWorkDay}
+                          disabled={!newNonWorkDay || isSubmitting}
                         >
-                          Guardar
+                          {isSubmitting ? (
+                            <>
+                              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              Guardando...
+                            </>
+                          ) : (
+                            "Guardar"
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -553,6 +600,7 @@ const VehicleDetailsDialog = ({
                     <Button 
                       onClick={() => setAddingNonWorkDay(true)}
                       className="w-full"
+                      disabled={isSubmitting}
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       Añadir Día No Trabajado
