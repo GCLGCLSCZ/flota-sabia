@@ -1,43 +1,34 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProfileSettings } from "./components/ProfileSettings";
-import { NotificationSettings } from "./components/NotificationSettings";
-import { SystemSettings } from "./components/SystemSettings";
+import SystemSettings from "./components/SystemSettings";
+import ProfileSettings from "./components/ProfileSettings";
+import DataCleanup from "./components/DataCleanup";
 
-const Settings = () => {
+const SettingsPage = () => {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Configuración</h1>
-        <p className="text-muted-foreground mt-1">
-          Administra las configuraciones de tu cuenta y del sistema.
-        </p>
+    <div className="container mx-auto py-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Configuración</h1>
       </div>
 
-      <Tabs defaultValue="profile">
-        <TabsList className="w-full max-w-md">
-          <TabsTrigger value="profile" className="flex-1">
-            Perfil
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex-1">
-            Notificaciones
-          </TabsTrigger>
-          <TabsTrigger value="system" className="flex-1">
-            Sistema
-          </TabsTrigger>
+      <Tabs defaultValue="system" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="system">Sistema</TabsTrigger>
+          <TabsTrigger value="profile">Perfil</TabsTrigger>
+          <TabsTrigger value="data">Datos</TabsTrigger>
         </TabsList>
-        <TabsContent value="profile" className="mt-6">
+        <TabsContent value="system">
+          <SystemSettings />
+        </TabsContent>
+        <TabsContent value="profile">
           <ProfileSettings />
         </TabsContent>
-        <TabsContent value="notifications" className="mt-6">
-          <NotificationSettings />
-        </TabsContent>
-        <TabsContent value="system" className="mt-6">
-          <SystemSettings />
+        <TabsContent value="data">
+          <DataCleanup />
         </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-export default Settings;
+export default SettingsPage;
