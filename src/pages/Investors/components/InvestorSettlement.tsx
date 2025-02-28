@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Building } from "lucide-react";
+import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Building, CheckCircle2 } from "lucide-react";
 import { format, isSunday, addMonths, subMonths, getMonth, getYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const InvestorSettlement = () => {
   const { id } = useParams<{ id: string }>();
-  const { investors, vehicles, payments, addPayment, updateInvestor, settings } = useApp();
+  const { investors, vehicles, payments, addPayment, updateInvestor, settings, refreshData } = useApp();
   const { toast } = useToast();
   const [investor, setInvestor] = useState<Investor | null>(null);
   const [startDate, setStartDate] = useState("");
@@ -33,6 +33,14 @@ const InvestorSettlement = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableMonths, setAvailableMonths] = useState<{value: number, label: string}[]>([]);
+  const [paymentComplete, setPaymentComplete] = useState(false); // Estado para marcar si el pago está completo
+  const [paymentDetails, setPaymentDetails] = useState<{
+    amount: number;
+    date: string;
+    method: string;
+    bankName?: string;
+    transferNumber?: string;
+  } | null>(null); // Detalles del pago realizado
 
   useEffect(() => {
     if (id) {
@@ -84,6 +92,10 @@ const InvestorSettlement = () => {
     
     setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
     setEndDate(lastDayOfMonth.toISOString().split('T')[0]);
+    
+    // Reiniciar estado de pago al cambiar de mes
+    setPaymentComplete(false);
+    setPaymentDetails(null);
   }, [selectedMonth]);
 
   // Establece mes anterior por defecto al inicio
@@ -93,6 +105,38 @@ const InvestorSettlement = () => {
     // Establecer la fecha de pago como la fecha actual
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
   }, []);
+
+  // Verificar si ya se hizo un pago para este periodo
+  useEffect(() => {
+    if (!startDate || !endDate || !investor) return;
+    
+    // Buscar pagos a este inversionista en este periodo específico
+    const periodPayments = payments.filter(p => 
+      p.concept.toLowerCase().includes(`pago a inversionista: ${investor.name.toLowerCase()}`) &&
+      p.concept.toLowerCase().includes(`rendición de ${getPeriodMonthName().toLowerCase()}`)
+    );
+    
+    if (periodPayments.length > 0) {
+      // Ya existe un pago para este periodo
+      setPaymentComplete(true);
+      
+      // Tomar los datos del pago más reciente
+      const latestPayment = periodPayments.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      )[0];
+      
+      setPaymentDetails({
+        amount: latestPayment.amount,
+        date: latestPayment.date,
+        method: latestPayment.paymentMethod,
+        bankName: latestPayment.bankName,
+        transferNumber: latestPayment.transferNumber
+      });
+    } else {
+      setPaymentComplete(false);
+      setPaymentDetails(null);
+    }
+  }, [payments, startDate, endDate, investor]);
 
   if (!investor) {
     return (
@@ -399,6 +443,21 @@ const InvestorSettlement = () => {
         description: `Se ha registrado un pago de Bs ${parseFloat(payAmount).toFixed(2)} al inversionista ${investor.name}`,
       });
 
+      // Guardar detalles del pago para mostrarlos en la UI
+      setPaymentComplete(true);
+      setPaymentDetails({
+        amount: parseFloat(payAmount),
+        date: paymentDate,
+        method: paymentMethod,
+        ...(paymentMethod === "transfer" && {
+          bankName,
+          transferNumber,
+        }),
+      });
+
+      // Refrescar datos para mostrar el cambio
+      await refreshData();
+
       setShowPayDialog(false);
       setPayAmount("");
       setPaymentMethod("cash");
@@ -428,7 +487,7 @@ const InvestorSettlement = () => {
     }
     
     // Crear el texto de la liquidación
-    const message = `*LIQUIDACIÓN DE INVERSIONISTA*
+    let message = `*LIQUIDACIÓN DE INVERSIONISTA*
 *Período:* ${format(new Date(startDate), "dd/MM/yyyy")} - ${format(new Date(endDate), "dd/MM/yyyy")}
 *Inversionista:* ${investor.name}
 
@@ -440,9 +499,25 @@ Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
 - Comisión diaria: Bs ${totals.commissionDiscounts.toFixed(2)}
 Corresponde al inversionista (100%): Bs ${totals.investorAmount.toFixed(2)}
 Pagado en período: Bs ${totals.paid.toFixed(2)}
-*Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
+*Saldo por pagar: Bs ${totals.balance.toFixed(2)}*`;
 
-*DETALLE POR VEHÍCULO:*
+    // Agregar información de pago si existe
+    if (paymentComplete && paymentDetails) {
+      message += `\n\n*PAGO REGISTRADO:*
+Monto: Bs ${paymentDetails.amount.toFixed(2)}
+Fecha: ${format(new Date(paymentDetails.date), "dd/MM/yyyy")}
+Método: ${paymentDetails.method === 'cash' ? 'Efectivo' : 'Transferencia'}`;
+
+      if (paymentDetails.method === 'transfer' && paymentDetails.bankName) {
+        message += `\nBanco: ${paymentDetails.bankName}`;
+      }
+      if (paymentDetails.method === 'transfer' && paymentDetails.transferNumber) {
+        message += `\nNº Transferencia: ${paymentDetails.transferNumber}`;
+      }
+    }
+
+    // Agregar detalle por vehículo
+    message += `\n\n*DETALLE POR VEHÍCULO:*
 ${vehicleData.map(data => 
   `${data.vehicle.plate} - ${data.vehicle.model}
   Días trabajados: ${data.workingDays}
@@ -508,15 +583,17 @@ ${vehicleData.map(data =>
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
-          <Button 
-            variant="default" 
-            size="sm" 
-            className="h-8 gap-1"
-            onClick={() => setShowPayDialog(true)}
-          >
-            <DollarSign className="h-4 w-4" />
-            Registrar Pago
-          </Button>
+          {!paymentComplete && (
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="h-8 gap-1"
+              onClick={() => setShowPayDialog(true)}
+            >
+              <DollarSign className="h-4 w-4" />
+              Registrar Pago
+            </Button>
+          )}
         </div>
       </div>
 
@@ -550,46 +627,89 @@ ${vehicleData.map(data =>
               </div>
               
               <div className="space-y-2 print:space-y-0 print:hidden">
-                <h3 className="font-semibold text-lg">Configuración</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="space-y-1">
-                    <Label>Mes de la rendición</Label>
-                    <Select 
-                      value={selectedMonth.toString()} 
-                      onValueChange={(value) => setSelectedMonth(parseInt(value))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar mes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableMonths.map((month) => (
-                          <SelectItem key={month.value} value={month.value.toString()}>
-                            {capitalizeFirstLetter(month.label)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label>Fecha inicial</Label>
-                      <Input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
+                {paymentComplete && paymentDetails ? (
+                  <div className="border border-green-200 bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <h3 className="font-semibold text-lg text-green-700">Pago registrado</h3>
+                        <p className="text-green-700">
+                          Bs {paymentDetails.amount.toFixed(2)} - {format(new Date(paymentDetails.date), "dd/MM/yyyy")}
+                        </p>
+                        <p className="text-sm text-green-600">
+                          Método: {paymentDetails.method === 'cash' ? 'Efectivo' : 'Transferencia'}
+                        </p>
+                        {paymentDetails.method === 'transfer' && (
+                          <div className="text-sm text-green-600">
+                            <p>Banco: {paymentDetails.bankName}</p>
+                            <p>Nº Transf.: {paymentDetails.transferNumber}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label>Fecha final</Label>
-                      <Input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="font-semibold text-lg">Configuración</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="space-y-1">
+                        <Label>Mes de la rendición</Label>
+                        <Select 
+                          value={selectedMonth.toString()} 
+                          onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Seleccionar mes" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableMonths.map((month) => (
+                              <SelectItem key={month.value} value={month.value.toString()}>
+                                {capitalizeFirstLetter(month.label)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label>Fecha inicial</Label>
+                          <Input 
+                            type="date" 
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Fecha final</Label>
+                          <Input 
+                            type="date" 
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Banner de pago para impresión */}
+              {paymentComplete && paymentDetails && (
+                <div className="hidden print:block print:col-span-2 print:mt-2 print:mb-4 print:border print:border-green-200 print:p-2 print:rounded">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <div>
+                      <p className="text-green-700 font-medium">
+                        Pago registrado: Bs {paymentDetails.amount.toFixed(2)} - {format(new Date(paymentDetails.date), "dd/MM/yyyy")}
+                      </p>
+                      <p className="text-sm text-green-600">
+                        {paymentDetails.method === 'cash' ? 'Pago en efectivo' : 
+                          `Transferencia bancaria - Banco: ${paymentDetails.bankName} - Nº: ${paymentDetails.transferNumber}`}
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="mt-6 print:mt-2">
@@ -653,8 +773,8 @@ ${vehicleData.map(data =>
                       </TableCell>
                       <TableCell className="text-right align-top">Bs {data.investorAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right align-top">Bs {data.periodPayments.toFixed(2)}</TableCell>
-                      <TableCell className={`text-right align-top ${data.balanceDue > 0 ? "text-red-500" : ""}`}>
-                        Bs {data.balanceDue.toFixed(2)}
+                      <TableCell className={`text-right align-top ${paymentComplete ? 'text-green-500' : (data.balanceDue > 0 ? 'text-red-500' : '')}`}>
+                        {paymentComplete ? 'PAGADO' : `Bs ${data.balanceDue.toFixed(2)}`}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -694,8 +814,8 @@ ${vehicleData.map(data =>
                 </div>
                 <div className="flex justify-between py-1 border-b font-semibold">
                   <span>Saldo por pagar:</span>
-                  <span className={totals.balance > 0 ? "text-red-500" : ""}>
-                    Bs {totals.balance.toFixed(2)}
+                  <span className={`${paymentComplete ? 'text-green-500' : (totals.balance > 0 ? 'text-red-500' : '')}`}>
+                    {paymentComplete ? 'PAGADO' : `Bs ${totals.balance.toFixed(2)}`}
                   </span>
                 </div>
               </div>
@@ -725,14 +845,27 @@ ${vehicleData.map(data =>
               </div>
               
               <div className="flex items-end justify-end mt-4 md:mt-0">
-                <Button
-                  onClick={() => setShowPayDialog(true)}
-                  className="w-full md:w-auto"
-                  size="lg"
-                >
-                  <DollarSign className="mr-2 h-5 w-5" />
-                  Registrar Pago
-                </Button>
+                {!paymentComplete && (
+                  <Button
+                    onClick={() => setShowPayDialog(true)}
+                    className="w-full md:w-auto"
+                    size="lg"
+                  >
+                    <DollarSign className="mr-2 h-5 w-5" />
+                    Registrar Pago
+                  </Button>
+                )}
+                {paymentComplete && paymentDetails && (
+                  <div className="text-right">
+                    <p className="text-green-600 font-medium flex items-center justify-end gap-1">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Pago registrado
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(paymentDetails.date), "dd/MM/yyyy")}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
