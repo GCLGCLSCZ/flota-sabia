@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
-import { format, isMonday, isSunday } from "date-fns";
+import { format, isMonday, isSunday, addMonths, subMonths, getMonth, getYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Investor, Payment } from "@/types";
@@ -23,6 +23,7 @@ const InvestorSettlement = () => {
   const [investor, setInvestor] = useState<Investor | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState<number>(-1); // -1 para mes anterior
   const [showPayDialog, setShowPayDialog] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
@@ -30,6 +31,7 @@ const InvestorSettlement = () => {
   const [transferNumber, setTransferNumber] = useState("");
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableMonths, setAvailableMonths] = useState<{value: number, label: string}[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -40,15 +42,52 @@ const InvestorSettlement = () => {
     }
   }, [id, investors]);
 
+  // Generar lista de meses para el selector
   useEffect(() => {
-    // Establecer fechas por defecto: mes anterior
+    const months = [];
     const today = new Date();
-    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const firstDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
-    const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
     
-    setStartDate(firstDayOfPrevMonth.toISOString().split('T')[0]);
-    setEndDate(lastDayOfPrevMonth.toISOString().split('T')[0]);
+    // Mes actual
+    months.push({
+      value: 0,
+      label: format(today, "MMMM yyyy", { locale: es })
+    });
+    
+    // Mes anterior (por defecto)
+    const prevMonth = subMonths(today, 1);
+    months.push({
+      value: -1,
+      label: format(prevMonth, "MMMM yyyy", { locale: es })
+    });
+    
+    // Últimos 6 meses
+    for (let i = -2; i >= -6; i--) {
+      const month = subMonths(today, Math.abs(i));
+      months.push({
+        value: i,
+        label: format(month, "MMMM yyyy", { locale: es })
+      });
+    }
+    
+    setAvailableMonths(months);
+  }, []);
+
+  // Cambiar las fechas cuando cambia el mes seleccionado
+  useEffect(() => {
+    const today = new Date();
+    const targetMonth = addMonths(today, selectedMonth);
+    
+    // Si es mes anterior o anterior (-1, -2, etc.)
+    const firstDayOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+    const lastDayOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+    
+    setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
+    setEndDate(lastDayOfMonth.toISOString().split('T')[0]);
+  }, [selectedMonth]);
+
+  // Establece mes anterior por defecto al inicio
+  useEffect(() => {
+    setSelectedMonth(-1);
   }, []);
 
   if (!investor) {
@@ -133,7 +172,7 @@ const InvestorSettlement = () => {
               new Date(m.date) >= new Date(startDate) &&
               new Date(m.date) <= new Date(endDate)
             )
-            .reduce((sum, m) => sum + m.cost, 0)
+            .reduce((sum, m) => sum + (m.cost || 0), 0)
         : 0;
       
       // Calcular días LABORABLES en el período (excluyendo domingos y días no trabajados)
@@ -146,14 +185,26 @@ const InvestorSettlement = () => {
       // Usar el GPS mensual - 1 GPS por mes
       const gpsDiscount = gpsMonthlyFee;
       
+      // Valor de renta diaria (cuota diaria)
+      const dailyRentAmount = vehicle.installmentAmount || 0;
+      
+      // Comisión diaria de la empresa
+      const dailyCommission = vehicle.dailyRate || 0;
+      
+      // Calcular ingresos reales basados en días trabajados y tarifa diaria
+      const expectedIncome = workingDays * dailyRentAmount;
+      
+      // Descuentos por comisión de la empresa (días trabajados * comisión diaria)
+      const commissionDiscount = workingDays * dailyCommission;
+      
       // Descuentos totales
-      const totalDiscounts = maintenanceDiscounts + gpsDiscount;
+      const totalDiscounts = maintenanceDiscounts + gpsDiscount + commissionDiscount;
 
       // Cálculo del porcentaje del inversionista (70% por defecto si no se especifica)
       const investorPercentage = 0.7; // Asumimos 70% para el inversionista
 
       // Monto que corresponde al inversionista (ingresos menos descuentos)
-      const investorAmount = (periodIncome - totalDiscounts) * investorPercentage;
+      const investorAmount = (expectedIncome - totalDiscounts) * investorPercentage;
 
       // Saldo por pagar al inversionista
       const balanceDue = investorAmount - periodPayments;
@@ -188,9 +239,11 @@ const InvestorSettlement = () => {
       return {
         vehicle,
         periodIncome,
+        expectedIncome,
         periodPayments,
         maintenanceDiscounts,
         gpsDiscount,
+        commissionDiscount,
         totalDiscounts,
         investorAmount,
         balanceDue,
@@ -201,7 +254,9 @@ const InvestorSettlement = () => {
         totalInstallments,
         lastPayment,
         monthlyAverage,
-        workingDays
+        workingDays,
+        dailyRentAmount,
+        dailyCommission
       };
     });
   };
@@ -212,17 +267,31 @@ const InvestorSettlement = () => {
   const totals = vehicleData.reduce(
     (acc, data) => {
       acc.income += data.periodIncome;
+      acc.expectedIncome += data.expectedIncome;
       acc.investorAmount += data.investorAmount;
       acc.paid += data.periodPayments;
       acc.balance += data.balanceDue;
       acc.maintenanceDiscounts += data.maintenanceDiscounts;
       acc.gpsDiscounts += data.gpsDiscount;
+      acc.commissionDiscounts += data.commissionDiscount;
       acc.totalDiscounts += data.totalDiscounts;
       acc.totalPaid += data.totalPaid;
       acc.workingDays += data.workingDays;
       return acc;
     },
-    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0, totalPaid: 0, workingDays: 0 }
+    { 
+      income: 0, 
+      expectedIncome: 0,
+      investorAmount: 0, 
+      paid: 0, 
+      balance: 0, 
+      maintenanceDiscounts: 0, 
+      gpsDiscounts: 0, 
+      commissionDiscounts: 0,
+      totalDiscounts: 0, 
+      totalPaid: 0, 
+      workingDays: 0 
+    }
   );
 
   // Calcular pagos totales históricos al inversionista
@@ -300,7 +369,7 @@ const InvestorSettlement = () => {
               vehicleId: data.vehicle.id,
               amount: vehiclePayAmount,
               date: new Date().toISOString().split('T')[0],
-              concept: `Pago a inversionista: ${investor.name} - Liquidación`,
+              concept: `Pago a inversionista: ${investor.name} - Rendición de ${getPeriodMonthName()}`,
               status: "completed",
               paymentMethod,
               ...(paymentMethod === "transfer" && {
@@ -361,10 +430,11 @@ const InvestorSettlement = () => {
 *Inversionista:* ${investor.name}
 
 *RESUMEN:*
-Ingresos totales: Bs ${totals.income.toFixed(2)}
+Ingresos totales: Bs ${totals.expectedIncome.toFixed(2)}
 Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
 - Mantenimiento: Bs ${totals.maintenanceDiscounts.toFixed(2)}
 - GPS: Bs ${totals.gpsDiscounts.toFixed(2)}
+- Comisión diaria: Bs ${totals.commissionDiscounts.toFixed(2)}
 Corresponde al inversionista: Bs ${totals.investorAmount.toFixed(2)}
 Pagado en período: Bs ${totals.paid.toFixed(2)}
 *Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
@@ -372,14 +442,17 @@ Pagado en período: Bs ${totals.paid.toFixed(2)}
 *DETALLE POR VEHÍCULO:*
 ${vehicleData.map(data => 
   `${data.vehicle.plate} - ${data.vehicle.model}
-  Ingresos: Bs ${data.periodIncome.toFixed(2)}
+  Días trabajados: ${data.workingDays}
+  Ingresos: Bs ${data.expectedIncome.toFixed(2)}
   Descuentos: Bs ${data.totalDiscounts.toFixed(2)}
+   - Mantenimiento: Bs ${data.maintenanceDiscounts.toFixed(2)}
+   - GPS: Bs ${data.gpsDiscount.toFixed(2)}
+   - Comisión: Bs ${data.commissionDiscount.toFixed(2)}
   Corresponde: Bs ${data.investorAmount.toFixed(2)}
   Pagado: Bs ${data.periodPayments.toFixed(2)}
   Saldo: Bs ${data.balanceDue.toFixed(2)}
-  Días trabajados: ${data.workingDays}
   
-  Cuotas: ${data.paidInstallments} de ${data.totalInstallments}
+  Cuotas pagadas: ${data.paidInstallments} de ${data.totalInstallments}
   Total pagado histórico: Bs ${data.totalPaid.toFixed(2)}`
 ).join('\n\n')}`;
 
@@ -393,6 +466,11 @@ ${vehicleData.map(data =>
     if (!startDate) return "";
     const date = new Date(startDate);
     return format(date, "MMMM yyyy", { locale: es });
+  };
+
+  // Capitalizar primera letra del mes
+  const capitalizeFirstLetter = (string: string) => {
+    return string.charAt(0).toUpperCase() + string.slice(1);
   };
 
   return (
@@ -442,7 +520,7 @@ ${vehicleData.map(data =>
               Liquidación de Inversionista
             </CardTitle>
             <CardDescription className="print:text-center print:text-base">
-              <span className="font-medium">Rendición de {getPeriodMonthName()}</span>
+              <span className="font-medium text-lg">Rendición de {capitalizeFirstLetter(getPeriodMonthName())}</span>
               <br />
               Período: {format(new Date(startDate), "PPP", { locale: es })} - {format(new Date(endDate), "PPP", { locale: es })}
             </CardDescription>
@@ -465,23 +543,43 @@ ${vehicleData.map(data =>
               </div>
               
               <div className="space-y-2 print:space-y-0 print:hidden">
-                <h3 className="font-semibold text-lg">Rango de Fechas</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <h3 className="font-semibold text-lg">Seleccionar Mes</h3>
+                <div className="grid grid-cols-1 gap-2">
                   <div className="space-y-1">
-                    <Label>Fecha inicial</Label>
-                    <Input 
-                      type="date" 
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
+                    <Label>Mes de la rendición</Label>
+                    <Select 
+                      value={selectedMonth.toString()} 
+                      onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar mes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMonths.map((month) => (
+                          <SelectItem key={month.value} value={month.value.toString()}>
+                            {capitalizeFirstLetter(month.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Fecha final</Label>
-                    <Input 
-                      type="date" 
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label>Fecha inicial</Label>
+                      <Input 
+                        type="date" 
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Fecha final</Label>
+                      <Input 
+                        type="date" 
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -510,11 +608,20 @@ ${vehicleData.map(data =>
                           <div className="text-xs text-muted-foreground mt-1">
                             Días trabajados: {data.workingDays}
                           </div>
+                          <div className="text-xs text-muted-foreground">
+                            Tarifa diaria: Bs {data.dailyRentAmount}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Comisión diaria: Bs {data.dailyCommission}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right align-top">
                         <div>
-                          <div>Bs {data.periodIncome.toFixed(2)}</div>
+                          <div>Bs {data.expectedIncome.toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            ({data.workingDays} días x {data.dailyRentAmount} Bs)
+                          </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             <div className="flex items-center justify-end gap-1">
                               <Calendar className="h-3 w-3" />
@@ -531,8 +638,9 @@ ${vehicleData.map(data =>
                         <div>
                           <div>Bs {data.totalDiscounts.toFixed(2)}</div>
                           <div className="text-xs text-muted-foreground">
-                            <div>Mant: Bs {data.maintenanceDiscounts.toFixed(2)}</div>
+                            <div>Mantenimiento: Bs {data.maintenanceDiscounts.toFixed(2)}</div>
                             <div>GPS: Bs {data.gpsDiscount.toFixed(2)}</div>
+                            <div>Comisión: Bs {data.commissionDiscount.toFixed(2)}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -551,7 +659,7 @@ ${vehicleData.map(data =>
               <div className="w-full max-w-xs space-y-2">
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Ingresos totales:</span>
-                  <span>Bs {totals.income.toFixed(2)}</span>
+                  <span>Bs {totals.expectedIncome.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Descuentos totales:</span>
@@ -564,6 +672,10 @@ ${vehicleData.map(data =>
                 <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
                   <span>GPS:</span>
                   <span>Bs {totals.gpsDiscounts.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
+                  <span>Comisión diaria:</span>
+                  <span>Bs {totals.commissionDiscounts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Corresponde al inversionista:</span>
