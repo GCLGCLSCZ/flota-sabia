@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
-import { format } from "date-fns";
+import { format, isMonday, isSunday } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Investor, Payment } from "@/types";
@@ -41,13 +41,14 @@ const InvestorSettlement = () => {
   }, [id, investors]);
 
   useEffect(() => {
-    // Establecer fechas por defecto: mes actual
+    // Establecer fechas por defecto: mes anterior
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const firstDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+    const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
     
-    setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
-    setEndDate(lastDayOfMonth.toISOString().split('T')[0]);
+    setStartDate(firstDayOfPrevMonth.toISOString().split('T')[0]);
+    setEndDate(lastDayOfPrevMonth.toISOString().split('T')[0]);
   }, []);
 
   if (!investor) {
@@ -65,6 +66,30 @@ const InvestorSettlement = () => {
   const investorVehicles = vehicles.filter(
     (vehicle) => vehicle.investor === investor.name && vehicle.status === "active"
   );
+
+  // Función para contar días laborables en un rango (excluye domingos y días no trabajados)
+  const countWorkingDays = (start: Date, end: Date, daysNotWorked: string[] = []) => {
+    let count = 0;
+    const currentDate = new Date(start);
+    const daysOffDates = daysNotWorked.map(d => new Date(d).toDateString());
+    
+    // Asegurarse de que las fechas estén al inicio del día para comparaciones correctas
+    currentDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(0, 0, 0, 0);
+    
+    // Iterar por cada día del período
+    while (currentDate <= endDate) {
+      // Excluir domingos y días marcados como no trabajados
+      if (!isSunday(currentDate) && !daysOffDates.includes(currentDate.toDateString())) {
+        count++;
+      }
+      // Avanzar al siguiente día
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return count;
+  };
 
   // Calcular ingresos y pagos por vehículo en el período seleccionado
   const calculateVehicleData = () => {
@@ -111,16 +136,15 @@ const InvestorSettlement = () => {
             .reduce((sum, m) => sum + m.cost, 0)
         : 0;
       
-      // Calcular días del período
-      const periodDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Calcular días LABORABLES en el período (excluyendo domingos y días no trabajados)
+      const workingDays = countWorkingDays(
+        new Date(startDate), 
+        new Date(endDate), 
+        vehicle.daysNotWorked || []
+      );
       
-      // Usar SIEMPRE el monto completo mensual de GPS (120 Bs o el configurado)
-      // Calcular cuántos meses completos hay en el período
-      const months = Math.ceil(periodDays / 30); // Redondeamos hacia arriba para asegurar el cobro completo
-      
-      // Calcular descuento de GPS para el período - SIEMPRE el monto completo mensual (120 Bs)
-      // Independientemente de si el vehículo trabajó o no
-      const gpsDiscount = gpsMonthlyFee * months;
+      // Usar el GPS mensual - 1 GPS por mes
+      const gpsDiscount = gpsMonthlyFee;
       
       // Descuentos totales
       const totalDiscounts = maintenanceDiscounts + gpsDiscount;
@@ -176,7 +200,8 @@ const InvestorSettlement = () => {
         installmentAmount,
         totalInstallments,
         lastPayment,
-        monthlyAverage
+        monthlyAverage,
+        workingDays
       };
     });
   };
@@ -194,9 +219,10 @@ const InvestorSettlement = () => {
       acc.gpsDiscounts += data.gpsDiscount;
       acc.totalDiscounts += data.totalDiscounts;
       acc.totalPaid += data.totalPaid;
+      acc.workingDays += data.workingDays;
       return acc;
     },
-    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0, totalPaid: 0 }
+    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0, totalPaid: 0, workingDays: 0 }
   );
 
   // Calcular pagos totales históricos al inversionista
@@ -351,6 +377,7 @@ ${vehicleData.map(data =>
   Corresponde: Bs ${data.investorAmount.toFixed(2)}
   Pagado: Bs ${data.periodPayments.toFixed(2)}
   Saldo: Bs ${data.balanceDue.toFixed(2)}
+  Días trabajados: ${data.workingDays}
   
   Cuotas: ${data.paidInstallments} de ${data.totalInstallments}
   Total pagado histórico: Bs ${data.totalPaid.toFixed(2)}`
@@ -471,6 +498,9 @@ ${vehicleData.map(data =>
                         <div>
                           <div className="font-medium">{data.vehicle.plate}</div>
                           <div className="text-sm text-muted-foreground">{data.vehicle.model}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Días trabajados: {data.workingDays}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right align-top">
@@ -558,6 +588,10 @@ ${vehicleData.map(data =>
                   <div className="flex justify-between">
                     <span>Total pagado por vehículos:</span>
                     <span>Bs {totals.totalPaid.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total días trabajados:</span>
+                    <span>{totals.workingDays}</span>
                   </div>
                 </div>
               </div>
