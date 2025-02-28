@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -801,105 +802,38 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
             </div>
           </TabsContent>
 
-          <TabsContent value="contract" className="space-y-4">
-            <div className="bg-muted/30 p-4 rounded-lg">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-semibold">Información del Contrato</h3>
-                {!isEditingContract ? (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setIsEditingContract(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" />
-                    Editar
-                  </Button>
-                ) : (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-xs"
-                    onClick={() => {
-                      setIsEditingContract(false);
-                      setEditedContract(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                )}
-              </div>
-              
-              {!isEditingContract ? (
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <p><span className="font-medium">Fecha de inicio:</span> {
-                    vehicle.contractStartDate ? 
-                    format(new Date(vehicle.contractStartDate), "dd MMM yyyy", { locale: es }) : 
-                    "No registrado"
-                  }</p>
-                  <p><span className="font-medium">Total de cuotas:</span> {vehicle.totalInstallments || 0}</p>
-                  <p><span className="font-medium">Monto por cuota:</span> Bs {vehicle.installmentAmount || 0}</p>
-                  <p><span className="font-medium">Monto total del contrato:</span> Bs {(vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0)}</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="contractStartDate" className="text-xs">Fecha de inicio</Label>
-                      <Input 
-                        id="contractStartDate" 
-                        type="date"
-                        value={editedContract?.contractStartDate?.split('T')[0] || ''} 
-                        onChange={(e) => setEditedContract(prev => prev ? 
-                          {...prev, contractStartDate: e.target.value} : null
-                        )}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="totalInstallments" className="text-xs">Total de cuotas</Label>
-                      <Input 
-                        id="totalInstallments" 
-                        type="number"
-                        value={editedContract?.totalInstallments || 0} 
-                        onChange={(e) => setEditedContract(prev => prev ? 
-                          {...prev, totalInstallments: Number(e.target.value)} : null
-                        )}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="installmentAmount" className="text-xs">Monto por cuota (Bs)</Label>
-                      <Input 
-                        id="installmentAmount" 
-                        type="number"
-                        value={editedContract?.installmentAmount || 0} 
-                        onChange={(e) => setEditedContract(prev => prev ? 
-                          {...prev, installmentAmount: Number(e.target.value)} : null
-                        )}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="self-end">
-                      <p className="text-xs font-medium">
-                        Monto total: Bs {((editedContract?.installmentAmount || 0) * (editedContract?.totalInstallments || 0)).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button 
-                    className="w-full mt-2 text-xs" 
-                    size="sm"
-                    onClick={handleSaveContractInfo}
-                  >
-                    <Save className="h-3.5 w-3.5 mr-1" />
-                    Guardar cambios del contrato
-                  </Button>
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold mb-3">Estado de Pagos</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <p><span className="font-medium">Cuotas pagadas:</span> {calculatedPaidInstallments}</p>
-                <p><span className="font-medium">Cuotas restantes:</span> {remainingInstallments}</p>
+          <TabsContent value="contract">
+            {/* Contenido de la pestaña de contrato */}
+            <div>Información del contrato</div>
+          </TabsContent>
+
+          <TabsContent value="maintenance">
+            {/* Contenido de la pestaña de mantenimiento */}
+            <div>Información de mantenimiento</div>
+          </TabsContent>
+
+          <TabsContent value="cardex">
+            {/* Contenido de la pestaña de cardex */}
+            <div>Información de cardex</div>
+          </TabsContent>
+
+          <TabsContent value="discounts">
+            {/* Contenido de la pestaña de descuentos */}
+            <div>Información de descuentos</div>
+          </TabsContent>
+
+          <TabsContent value="insurance">
+            {/* Contenido de la pestaña de seguros */}
+            <div>Información de seguros</div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default VehicleDetailsDialog;
