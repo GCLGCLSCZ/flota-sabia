@@ -76,8 +76,8 @@ export interface Vehicle {
   maintenanceHistory?: Maintenance[];
   cardex?: CardexItem[];
   discounts?: Discount[];
+  daysNotWorked?: string[];
   insurancePolicies?: InsurancePolicy[];
-  freeDays?: string[]; // Días de jornada libre
 }
 
 // Definición de pago

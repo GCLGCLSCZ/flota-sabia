@@ -1,73 +1,59 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useApp } from "@/context/AppContext";
-import { Vehicle } from "@/types";
-import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
-import VehicleBasicInfoFields from "../../components/vehicle-form/VehicleBasicInfoFields";
-import InvestorSelector from "../../components/vehicle-form/InvestorSelector";
-import FinancialInfoFields from "../../components/vehicle-form/FinancialInfoFields";
-import DriverSelector from "../../components/vehicle-form/DriverSelector";
 
 interface AddVehicleDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
-  const { addVehicle, investors, drivers } = useApp();
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState<Omit<Vehicle, "id">>({
+export const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
+  const { addVehicle } = useApp();
+  const [newVehicle, setNewVehicle] = useState({
     plate: "",
     brand: "",
     model: "",
     year: "",
-    status: "active" as const,
     investor: "",
-    dailyRate: 0,
+    dailyRate: 21,
     driverName: "",
     driverPhone: "",
-    driverId: undefined,
-    // Nuevos campos para el contrato
-    contractStartDate: format(new Date(), "yyyy-MM-dd"),
-    totalInstallments: 24, // Por defecto 24 cuotas (2 años)
-    paidInstallments: 0,
-    installmentAmount: 0,
-    totalPaid: 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.investor) {
-      return; // No permitir enviar si no hay inversor seleccionado
-    }
-    const success = addVehicle(formData);
+    const success = addVehicle({
+      ...newVehicle,
+      status: "active",
+      monthlyEarnings: newVehicle.dailyRate * 30,
+      maintenanceHistory: [],
+      daysNotWorked: [],
+      driverName: newVehicle.driverName,
+      driverPhone: newVehicle.driverPhone,
+    });
+
     if (success) {
+      setNewVehicle({
+        plate: "",
+        brand: "",
+        model: "",
+        year: "",
+        investor: "",
+        dailyRate: 21,
+        driverName: "",
+        driverPhone: "",
+      });
       onClose();
     }
-  };
-
-  const handleDriverSelect = (driverId: string) => {
-    const selectedDriver = drivers.find(d => d.id === driverId);
-    if (selectedDriver) {
-      setFormData({
-        ...formData,
-        driverId: selectedDriver.id,
-        driverName: selectedDriver.name,
-        driverPhone: selectedDriver.phone,
-      });
-    }
-  };
-
-  const goToInvestors = () => {
-    onClose(); // Cerrar el diálogo
-    navigate('/investors'); // Redirigir a la página de inversores
-  };
-
-  const handleFormChange = (newFormData: Partial<Vehicle>) => {
-    setFormData(prev => ({ ...prev, ...newFormData }));
   };
 
   return (
@@ -78,42 +64,110 @@ const AddVehicleDialog = ({ isOpen, onClose }: AddVehicleDialogProps) => {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <VehicleBasicInfoFields 
-              formData={formData} 
-              onChange={handleFormChange} 
-            />
-            
-            <InvestorSelector 
-              formData={formData} 
-              onChange={handleFormChange} 
-              investors={investors}
-              onGoToInvestors={goToInvestors}
-            />
-            
-            <FinancialInfoFields 
-              formData={formData} 
-              onChange={handleFormChange} 
-            />
-            
-            <DriverSelector 
-              formData={formData} 
-              onChange={handleFormChange} 
-              drivers={drivers}
-              onDriverSelect={handleDriverSelect}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="plate">Placa</Label>
+              <Input
+                id="plate"
+                value={newVehicle.plate}
+                onChange={(e) =>
+                  setNewVehicle({ ...newVehicle, plate: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="brand">Marca</Label>
+              <Input
+                id="brand"
+                value={newVehicle.brand}
+                onChange={(e) =>
+                  setNewVehicle({ ...newVehicle, brand: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model">Modelo</Label>
+              <Input
+                id="model"
+                value={newVehicle.model}
+                onChange={(e) =>
+                  setNewVehicle({ ...newVehicle, model: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="year">Año</Label>
+              <Input
+                id="year"
+                value={newVehicle.year}
+                onChange={(e) =>
+                  setNewVehicle({ ...newVehicle, year: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="investor">Inversor</Label>
+              <Input
+                id="investor"
+                value={newVehicle.investor}
+                onChange={(e) =>
+                  setNewVehicle({ ...newVehicle, investor: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dailyRate">Tarifa Diaria (Bs)</Label>
+              <Input
+                id="dailyRate"
+                type="number"
+                value={newVehicle.dailyRate}
+                onChange={(e) =>
+                  setNewVehicle({
+                    ...newVehicle,
+                    dailyRate: Number(e.target.value),
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="driverName">Nombre del Conductor</Label>
+              <Input
+                id="driverName"
+                value={newVehicle.driverName}
+                onChange={(e) =>
+                  setNewVehicle({
+                    ...newVehicle,
+                    driverName: e.target.value,
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="driverPhone">Teléfono del Conductor</Label>
+              <Input
+                id="driverPhone"
+                value={newVehicle.driverPhone}
+                onChange={(e) =>
+                  setNewVehicle({
+                    ...newVehicle,
+                    driverPhone: e.target.value,
+                  })
+                }
+                required
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-4">
-            <Button 
-              type="submit"
-              disabled={!formData.investor || investors.length === 0}
-            >
-              Guardar Vehículo
-            </Button>
+            <Button type="submit">Guardar Vehículo</Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
   );
 };
-
-export default AddVehicleDialog;

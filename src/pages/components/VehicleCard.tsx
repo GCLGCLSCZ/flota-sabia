@@ -45,7 +45,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   // La comisión diaria es por cuota pagada, no un acumulado arbitrario
   const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
   
-  // Calcular cuotas atrasadas (excluyendo domingos y días de jornada libre)
+  // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
   const calculateOverdueInstallments = () => {
     if (!vehicle.contractStartDate) return 0;
     
@@ -58,19 +58,20 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     // Si la fecha de inicio es posterior a hoy, no hay cuotas atrasadas
     if (isAfter(startDate, today)) return 0;
     
-    // Obtener los días de jornada libre
-    const freeDaysArray = vehicle.freeDays || [];
+    // Obtener días no laborables específicos para este vehículo
+    const nonWorkingDays = vehicle.daysNotWorked || [];
+    const nonWorkingDatesSet = new Set(nonWorkingDays.map(day => day.split('T')[0]));
     
-    // Calcular días transcurridos excluyendo domingos y días de jornada libre
+    // Calcular días transcurridos excluyendo domingos y días no laborables
     let dayCount = 0;
     let currentDate = new Date(startDate);
     
     while (currentDate <= today) {
-      // Convertir la fecha actual a formato ISO (solo fecha)
-      const currentDateStr = format(currentDate, "yyyy-MM-dd");
+      // Convertir la fecha actual a formato YYYY-MM-DD para comparar con daysNotWorked
+      const currentDateStr = currentDate.toISOString().split('T')[0];
       
-      // Si no es domingo y no es un día de jornada libre
-      if (!isSunday(currentDate) && !freeDaysArray.includes(currentDateStr)) {
+      // Si no es domingo y no está en la lista de días no laborables
+      if (!isSunday(currentDate) && !nonWorkingDatesSet.has(currentDateStr)) {
         dayCount++;
       }
       
@@ -88,7 +89,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   const overdueInstallments = calculateOverdueInstallments();
   
   // Calcular la deuda total (cuotas atrasadas * monto de cuota)
-  const totalDebt = Math.round(overdueInstallments * installmentAmount);
+  const totalDebt = (overdueInstallments * installmentAmount);
 
   // Obtener fecha del último pago
   const lastPayment = vehiclePayments.length > 0 
@@ -171,7 +172,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
               Deuda actual
             </p>
             <p className={`font-medium ${totalDebt > 0 ? "text-destructive" : ""}`}>
-              {totalDebt} Bs
+              {totalDebt.toFixed(0)} Bs
             </p>
           </div>
           <div>
@@ -204,6 +205,13 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
             </p>
           </div>
         </div>
+        
+        {(vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0) && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Días no trabajados</p>
+            <p className="font-medium">{vehicle.daysNotWorked.length} días</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between p-4 pt-0 gap-2">
         <Button

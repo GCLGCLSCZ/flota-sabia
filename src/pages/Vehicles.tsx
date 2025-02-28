@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Vehicle, Maintenance } from "@/types";
+import { Vehicle, Maintenance, InsurancePolicy, InsurancePayment } from "@/types";
 import { VehiclesHeader } from "./components/VehiclesHeader";
 import { VehicleList } from "./components/VehicleList";
 import AddVehicleDialog from "./components/AddVehicleDialog";
