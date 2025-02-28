@@ -1,5 +1,5 @@
 
-import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, Discount } from "@/types";
+import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount } from "@/types";
 
 // Transformaciones para Vehicle
 export const vehicleToDb = (vehicle: Partial<Vehicle>) => ({
@@ -21,7 +21,7 @@ export const vehicleToDb = (vehicle: Partial<Vehicle>) => ({
   total_paid: vehicle.totalPaid,
   next_maintenance: vehicle.nextMaintenance,
   monthly_earnings: vehicle.monthlyEarnings,
-  // No transformamos días no trabajados, mantenimientos, o descuentos directamente
+  // No transformamos días no trabajados, mantenimientos, cardex o descuentos directamente
   // ya que están en tablas relacionadas
 });
 
@@ -44,7 +44,7 @@ export const vehicleFromDb = (dbVehicle: any): Partial<Vehicle> => ({
   totalPaid: dbVehicle.total_paid,
   nextMaintenance: dbVehicle.next_maintenance,
   monthlyEarnings: dbVehicle.monthly_earnings,
-  // maintenanceHistory, daysNotWorked y discounts se cargarán por separado
+  // maintenanceHistory, daysNotWorked, cardex y discounts se cargarán por separado
 });
 
 // Transformaciones para Payment
@@ -165,6 +165,33 @@ export const maintenanceFromDb = (dbMaintenance: any): Partial<Maintenance> => (
   type: dbMaintenance.type,
   proformaNumber: dbMaintenance.proforma_number,
   isInsuranceCovered: dbMaintenance.is_insurance_covered,
+});
+
+// Transformaciones para CardexItem
+export const cardexToDb = (cardex: Partial<CardexItem>) => ({
+  id: cardex.id,
+  vehicle_id: cardex.vehicleId,
+  type: cardex.type,
+  date: cardex.date,
+  description: cardex.description,
+  next_scheduled_date: cardex.nextScheduledDate,
+  kilometers_at_service: cardex.kilometersAtService,
+  next_service_kilometers: cardex.nextServiceKilometers,
+  cost: cardex.cost,
+  complete: cardex.complete,
+});
+
+export const cardexFromDb = (dbCardex: any): Partial<CardexItem> => ({
+  id: dbCardex.id,
+  vehicleId: dbCardex.vehicle_id,
+  type: dbCardex.type,
+  date: dbCardex.date,
+  description: dbCardex.description,
+  nextScheduledDate: dbCardex.next_scheduled_date,
+  kilometersAtService: dbCardex.kilometers_at_service,
+  nextServiceKilometers: dbCardex.next_service_kilometers,
+  cost: dbCardex.cost,
+  complete: dbCardex.complete,
 });
 
 // Transformaciones para Discount

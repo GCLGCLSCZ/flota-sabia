@@ -267,6 +267,49 @@ export interface Database {
           updated_at?: string
         }
       }
+      cardex: {
+        Row: {
+          id: string
+          vehicle_id: string
+          type: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other"
+          date: string
+          description: string
+          next_scheduled_date?: string
+          kilometers_at_service?: number
+          next_service_kilometers?: number
+          cost: number
+          complete: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Insert: {
+          id?: string
+          vehicle_id: string
+          type: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other"
+          date: string
+          description: string
+          next_scheduled_date?: string
+          kilometers_at_service?: number
+          next_service_kilometers?: number
+          cost: number
+          complete: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          vehicle_id?: string
+          type?: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other"
+          date?: string
+          description?: string
+          next_scheduled_date?: string
+          kilometers_at_service?: number
+          next_service_kilometers?: number
+          cost?: number
+          complete?: boolean
+          updated_at?: string
+        }
+      }
       discounts: {
         Row: {
           id: string

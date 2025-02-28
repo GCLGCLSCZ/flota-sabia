@@ -1,6 +1,6 @@
 
 import { createContext, useContext, ReactNode, useEffect, useState } from "react";
-import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, Discount } from "@/types";
+import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount } from "@/types";
 import { STORAGE_KEYS } from "./storage";
 import { validateVehicleData, validateInvestorData, validateDriverData } from "./validators";
 import { useCRUD } from "./hooks/useCRUD";
@@ -11,6 +11,7 @@ import {
   driverToDb, driverFromDb, 
   settingsToDb, settingsFromDb,
   maintenanceToDb, maintenanceFromDb,
+  cardexToDb, cardexFromDb,
   discountToDb, discountFromDb
 } from "@/lib/transformers";
 import { supabase } from "@/lib/supabase";
@@ -158,6 +159,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     transformFromDb: maintenanceFromDb
   });
 
+  // Para cardex
+  const {
+    items: cardexItems,
+    loading: cardexLoading,
+    refresh: refreshCardex
+  } = useCRUD<CardexItem>({
+    storageKey: 'cardex',
+    tableName: 'cardex',
+    useSupabase,
+    transformToDb: cardexToDb,
+    transformFromDb: cardexFromDb
+  });
+
   // Para descuentos
   const {
     items: discountItems,
@@ -203,7 +217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     // Solo proceder si todos los datos necesarios están cargados
-    if (vehiclesLoading || maintenanceLoading || discountsLoading) {
+    if (vehiclesLoading || maintenanceLoading || cardexLoading || discountsLoading) {
       return;
     }
 
@@ -212,6 +226,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const vehicleMaintenance = maintenanceItems
         .filter(m => m.vehicleId === vehicle.id)
         .map(m => ({ ...m }));
+      
+      // Asignar cardex
+      const vehicleCardex = cardexItems
+        .filter(c => c.vehicleId === vehicle.id)
+        .map(c => ({ ...c }));
       
       // Asignar descuentos
       const vehicleDiscounts = discountItems
@@ -226,6 +245,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return {
         ...vehicle,
         maintenanceHistory: vehicleMaintenance,
+        cardex: vehicleCardex,
         discounts: vehicleDiscounts,
         daysNotWorked: vehicleDaysNotWorked
       };
@@ -236,10 +256,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useSupabase, 
     vehicles, 
     maintenanceItems, 
+    cardexItems, 
     discountItems, 
     daysNotWorked,
     vehiclesLoading,
     maintenanceLoading,
+    cardexLoading,
     discountsLoading
   ]);
 
@@ -267,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
       
       // Primero agregar el vehículo base
       const success = await addVehicleBase(baseVehicleData);
@@ -291,6 +313,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 vehicleId
               };
               await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
+            }
+          }
+          
+          // Agregar cardex si existe
+          if (cardex && cardex.length > 0) {
+            for (const item of cardex) {
+              const cardexData = {
+                ...item,
+                vehicleId
+              };
+              await supabase.from('cardex').insert(cardexToDb(cardexData));
             }
           }
           
@@ -334,7 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
       
       // Actualizar el vehículo base
       const success = await updateVehicleBase(id, baseVehicleData);
@@ -352,6 +385,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
               vehicleId: id
             };
             await supabase.from('maintenance').insert(maintenanceToDb(maintenanceData));
+          }
+        }
+        
+        // Actualizar cardex si se proporcionó
+        if (cardex) {
+          // Primero eliminamos los existentes
+          await supabase.from('cardex').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
+          for (const item of cardex) {
+            const cardexData = {
+              ...item,
+              vehicleId: id
+            };
+            await supabase.from('cardex').insert(cardexToDb(cardexData));
           }
         }
         
@@ -408,6 +456,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           refreshDrivers(),
           refreshSettings(),
           refreshMaintenance(),
+          refreshCardex(),
           refreshDiscounts(),
           (async () => {
             const { data } = await supabase.from('days_not_worked').select('*');
@@ -431,6 +480,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       driversLoading || 
       settingsLoading ||
       maintenanceLoading ||
+      cardexLoading ||
       discountsLoading
     );
   }, [
@@ -440,6 +490,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     driversLoading,
     settingsLoading,
     maintenanceLoading,
+    cardexLoading,
     discountsLoading
   ]);
 
