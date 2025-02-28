@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
@@ -63,7 +63,7 @@ const InvestorSettlement = () => {
   
   // Filtrar vehículos del inversionista
   const investorVehicles = vehicles.filter(
-    (vehicle) => vehicle.investor === investor.name
+    (vehicle) => vehicle.investor === investor.name && vehicle.status === "active"
   );
 
   // Calcular ingresos y pagos por vehículo en el período seleccionado
@@ -134,6 +134,33 @@ const InvestorSettlement = () => {
       // Saldo por pagar al inversionista
       const balanceDue = investorAmount - periodPayments;
 
+      // Información de cuotas
+      const installmentAmount = vehicle.installmentAmount || 0;
+      const totalInstallments = vehicle.totalInstallments || 0;
+      
+      // Calcular cuotas pagadas basado en los pagos realizados
+      const vehicleAllPayments = payments.filter(
+        (p) => p.vehicleId === vehicle.id && !p.concept.toLowerCase().includes("inversionista") && p.status === "completed"
+      );
+      
+      const totalPaid = vehicleAllPayments.reduce((sum, p) => sum + p.amount, 0);
+      const paidInstallments = installmentAmount > 0 ? Math.floor(totalPaid / installmentAmount) : 0;
+      const remainingInstallments = Math.max(0, totalInstallments - paidInstallments);
+      
+      // Calcular último pago
+      const lastPayment = vehicleAllPayments.length > 0 
+        ? vehicleAllPayments
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        : null;
+      
+      // Calcular promedio de ingresos mensuales
+      const startDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
+      const monthsSinceStart = startDate 
+        ? Math.max(1, Math.ceil((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+        : 1;
+        
+      const monthlyAverage = totalPaid / monthsSinceStart;
+
       return {
         vehicle,
         periodIncome,
@@ -142,7 +169,14 @@ const InvestorSettlement = () => {
         gpsDiscount,
         totalDiscounts,
         investorAmount,
-        balanceDue
+        balanceDue,
+        totalPaid,
+        paidInstallments,
+        remainingInstallments,
+        installmentAmount,
+        totalInstallments,
+        lastPayment,
+        monthlyAverage
       };
     });
   };
@@ -159,9 +193,10 @@ const InvestorSettlement = () => {
       acc.maintenanceDiscounts += data.maintenanceDiscounts;
       acc.gpsDiscounts += data.gpsDiscount;
       acc.totalDiscounts += data.totalDiscounts;
+      acc.totalPaid += data.totalPaid;
       return acc;
     },
-    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0 }
+    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0, totalPaid: 0 }
   );
 
   // Calcular pagos totales históricos al inversionista
@@ -315,7 +350,10 @@ ${vehicleData.map(data =>
   Descuentos: Bs ${data.totalDiscounts.toFixed(2)}
   Corresponde: Bs ${data.investorAmount.toFixed(2)}
   Pagado: Bs ${data.periodPayments.toFixed(2)}
-  Saldo: Bs ${data.balanceDue.toFixed(2)}`
+  Saldo: Bs ${data.balanceDue.toFixed(2)}
+  
+  Cuotas: ${data.paidInstallments} de ${data.totalInstallments}
+  Total pagado histórico: Bs ${data.totalPaid.toFixed(2)}`
 ).join('\n\n')}`;
 
     // Crear enlace de WhatsApp
@@ -429,17 +467,39 @@ ${vehicleData.map(data =>
                 <TableBody>
                   {vehicleData.map((data) => (
                     <TableRow key={data.vehicle.id}>
-                      <TableCell>{data.vehicle.plate} - {data.vehicle.model}</TableCell>
-                      <TableCell className="text-right">Bs {data.periodIncome.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        Bs {data.totalDiscounts.toFixed(2)}
-                        <div className="text-xs text-muted-foreground">
-                          Mant: Bs {data.maintenanceDiscounts.toFixed(2)} | GPS: Bs {data.gpsDiscount.toFixed(2)}
+                      <TableCell className="align-top">
+                        <div>
+                          <div className="font-medium">{data.vehicle.plate}</div>
+                          <div className="text-sm text-muted-foreground">{data.vehicle.model}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">Bs {data.investorAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">Bs {data.periodPayments.toFixed(2)}</TableCell>
-                      <TableCell className={`text-right ${data.balanceDue > 0 ? "text-red-500" : ""}`}>
+                      <TableCell className="text-right align-top">
+                        <div>
+                          <div>Bs {data.periodIncome.toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <div className="flex items-center justify-end gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>Cuotas: {data.paidInstallments} de {data.totalInstallments}</span>
+                            </div>
+                            <div className="flex items-center justify-end gap-1">
+                              <CreditCard className="h-3 w-3" />
+                              <span>Total histórico: Bs {data.totalPaid.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right align-top">
+                        <div>
+                          <div>Bs {data.totalDiscounts.toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            <div>Mant: Bs {data.maintenanceDiscounts.toFixed(2)}</div>
+                            <div>GPS: Bs {data.gpsDiscount.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right align-top">Bs {data.investorAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right align-top">Bs {data.periodPayments.toFixed(2)}</TableCell>
+                      <TableCell className={`text-right align-top ${data.balanceDue > 0 ? "text-red-500" : ""}`}>
                         Bs {data.balanceDue.toFixed(2)}
                       </TableCell>
                     </TableRow>
@@ -492,8 +552,12 @@ ${vehicleData.map(data =>
                     <span>Bs {totalHistoricalIncome.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Pagado hasta la fecha:</span>
+                    <span>Pagado al inversionista:</span>
                     <span>Bs {totalHistoricalPayments.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total pagado por vehículos:</span>
+                    <span>Bs {totals.totalPaid.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
