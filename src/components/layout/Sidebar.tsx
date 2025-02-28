@@ -1,8 +1,7 @@
 
-import { LucideIcon, Home, Car, CreditCard, Users, Clipboard, Calendar, Settings, ReceiptText, CalendarOff } from "lucide-react";
+import { LucideIcon, Home, Car, CreditCard, Users, Clipboard, Settings, ReceiptText, CalendarOff } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { useIsMobile, useMobileOpen } from "@/hooks/use-mobile";
 
 interface SidebarItemProps {
@@ -101,10 +100,10 @@ export const Sidebar = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto bg-white shadow-sm border-r">
-      <div className="p-6 flex items-center justify-center border-b">
+    <div className="h-full flex flex-col overflow-y-auto bg-white shadow-sm border-r dark:bg-gray-800 dark:border-gray-700">
+      <div className="p-6 flex items-center justify-center border-b dark:border-gray-700">
         <ReceiptText className="text-sky-500 h-10 w-10" />
-        <h1 className="text-2xl font-bold ml-2">AutoFin</h1>
+        <h1 className="text-2xl font-bold ml-2 dark:text-white">AutoFin</h1>
       </div>
       <div className="flex flex-col w-full mt-4">
         {routes.map((route) => (
