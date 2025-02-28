@@ -78,6 +78,7 @@ export interface Vehicle {
   discounts?: Discount[];
   daysNotWorked?: string[];
   insurancePolicies?: InsurancePolicy[];
+  freeDays?: string[]; // Added this property
 }
 
 // Definición de pago

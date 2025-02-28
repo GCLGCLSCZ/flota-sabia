@@ -41,6 +41,8 @@ interface AppContextType {
   validateDriverData: (driver: Partial<Driver>) => { isValid: boolean; errors: string[] };
   loading: boolean;
   refreshData: () => Promise<void>;
+  addFreeDay: (vehicleId: string, date: string) => Promise<boolean>; // Added this method
+  removeFreeDay: (vehicleId: string, date: string) => Promise<boolean>; // Added this method
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -247,7 +249,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         maintenanceHistory: vehicleMaintenance,
         cardex: vehicleCardex,
         discounts: vehicleDiscounts,
-        daysNotWorked: vehicleDaysNotWorked
+        daysNotWorked: vehicleDaysNotWorked,
+        freeDays: vehicleDaysNotWorked // Adding freeDays as a synonym for daysNotWorked
       };
     });
 
@@ -281,6 +284,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Function to add a free day to a vehicle
+  const addFreeDay = async (vehicleId: string, date: string): Promise<boolean> => {
+    try {
+      const vehicle = vehicles.find(v => v.id === vehicleId);
+      if (!vehicle) return false;
+      
+      // Check if the date already exists to avoid duplicates
+      const existingFreeDays = vehicle.freeDays || [];
+      if (existingFreeDays.includes(date)) {
+        return false;
+      }
+      
+      const updatedFreeDays = [...existingFreeDays, date];
+      
+      if (useSupabase) {
+        // Add to the days_not_worked table in Supabase
+        await supabase.from('days_not_worked').insert({
+          vehicle_id: vehicleId,
+          date
+        });
+      }
+      
+      // Update the vehicle object
+      await updateVehicleBase(vehicleId, { 
+        freeDays: updatedFreeDays,
+        daysNotWorked: updatedFreeDays
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error adding free day:", error);
+      return false;
+    }
+  };
+  
+  // Function to remove a free day from a vehicle
+  const removeFreeDay = async (vehicleId: string, date: string): Promise<boolean> => {
+    try {
+      const vehicle = vehicles.find(v => v.id === vehicleId);
+      if (!vehicle) return false;
+      
+      const existingFreeDays = vehicle.freeDays || [];
+      const updatedFreeDays = existingFreeDays.filter(d => d !== date);
+      
+      if (useSupabase) {
+        // Remove from the days_not_worked table in Supabase
+        await supabase
+          .from('days_not_worked')
+          .delete()
+          .match({ vehicle_id: vehicleId, date });
+      }
+      
+      // Update the vehicle object
+      await updateVehicleBase(vehicleId, { 
+        freeDays: updatedFreeDays,
+        daysNotWorked: updatedFreeDays
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error removing free day:", error);
+      return false;
+    }
+  };
+
   // Funciones para agregar o actualizar vehículos con relaciones
   const addVehicle = async (vehicleData: Omit<Vehicle, "id">) => {
     if (!useSupabase) {
@@ -289,7 +357,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, freeDays, ...baseVehicleData } = vehicleData;
       
       // Primero agregar el vehículo base
       const success = await addVehicleBase(baseVehicleData);
@@ -338,9 +406,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           }
           
-          // Agregar días no trabajados si existen
-          if (daysNotWorked && daysNotWorked.length > 0) {
-            for (const date of daysNotWorked) {
+          // Agregar días no trabajados o días libres si existen
+          const daysToAdd = daysNotWorked || freeDays || [];
+          if (daysToAdd.length > 0) {
+            for (const date of daysToAdd) {
               await supabase.from('days_not_worked').insert({
                 vehicle_id: vehicleId,
                 date
@@ -367,7 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, cardex, discounts, daysNotWorked, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, daysNotWorked, freeDays, ...baseVehicleData } = vehicleData;
       
       // Actualizar el vehículo base
       const success = await updateVehicleBase(id, baseVehicleData);
@@ -418,13 +487,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // Actualizar días no trabajados si se proporcionaron
-        if (daysNotWorked) {
+        // Actualizar días no trabajados si se proporcionaron (usar freeDays o daysNotWorked)
+        const daysToUpdate = daysNotWorked || freeDays;
+        if (daysToUpdate) {
           // Primero eliminamos los existentes
           await supabase.from('days_not_worked').delete().eq('vehicle_id', id);
           
           // Luego agregamos los nuevos
-          for (const date of daysNotWorked) {
+          for (const date of daysToUpdate) {
             await supabase.from('days_not_worked').insert({
               vehicle_id: id,
               date
@@ -527,7 +597,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         validateInvestorData,
         validateDriverData,
         loading,
-        refreshData
+        refreshData,
+        addFreeDay,
+        removeFreeDay
       }}
     >
       {children}

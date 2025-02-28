@@ -1,7 +1,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SystemSettings from "./components/SystemSettings";
-import ProfileSettings from "./components/ProfileSettings";
+import { SystemSettings } from "./components/SystemSettings";
+import { ProfileSettings } from "./components/ProfileSettings";
 import DataCleanup from "./components/DataCleanup";
 
 const SettingsPage = () => {
