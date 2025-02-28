@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Vehicle, Maintenance, InsurancePolicy, InsurancePayment } from "@/types";
+import { Vehicle, Maintenance } from "@/types";
 import { VehiclesHeader } from "./components/VehiclesHeader";
 import { VehicleList } from "./components/VehicleList";
 import AddVehicleDialog from "./components/AddVehicleDialog";
 import EditVehicleDialog from "./components/EditVehicleDialog";
 import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
+import { daysNotWorkedService } from "@/services/daysNotWorkedService";
 
 const VehiclesPage = () => {
   const { updateVehicle, vehicles, refreshData } = useApp();
@@ -90,30 +91,37 @@ const VehiclesPage = () => {
     });
   };
 
-  const handleUpdateDaysNotWorked = (vehicleId: string, daysNotWorked: string[]) => {
+  const handleUpdateDaysNotWorked = async (vehicleId: string, daysNotWorked: string[]) => {
     console.log("Actualizando días no trabajados:", vehicleId, daysNotWorked);
     
-    return updateVehicle(vehicleId, { daysNotWorked })
-      .then(() => {
-        // Después de actualizar, refrescar los datos
-        console.log("Días no trabajados actualizados, refrescando datos");
-        return refreshData().then(() => {
-          // Actualizar el vehículo seleccionado después de que los datos han sido refrescados
-          console.log("Datos refrescados, actualizando vehículo seleccionado");
-          const updatedVehicle = vehicles.find(v => v.id === vehicleId);
-          if (updatedVehicle) {
-            console.log("Vehículo encontrado, actualizando selección", updatedVehicle);
-            setSelectedVehicle(updatedVehicle);
-          } else {
-            console.log("No se encontró el vehículo con ID:", vehicleId);
-          }
-          return true;
-        });
-      })
-      .catch(err => {
-        console.error("Error al actualizar días no trabajados:", err);
-        return Promise.reject(err);
-      });
+    try {
+      // Usar el servicio especializado para manejar días no trabajados
+      const success = await daysNotWorkedService.updateDaysNotWorked(vehicleId, daysNotWorked);
+      
+      if (success) {
+        console.log("Días no trabajados actualizados con éxito");
+        
+        // Refrescar datos y actualizar el vehículo seleccionado
+        await refreshData();
+        
+        const updatedVehicle = vehicles.find(v => v.id === vehicleId);
+        if (updatedVehicle) {
+          console.log("Vehículo actualizado:", updatedVehicle);
+          setSelectedVehicle({
+            ...updatedVehicle,
+            daysNotWorked // Actualizar inmediatamente para evitar problemas de sincronización
+          });
+        }
+        
+        return true;
+      } else {
+        console.error("No se pudieron actualizar los días no trabajados");
+        return false;
+      }
+    } catch (err) {
+      console.error("Error al actualizar días no trabajados:", err);
+      return false;
+    }
   };
 
   return (
