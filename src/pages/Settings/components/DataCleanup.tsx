@@ -29,6 +29,16 @@ const DataCleanup = () => {
     localStorage.removeItem('cardex');
     localStorage.removeItem('discounts');
     localStorage.removeItem('free_days');
+    
+    // Limpiar cualquier otro dato que pueda estar en localStorage
+    const keysToPreserve = ['theme', 'chakra-ui-color-mode']; // Claves que NO queremos borrar
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && !keysToPreserve.includes(key) && key.startsWith('app_')) {
+        localStorage.removeItem(key);
+      }
+    }
   };
 
   // Función para limpiar datos en Supabase
@@ -50,15 +60,34 @@ const DataCleanup = () => {
         'days_not_worked'
       ];
       
-      // Borrar datos de cada tabla
+      // Borrar datos de cada tabla con un método más robusto
       for (const table of tables) {
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .neq('id', 'non_existent_id'); // Truco para borrar todos los registros
-        
-        if (error && error.code !== '42P01') { // 42P01 es error de "tabla no existe", que podemos ignorar
-          console.error(`Error al limpiar tabla ${table}:`, error);
+        try {
+          // Primero intentamos obtener todos los registros para verificar si la tabla existe
+          const { data, error: fetchError } = await supabase
+            .from(table)
+            .select('id')
+            .limit(1);
+            
+          if (fetchError && fetchError.code === '42P01') {
+            // Si la tabla no existe, ignoramos el error y continuamos
+            console.log(`Tabla ${table} no existe, continuando...`);
+            continue;
+          }
+          
+          // Si la tabla existe, procedemos a eliminar todos los registros
+          const { error: deleteError } = await supabase
+            .from(table)
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Truco más seguro para borrar todos los registros
+          
+          if (deleteError) {
+            console.error(`Error al limpiar tabla ${table}:`, deleteError);
+          } else {
+            console.log(`Datos de tabla ${table} eliminados correctamente`);
+          }
+        } catch (tableError) {
+          console.error(`Error procesando tabla ${table}:`, tableError);
         }
       }
     } catch (err) {
