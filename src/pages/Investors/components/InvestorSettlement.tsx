@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
-import { format, isMonday, isSunday, addMonths, subMonths, getMonth, getYear } from "date-fns";
+import { format, isSunday, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Investor, Payment } from "@/types";
@@ -31,7 +32,7 @@ const InvestorSettlement = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableMonths, setAvailableMonths] = useState<{value: number, label: string}[]>([]);
-  const [investorPercentage, setInvestorPercentage] = useState<number>(0.7); // 70% por defecto
+  const [investorPercentage, setInvestorPercentage] = useState<number>(1); // 100% por defecto
 
   useEffect(() => {
     if (id) {
@@ -174,90 +175,90 @@ const InvestorSettlement = () => {
             )
             .reduce((sum, m) => sum + (m.cost || 0), 0)
         : 0;
-    
-    // Calcular días LABORABLES en el período (excluyendo domingos y días no trabajados)
-    const workingDays = countWorkingDays(
-      new Date(startDate), 
-      new Date(endDate), 
-      vehicle.daysNotWorked || []
-    );
-    
-    // Usar el GPS mensual - 1 GPS por mes
-    const gpsDiscount = gpsMonthlyFee;
-    
-    // Valor de renta diaria (cuota diaria)
-    const dailyRentAmount = vehicle.installmentAmount || 0;
-    
-    // Comisión diaria fija de 21 Bs por día
-    const dailyCommission = 21; // Valor fijo de 21 Bs como indicado
-    
-    // Calcular ingresos reales basados en días trabajados y tarifa diaria
-    const expectedIncome = workingDays * dailyRentAmount;
-    
-    // Descuentos por comisión de la empresa (días trabajados * comisión diaria)
-    const commissionDiscount = workingDays * dailyCommission;
-    
-    // Descuentos totales
-    const totalDiscounts = maintenanceDiscounts + gpsDiscount + commissionDiscount;
-
-    // Monto que corresponde al inversionista (ingresos menos descuentos)
-    // Ahora es el 100% de los ingresos esperados menos los descuentos
-    const investorAmount = Math.round(expectedIncome - totalDiscounts);
-
-    // Saldo por pagar al inversionista
-    const balanceDue = investorAmount - periodPayments;
-
-    // Información de cuotas
-    const installmentAmount = vehicle.installmentAmount || 0;
-    const totalInstallments = vehicle.totalInstallments || 0;
-    
-    // Calcular cuotas pagadas basado en los pagos realizados
-    const vehicleAllPayments = payments.filter(
-      (p) => p.vehicleId === vehicle.id && !p.concept.toLowerCase().includes("inversionista") && p.status === "completed"
-    );
-    
-    const totalPaid = vehicleAllPayments.reduce((sum, p) => sum + p.amount, 0);
-    const paidInstallments = installmentAmount > 0 ? Math.floor(totalPaid / installmentAmount) : 0;
-    const remainingInstallments = Math.max(0, totalInstallments - paidInstallments);
-    
-    // Calcular último pago
-    const lastPayment = vehicleAllPayments.length > 0 
-      ? vehicleAllPayments
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-      : null;
-    
-    // Calcular promedio de ingresos mensuales
-    const contractStartDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
-    const monthsSinceStart = contractStartDate 
-      ? Math.max(1, Math.ceil((new Date().getTime() - contractStartDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
-      : 1;
       
-    const monthlyAverage = totalPaid / monthsSinceStart;
+      // Calcular días LABORABLES en el período (excluyendo domingos y días no trabajados)
+      const workingDays = countWorkingDays(
+        new Date(startDate), 
+        new Date(endDate), 
+        vehicle.daysNotWorked || []
+      );
+      
+      // Usar el GPS mensual - 1 GPS por mes
+      const gpsDiscount = gpsMonthlyFee;
+      
+      // Valor de renta diaria (cuota diaria)
+      const dailyRentAmount = vehicle.installmentAmount || 0;
+      
+      // Comisión diaria fija de 21 Bs por día
+      const dailyCommission = 21; // Valor fijo de 21 Bs como indicado
+      
+      // Calcular ingresos reales basados en días trabajados y tarifa diaria
+      const expectedIncome = workingDays * dailyRentAmount;
+      
+      // Descuentos por comisión de la empresa (días trabajados * comisión diaria)
+      const commissionDiscount = workingDays * dailyCommission;
+      
+      // Descuentos totales
+      const totalDiscounts = maintenanceDiscounts + gpsDiscount + commissionDiscount;
 
-    return {
-      vehicle,
-      periodIncome,
-      expectedIncome,
-      periodPayments,
-      maintenanceDiscounts,
-      gpsDiscount,
-      commissionDiscount,
-      totalDiscounts,
-      investorAmount,
-      balanceDue,
-      totalPaid,
-      paidInstallments,
-      remainingInstallments,
-      installmentAmount,
-      totalInstallments,
-      lastPayment,
-      monthlyAverage,
-      workingDays,
-      dailyRentAmount,
-      dailyCommission
-    };
-  });
-};
+      // Monto que corresponde al inversionista (ingresos menos descuentos)
+      // Ahora es el 100% de los ingresos esperados menos los descuentos
+      const investorAmount = Math.round(expectedIncome - totalDiscounts);
+
+      // Saldo por pagar al inversionista
+      const balanceDue = investorAmount - periodPayments;
+
+      // Información de cuotas
+      const installmentAmount = vehicle.installmentAmount || 0;
+      const totalInstallments = vehicle.totalInstallments || 0;
+      
+      // Calcular cuotas pagadas basado en los pagos realizados
+      const vehicleAllPayments = payments.filter(
+        (p) => p.vehicleId === vehicle.id && !p.concept.toLowerCase().includes("inversionista") && p.status === "completed"
+      );
+      
+      const totalPaid = vehicleAllPayments.reduce((sum, p) => sum + p.amount, 0);
+      const paidInstallments = installmentAmount > 0 ? Math.floor(totalPaid / installmentAmount) : 0;
+      const remainingInstallments = Math.max(0, totalInstallments - paidInstallments);
+      
+      // Calcular último pago
+      const lastPayment = vehicleAllPayments.length > 0 
+        ? vehicleAllPayments
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        : null;
+      
+      // Calcular promedio de ingresos mensuales
+      const contractStartDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
+      const monthsSinceStart = contractStartDate 
+        ? Math.max(1, Math.ceil((new Date().getTime() - contractStartDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+        : 1;
+        
+      const monthlyAverage = totalPaid / monthsSinceStart;
+
+      return {
+        vehicle,
+        periodIncome,
+        expectedIncome,
+        periodPayments,
+        maintenanceDiscounts,
+        gpsDiscount,
+        commissionDiscount,
+        totalDiscounts,
+        investorAmount,
+        balanceDue,
+        totalPaid,
+        paidInstallments,
+        remainingInstallments,
+        installmentAmount,
+        totalInstallments,
+        lastPayment,
+        monthlyAverage,
+        workingDays,
+        dailyRentAmount,
+        dailyCommission
+      };
+    });
+  };
 
   const vehicleData = calculateVehicleData();
 
@@ -433,7 +434,7 @@ Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
 - Mantenimiento: Bs ${totals.maintenanceDiscounts.toFixed(2)}
 - GPS: Bs ${totals.gpsDiscounts.toFixed(2)}
 - Comisión diaria: Bs ${totals.commissionDiscounts.toFixed(2)}
-Corresponde al inversionista (${(investorPercentage * 100).toFixed(0)}%): Bs ${totals.investorAmount.toFixed(2)}
+Corresponde al inversionista (100%): Bs ${totals.investorAmount.toFixed(2)}
 Pagado en período: Bs ${totals.paid.toFixed(2)}
 *Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
 
@@ -593,7 +594,7 @@ ${vehicleData.map(data =>
                       <span className="text-sm">%</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Por defecto es 70% para el inversionista
+                      Por defecto es 100% para el inversionista
                     </p>
                   </div>
                 </div>
@@ -693,7 +694,7 @@ ${vehicleData.map(data =>
                   <span>Bs {totals.commissionDiscounts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
-                  <span className="font-medium">Corresponde al inversionista ({(investorPercentage * 100).toFixed(0)}%):</span>
+                  <span className="font-medium">Corresponde al inversionista (100%):</span>
                   <span>Bs {totals.investorAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
@@ -819,3 +820,12 @@ ${vehicleData.map(data =>
                   "Registrar Pago"
                 )}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default InvestorSettlement;
