@@ -1,68 +1,32 @@
-
 export interface Vehicle {
   id: string;
   plate: string;
   brand: string;
   model: string;
   year: string;
-  status: "active" | "maintenance" | "inactive";
+  status:
+    | "active"
+    | "inactive"
+    | "maintenance"
+    | "available"
+    | "rented"
+    | "sold";
   investor: string;
   dailyRate: number;
-  driverName: string;
-  driverPhone: string;
+  driverName?: string;
+  driverPhone?: string;
   driverId?: string;
   contractStartDate?: string;
-  maintenanceHistory?: Maintenance[];
-  daysNotWorked?: string[];
   totalInstallments?: number;
   paidInstallments?: number;
   installmentAmount?: number;
   totalPaid?: number;
   nextMaintenance?: string;
   monthlyEarnings?: number;
+  maintenanceHistory?: Maintenance[];
+  daysNotWorked?: string[];
   cardex?: CardexItem[];
   discounts?: Discount[];
-  vehicleId?: string; // Para relaciones
-}
-
-export interface Maintenance {
-  id: string;
-  date: string;
-  description: string;
-  cost: number;
-  costMaterials: number;
-  costLabor: number;
-  salePrice: number;
-  status: "pending" | "completed" | "cancelled";
-  type?: "mechanical" | "body_paint";
-  proformaNumber?: string;
-  isInsuranceCovered?: boolean;
-  vehicleId?: string; // Para relaciones
-}
-
-export interface CardexItem {
-  id: string;
-  type: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
-  date: string;
-  description: string;
-  nextScheduledDate?: string;
-  kilometersAtService?: number;
-  nextServiceKilometers?: number;
-  cost: number;
-  complete: boolean;
-  vehicleId?: string; // Para relaciones
-}
-
-export interface Discount {
-  id: string;
-  type: "insurance" | "repair" | "maintenance" | "other";
-  description: string;
-  amount: number;
-  date: string;
-  applyToMonths: string[]; // Lista de meses en formato 'YYYY-MM' a los que se aplica
-  recurring: boolean;
-  frequency?: "monthly" | "quarterly" | "biannual" | "annual";
-  vehicleId?: string; // Para relaciones
 }
 
 export interface Payment {
@@ -70,8 +34,8 @@ export interface Payment {
   date: string;
   amount: number;
   concept: string;
-  paymentMethod: "cash" | "transfer";
-  status: "completed" | "pending" | "cancelled" | "analysing";
+  paymentMethod: "cash" | "transfer" | "check" | "other";
+  status: "pending" | "completed" | "rejected";
   vehicleId: string;
   receiptNumber?: string;
   bankName?: string;
@@ -87,10 +51,10 @@ export interface Investor {
   status: "active" | "inactive";
   bankName?: string;
   bankAccount?: string;
-  lastPayment: string;
+  lastPayment?: string;
+  firstName: string;
+  lastName: string;
   vehicles?: Vehicle[];
-  firstName?: string;
-  lastName?: string;
 }
 
 export interface Driver {
@@ -102,12 +66,92 @@ export interface Driver {
   address?: string;
   licenseNumber?: string;
   licenseExpiry?: string;
-  status?: "active" | "inactive";
-  vehicles?: Vehicle[];
+  status: "active" | "inactive";
   documentId?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
   vehicleId?: string;
+}
+
+export interface Maintenance {
+  id: string;
+  vehicleId: string;
+  date: string;
+  description: string;
+  cost: number;
+  costMaterials?: number;
+  costLabor?: number;
+  salePrice?: number;
+  status: "pending" | "completed" | "rejected";
+  type:
+    | "preventive"
+    | "corrective"
+    | "predictive"
+    | "periodic"
+    | "emergency"
+    | "other";
+  proformaNumber?: string;
+  isInsuranceCovered?: boolean;
+}
+
+export interface CardexItem {
+  id: string;
+  vehicleId: string;
+  type:
+    | "oil_change"
+    | "tire_rotation"
+    | "brake_service"
+    | "spark_plug_replacement"
+    | "air_filter_replacement"
+    | "fuel_filter_replacement"
+    | "transmission_service"
+    | "coolant_flush"
+    | "power_steering_flush"
+    | "other";
+  date: string;
+  description?: string;
+  nextScheduledDate?: string;
+  kilometersAtService?: number;
+  nextServiceKilometers?: number;
+  cost?: number;
+  complete: boolean;
+}
+
+export interface Discount {
+  id: string;
+  vehicleId: string;
+  type: "percentage" | "fixed";
+  description: string;
+  amount: number;
+  date: string;
+  applyToMonths: number;
+  recurring: boolean;
+  frequency: "monthly" | "quarterly" | "yearly";
+}
+
+export interface Settlement {
+  id: string;
+  investorId: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
+  status: 'pending' | 'completed';
+  vehicleData?: Array<{
+    vehicleId: string;
+    workingDays: number;
+    income: number;
+    discounts: {
+      maintenance: number;
+      gps: number;
+      total: number;
+    };
+    investorAmount: number;
+    paid: number;
+    balance: number;
+  }>;
 }
 
 export interface SystemSettings {
@@ -116,26 +160,5 @@ export interface SystemSettings {
   currency: string;
   dateFormat: string;
   timezone: string;
+  investorPercentage?: number; // Porcentaje que corresponde al inversionista (0.7 = 70%)
 }
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  permissions: UserPermissions[];
-}
-
-export type UserRole = "admin" | "manager" | "user";
-
-export type UserPermissions = 
-  | "read:vehicles" 
-  | "write:vehicles" 
-  | "read:payments" 
-  | "write:payments"
-  | "read:investors"
-  | "write:investors"
-  | "read:drivers"
-  | "write:drivers"
-  | "read:settings"
-  | "write:settings";
