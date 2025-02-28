@@ -1,18 +1,19 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vehicle, Maintenance, CardexItem, Discount, InsurancePolicy, InsurancePayment } from "@/types";
+import { Vehicle, Maintenance, CardexItem, Discount, InsurancePolicy, InsurancePayment, MaintenanceType } from "@/types";
 import { useState, useEffect } from "react";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, addDays, parseISO, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, AlertCircle, Save, Shield } from "lucide-react";
+import { Pencil, Trash2, AlertCircle, Save, Shield, Plus, DollarSign, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -78,8 +79,16 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     description: "Pago de seguro"
   });
 
+  // Estado para nueva lógica de pago de seguros
+  const [totalInstallments, setTotalInstallments] = useState(1);
+  const [installmentAmount, setInstallmentAmount] = useState(0);
+  const [nextPaymentDate, setNextPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [showInstalments, setShowInstalments] = useState(false);
+
   // Estado para edición de póliza
   const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
 
   // Estado para manejar la edición de información general
   const [isEditingGeneral, setIsEditingGeneral] = useState(false);
@@ -143,6 +152,39 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
 
   // Obtener pólizas de seguro del vehículo
   const insurancePolicies = vehicle.insurancePolicies || [];
+
+  // Calcular próximas fechas de pago para pólizas
+  const calculateNextPaymentDates = () => {
+    return insurancePolicies.map(policy => {
+      // Si no hay pagos registrados, la próxima fecha es la fecha de inicio + 1 mes
+      if (!policy.payments || policy.payments.length === 0) {
+        return {
+          ...policy,
+          nextPaymentDate: format(addMonths(parseISO(policy.startDate), 1), "yyyy-MM-dd"),
+          isPaymentDue: isAfter(new Date(), addMonths(parseISO(policy.startDate), 1))
+        };
+      }
+
+      // Ordenar pagos por fecha
+      const sortedPayments = [...policy.payments].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      // La última fecha de pago
+      const lastPaymentDate = parseISO(sortedPayments[0].date);
+      
+      // La próxima fecha es 1 mes después de la última
+      const nextDate = format(addMonths(lastPaymentDate, 1), "yyyy-MM-dd");
+      
+      return {
+        ...policy,
+        nextPaymentDate: nextDate,
+        isPaymentDue: isAfter(new Date(), parseISO(nextDate))
+      };
+    });
+  };
+
+  const policiesWithNextPayments = calculateNextPaymentDates();
 
   const handleSubmitMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
@@ -458,6 +500,34 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
         payments: []
       };
       
+      // Generar pagos programados si se seleccionó la opción
+      if (showInstalments && totalInstallments > 1) {
+        const payments: InsurancePayment[] = [];
+        const paymentInterval = 30; // Intervalo en días entre pagos
+        let paymentDate = new Date(nextPaymentDate);
+        
+        for (let i = 0; i < totalInstallments; i++) {
+          if (i > 0) {
+            paymentDate = addDays(paymentDate, paymentInterval);
+          }
+          
+          payments.push({
+            id: `${newPolicy.id}-payment-${i+1}`,
+            date: format(paymentDate, "yyyy-MM-dd"),
+            amount: installmentAmount,
+            description: `Cuota ${i+1} de ${totalInstallments} - Póliza ${newInsurancePolicy.policyNumber}`
+          });
+        }
+        
+        newPolicy.payments = payments;
+        
+        // Agregar notificación para el pago inicial
+        toast({
+          title: "Pagos programados",
+          description: `Se han programado ${totalInstallments} pagos para esta póliza, con el primer pago el ${format(new Date(nextPaymentDate), "PPP", { locale: es })}`,
+        });
+      }
+      
       const updatedPolicies = [...(vehicle.insurancePolicies || []), newPolicy];
       updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
       
@@ -477,6 +547,10 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
       endDate: format(addMonths(new Date(), 12), "yyyy-MM-dd"),
       isInvestorPaying: false
     });
+    setTotalInstallments(1);
+    setInstallmentAmount(0);
+    setNextPaymentDate(format(new Date(), "yyyy-MM-dd"));
+    setShowInstalments(false);
   };
 
   // Manejar edición de póliza
@@ -520,11 +594,39 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     }
   };
 
+  // Preparar formulario para agregar pago a una póliza
+  const handlePrepareAddPayment = (policyId: string) => {
+    setSelectedPolicyId(policyId);
+    setShowPaymentForm(true);
+    
+    // Obtener la póliza seleccionada
+    const policy = insurancePolicies.find(p => p.id === policyId);
+    if (policy) {
+      // Calcular el monto de la cuota si está en instalments
+      if (policy.payments && policy.payments.length > 0) {
+        // Usar el mismo monto que el último pago
+        const lastPayment = policy.payments[policy.payments.length - 1];
+        setNewInsurancePayment({
+          date: format(new Date(), "yyyy-MM-dd"),
+          amount: lastPayment.amount,
+          description: `Pago de seguro - Póliza ${policy.policyNumber}`
+        });
+      } else {
+        // Si no hay pagos previos, sugerir el monto total
+        setNewInsurancePayment({
+          date: format(new Date(), "yyyy-MM-dd"),
+          amount: policy.amount,
+          description: `Pago de seguro - Póliza ${policy.policyNumber}`
+        });
+      }
+    }
+  };
+
   // Manejar envío de pago de seguro
-  const handleSubmitInsurancePayment = (e: React.FormEvent, policyId: string) => {
+  const handleSubmitInsurancePayment = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!vehicle.insurancePolicies) return;
+    if (!vehicle.insurancePolicies || !selectedPolicyId) return;
     
     const paymentToAdd: InsurancePayment = {
       id: Date.now().toString(),
@@ -532,7 +634,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     };
     
     const updatedPolicies = vehicle.insurancePolicies.map(policy => {
-      if (policy.id === policyId) {
+      if (policy.id === selectedPolicyId) {
         return {
           ...policy,
           payments: [...(policy.payments || []), paymentToAdd]
@@ -554,6 +656,8 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
       amount: 0,
       description: "Pago de seguro"
     });
+    setShowPaymentForm(false);
+    setSelectedPolicyId(null);
   };
 
   // Manejar eliminación de pago de seguro
@@ -593,6 +697,13 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     });
   };
 
+  // Actualizar el monto de cuota cuando cambia el monto total o el número de cuotas
+  useEffect(() => {
+    if (totalInstallments > 0 && newInsurancePolicy.amount > 0) {
+      setInstallmentAmount(Math.round(newInsurancePolicy.amount / totalInstallments));
+    }
+  }, [totalInstallments, newInsurancePolicy.amount]);
+
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] h-[95vh] overflow-y-auto">
@@ -613,227 +724,204 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
           <TabsContent value="details" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-semibold">Información del Vehículo</h3>
-                  {!isEditingGeneral ? (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setIsEditingGeneral(true)}
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Editar
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 px-2 text-xs"
-                      onClick={() => {
-                        setIsEditingGeneral(false);
-                        setEditedVehicle(null);
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  )}
-                </div>
-                
-                {!isEditingGeneral ? (
-                  <div className="text-sm mt-2 space-y-1">
-                    <p><span className="font-medium">Placa:</span> {vehicle.plate}</p>
-                    <p><span className="font-medium">Marca:</span> {vehicle.brand}</p>
-                    <p><span className="font-medium">Modelo:</span> {vehicle.model}</p>
-                    <p><span className="font-medium">Año:</span> {vehicle.year}</p>
-                    <p><span className="font-medium">Estado:</span> {
-                      vehicle.status === "active" ? "Activo" : 
-                      vehicle.status === "maintenance" ? "En Mantenimiento" : "Inactivo"
-                    }</p>
-                    <p><span className="font-medium">Tarifa diaria:</span> Bs {vehicle.dailyRate}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div>
-                      <Label htmlFor="plate" className="text-xs">Placa</Label>
-                      <Input 
-                        id="plate" 
-                        value={editedVehicle?.plate || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, plate: e.target.value} : null)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="brand" className="text-xs">Marca</Label>
-                      <Input 
-                        id="brand" 
-                        value={editedVehicle?.brand || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, brand: e.target.value} : null)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="model" className="text-xs">Modelo</Label>
-                      <Input 
-                        id="model" 
-                        value={editedVehicle?.model || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, model: e.target.value} : null)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="year" className="text-xs">Año</Label>
-                      <Input 
-                        id="year" 
-                        value={editedVehicle?.year || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, year: e.target.value} : null)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="status" className="text-xs">Estado</Label>
-                      <Select 
-                        value={editedVehicle?.status || 'active'} 
-                        onValueChange={(value: 'active' | 'maintenance' | 'inactive') => 
-                          setEditedVehicle(prev => prev ? {...prev, status: value} : null)
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Activo</SelectItem>
-                          <SelectItem value="maintenance">En Mantenimiento</SelectItem>
-                          <SelectItem value="inactive">Inactivo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="dailyRate" className="text-xs">Tarifa diaria (Bs)</Label>
-                      <Input 
-                        id="dailyRate" 
-                        type="number"
-                        value={editedVehicle?.dailyRate || 0} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? 
-                          {...prev, dailyRate: Number(e.target.value)} : null
-                        )}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <Button 
-                      className="w-full mt-2 text-xs" 
-                      size="sm"
-                      onClick={handleSaveGeneralInfo}
-                    >
-                      <Save className="h-3.5 w-3.5 mr-1" />
-                      Guardar cambios
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-semibold">Información de Operación</h3>
-                  {!isEditingGeneral ? (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setIsEditingGeneral(true)}
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Editar
-                    </Button>
-                  ) : null}
-                </div>
-                
-                {!isEditingGeneral ? (
-                  <div className="text-sm mt-2 space-y-1">
-                    <p><span className="font-medium">Inversionista:</span> {vehicle.investor || "No asignado"}</p>
-                    <p><span className="font-medium">Conductor:</span> {vehicle.driverName || "No asignado"}</p>
-                    {vehicle.driverPhone && (
-                      <p><span className="font-medium">Teléfono del conductor:</span> {vehicle.driverPhone}</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label>Placa</Label>
+                    {!isEditingGeneral ? (
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingGeneral(true)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setIsEditingGeneral(false);
+                          setEditedVehicle(null);
+                        }}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" onClick={handleSaveGeneralInfo}>
+                          <Save className="h-4 w-4 mr-2" />
+                          Guardar
+                        </Button>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div>
-                      <Label htmlFor="investor" className="text-xs">Inversionista</Label>
-                      <Select 
-                        value={editedVehicle?.investor || ''} 
-                        onValueChange={(value) => 
-                          setEditedVehicle(prev => prev ? {...prev, investor: value} : null)
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder="Selecciona un inversionista" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {investors.map(investor => (
-                            <SelectItem key={investor.id} value={investor.name}>
-                              {investor.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {isEditingGeneral ? (
+                    <Input
+                      value={editedVehicle?.plate || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, plate: e.target.value })}
+                      placeholder="Placa del vehículo"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.plate}</div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Marca</Label>
+                  {isEditingGeneral ? (
+                    <Input
+                      value={editedVehicle?.brand || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, brand: e.target.value })}
+                      placeholder="Marca del vehículo"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.brand}</div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Modelo</Label>
+                  {isEditingGeneral ? (
+                    <Input
+                      value={editedVehicle?.model || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, model: e.target.value })}
+                      placeholder="Modelo del vehículo"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.model}</div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Año</Label>
+                  {isEditingGeneral ? (
+                    <Input
+                      type="number"
+                      value={editedVehicle?.year || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, year: Number(e.target.value) })}
+                      placeholder="Año del vehículo"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.year}</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="space-y-2">
+                  <Label>Estado</Label>
+                  {isEditingGeneral ? (
+                    <Select
+                      value={editedVehicle?.status || "active"}
+                      onValueChange={(value: "active" | "maintenance" | "inactive") =>
+                        setEditedVehicle({ ...editedVehicle, status: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Activo</SelectItem>
+                        <SelectItem value="maintenance">En Mantenimiento</SelectItem>
+                        <SelectItem value="inactive">Inactivo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="font-medium">
+                      {vehicle.status === "active" ? "Activo" : vehicle.status === "maintenance" ? "En Mantenimiento" : "Inactivo"}
                     </div>
-                    <div>
-                      <Label htmlFor="driverName" className="text-xs">Nombre del conductor</Label>
-                      <Input 
-                        id="driverName" 
-                        value={editedVehicle?.driverName || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, driverName: e.target.value} : null)}
-                        className="h-8 text-sm"
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Inversionista</Label>
+                  {isEditingGeneral ? (
+                    <Input
+                      value={editedVehicle?.investor || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, investor: e.target.value })}
+                      placeholder="Inversionista"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.investor || "Sin asignar"}</div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Conductor</Label>
+                  {isEditingGeneral ? (
+                    <>
+                      <Input
+                        value={editedVehicle?.driverName || ""}
+                        onChange={(e) => setEditedVehicle({ ...editedVehicle, driverName: e.target.value })}
+                        placeholder="Nombre del conductor"
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="driverPhone" className="text-xs">Teléfono del conductor</Label>
-                      <Input 
-                        id="driverPhone" 
-                        value={editedVehicle?.driverPhone || ''} 
-                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, driverPhone: e.target.value} : null)}
-                        className="h-8 text-sm"
+                      <Input
+                        value={editedVehicle?.driverPhone || ""}
+                        onChange={(e) => setEditedVehicle({ ...editedVehicle, driverPhone: e.target.value })}
+                        placeholder="Teléfono del conductor"
                       />
-                    </div>
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium">{vehicle.driverName || "Sin asignar"}</div>
+                      <div className="font-medium">{vehicle.driverPhone || "Sin asignar"}</div>
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tarifa Diaria</Label>
+                  {isEditingGeneral ? (
+                    <Input
+                      type="number"
+                      value={editedVehicle?.dailyRate || ""}
+                      onChange={(e) => setEditedVehicle({ ...editedVehicle, dailyRate: Number(e.target.value) })}
+                      placeholder="Tarifa Diaria"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.dailyRate}</div>
+                  )}
+                </div>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="contract">
-            {/* Contenido de la pestaña de contrato */}
-            <div>Información del contrato</div>
-          </TabsContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label>Fecha de Inicio del Contrato</Label>
+                    {!isEditingContract ? (
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingContract(true)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setIsEditingContract(false);
+                          setEditedContract(null);
+                        }}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" onClick={handleSaveContractInfo}>
+                          <Save className="h-4 w-4 mr-2" />
+                          Guardar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {isEditingContract ? (
+                    <Input
+                      type="date"
+                      value={editedContract?.contractStartDate || ""}
+                      onChange={(e) => setEditedContract({ ...editedContract, contractStartDate: e.target.value })}
+                      placeholder="Fecha de Inicio del Contrato"
+                    />
+                  ) : (
+                    <div className="font-medium">{vehicle.contractStartDate ? format(new Date(vehicle.contractStartDate), "dd/MM/yyyy") : "Sin asignar"}</div>
+                  )}
+                </div>
+              </div>
 
-          <TabsContent value="maintenance">
-            {/* Contenido de la pestaña de mantenimiento */}
-            <div>Información de mantenimiento</div>
-          </TabsContent>
-
-          <TabsContent value="cardex">
-            {/* Contenido de la pestaña de cardex */}
-            <div>Información de cardex</div>
-          </TabsContent>
-
-          <TabsContent value="discounts">
-            {/* Contenido de la pestaña de descuentos */}
-            <div>Información de descuentos</div>
-          </TabsContent>
-
-          <TabsContent value="insurance">
-            {/* Contenido de la pestaña de seguros */}
-            <div>Información de seguros</div>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cerrar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-export default VehicleDetailsDialog;
+              <div>
+                <div className="space-y-2">
+                  <Label>Total de Cuotas</Label>
+                  {isEditingContract ? (
+                    <Input
+                      type="number"
+                      value={editedContract?.totalInstallments || ""}
+                      onChange={(e) => setEditedContract({ ...editedContract, totalInstallments: Number
