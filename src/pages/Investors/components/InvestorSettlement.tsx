@@ -154,9 +154,9 @@ const InvestorSettlement = () => {
         : null;
       
       // Calcular promedio de ingresos mensuales
-      const startDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
-      const monthsSinceStart = startDate 
-        ? Math.max(1, Math.ceil((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+      const contractStartDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
+      const monthsSinceStart = contractStartDate 
+        ? Math.max(1, Math.ceil((new Date().getTime() - contractStartDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
         : 1;
         
       const monthlyAverage = totalPaid / monthsSinceStart;
