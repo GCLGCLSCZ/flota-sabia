@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Bank } from "lucide-react";
+import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Building } from "lucide-react";
 import { format, isSunday, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
@@ -789,7 +789,7 @@ ${vehicleData.map(data =>
                 <div className="space-y-2">
                   <Label>Banco</Label>
                   <div className="relative">
-                    <Bank className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Nombre del banco"
                       value={bankName}
