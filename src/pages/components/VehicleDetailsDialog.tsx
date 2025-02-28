@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -66,20 +66,20 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const [nonWorkDayToEdit, setNonWorkDayToEdit] = useState<{ index: number, value: NonWorkDay } | null>(null);
   
   // Inicializar los datos de días no trabajados cuando cambia el vehículo
-  useState(() => {
+  useEffect(() => {
     if (vehicle && vehicle.daysNotWorked) {
       // Si son solo strings, convertirlos a objetos
       const formattedDays = vehicle.daysNotWorked.map(day => {
-        if (typeof day === 'string') {
-          return { date: day, isSelected: false };
-        }
-        return { ...day, isSelected: false };
+        return { 
+          date: typeof day === 'string' ? day : day.toString(), 
+          isSelected: false 
+        };
       });
       setNonWorkDaysData(formattedDays);
     } else {
       setNonWorkDaysData([]);
     }
-  });
+  }, [vehicle]);
   
   if (!vehicle) return null;
   
@@ -185,7 +185,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     
     setNonWorkDaysData(updatedDaysNotWorked);
     
-    // Actualizar el vehículo
+    // Actualizar el vehículo - solo enviar las fechas
     updateVehicle(vehicle.id, {
       daysNotWorked: updatedDaysNotWorked.map(day => day.date)
     }).then(() => {
@@ -233,7 +233,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setNonWorkDaysData(updatedDays);
     setNonWorkDayToEdit(null);
     
-    // Actualizar en base de datos
+    // Actualizar en base de datos - solo enviar las fechas
     updateVehicle(vehicle.id, {
       daysNotWorked: updatedDays.map(day => day.date)
     }).then(() => {
@@ -265,7 +265,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     const updatedDays = nonWorkDaysData.filter(day => !day.isSelected);
     setNonWorkDaysData(updatedDays);
     
-    // Actualizar en base de datos
+    // Actualizar en base de datos - solo enviar las fechas
     updateVehicle(vehicle.id, {
       daysNotWorked: updatedDays.map(day => day.date)
     }).then(() => {
@@ -288,6 +288,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     
     setNonWorkDaysData(updatedDaysNotWorked);
     
+    // Actualizar en base de datos - solo enviar las fechas
     updateVehicle(vehicle.id, {
       daysNotWorked: updatedDaysNotWorked.map(day => day.date)
     }).then(() => {
