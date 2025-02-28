@@ -32,6 +32,7 @@ const InvestorSettlement = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableMonths, setAvailableMonths] = useState<{value: number, label: string}[]>([]);
+  const [investorPercentage, setInvestorPercentage] = useState<number>(0.7); // 70% por defecto
 
   useEffect(() => {
     if (id) {
@@ -200,11 +201,8 @@ const InvestorSettlement = () => {
       // Descuentos totales
       const totalDiscounts = maintenanceDiscounts + gpsDiscount + commissionDiscount;
 
-      // Cálculo del porcentaje del inversionista (70% por defecto si no se especifica)
-      const investorPercentage = 0.7; // Asumimos 70% para el inversionista
-
-      // Monto que corresponde al inversionista (ingresos menos descuentos)
-      const investorAmount = (expectedIncome - totalDiscounts) * investorPercentage;
+      // Monto que corresponde al inversionista (ingresos menos descuentos) * porcentaje del inversionista
+      const investorAmount = Math.round((expectedIncome - totalDiscounts) * investorPercentage);
 
       // Saldo por pagar al inversionista
       const balanceDue = investorAmount - periodPayments;
@@ -435,7 +433,7 @@ Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
 - Mantenimiento: Bs ${totals.maintenanceDiscounts.toFixed(2)}
 - GPS: Bs ${totals.gpsDiscounts.toFixed(2)}
 - Comisión diaria: Bs ${totals.commissionDiscounts.toFixed(2)}
-Corresponde al inversionista: Bs ${totals.investorAmount.toFixed(2)}
+Corresponde al inversionista (${(investorPercentage * 100).toFixed(0)}%): Bs ${totals.investorAmount.toFixed(2)}
 Pagado en período: Bs ${totals.paid.toFixed(2)}
 *Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
 
@@ -543,7 +541,7 @@ ${vehicleData.map(data =>
               </div>
               
               <div className="space-y-2 print:space-y-0 print:hidden">
-                <h3 className="font-semibold text-lg">Seleccionar Mes</h3>
+                <h3 className="font-semibold text-lg">Configuración</h3>
                 <div className="grid grid-cols-1 gap-2">
                   <div className="space-y-1">
                     <Label>Mes de la rendición</Label>
@@ -580,6 +578,23 @@ ${vehicleData.map(data =>
                         onChange={(e) => setEndDate(e.target.value)}
                       />
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Porcentaje del inversionista</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        value={(investorPercentage * 100).toString()}
+                        onChange={(e) => setInvestorPercentage(Number(e.target.value) / 100)}
+                        className="h-8"
+                      />
+                      <span className="text-sm">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Por defecto es 70% para el inversionista
+                    </p>
                   </div>
                 </div>
               </div>
@@ -678,7 +693,7 @@ ${vehicleData.map(data =>
                   <span>Bs {totals.commissionDiscounts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
-                  <span className="font-medium">Corresponde al inversionista:</span>
+                  <span className="font-medium">Corresponde al inversionista ({(investorPercentage * 100).toFixed(0)}%):</span>
                   <span>Bs {totals.investorAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
