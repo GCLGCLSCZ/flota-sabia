@@ -26,7 +26,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, Trash2, Plus, Ban } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 
 type NonWorkingDay = {
   date: string;
@@ -118,9 +117,9 @@ const NonWorkingDaysTab = ({ vehicle }: NonWorkingDaysTabProps) => {
       const daysNotWorked = updatedDays.map(day => day.date);
       
       // Creamos un objeto para almacenar los detalles de los días
-      const nonWorkingDaysDetails = {};
+      const detailsObject = {};
       updatedDays.forEach(day => {
-        nonWorkingDaysDetails[day.date] = {
+        detailsObject[day.date] = {
           type: day.type,
           details: day.details
         };
@@ -128,7 +127,7 @@ const NonWorkingDaysTab = ({ vehicle }: NonWorkingDaysTabProps) => {
       
       await updateVehicle(vehicle.id, {
         daysNotWorked,
-        nonWorkingDaysDetails
+        nonWorkingDaysDetails: detailsObject
       });
       
       toast({
@@ -164,9 +163,9 @@ const NonWorkingDaysTab = ({ vehicle }: NonWorkingDaysTabProps) => {
       const daysNotWorked = updatedDays.map(day => day.date);
       
       // Actualizamos los detalles de los días
-      const nonWorkingDaysDetails = {};
+      const detailsObject = {};
       updatedDays.forEach(day => {
-        nonWorkingDaysDetails[day.date] = {
+        detailsObject[day.date] = {
           type: day.type,
           details: day.details
         };
@@ -174,7 +173,7 @@ const NonWorkingDaysTab = ({ vehicle }: NonWorkingDaysTabProps) => {
       
       await updateVehicle(vehicle.id, {
         daysNotWorked,
-        nonWorkingDaysDetails
+        nonWorkingDaysDetails: detailsObject
       });
       
       toast({
@@ -375,25 +374,6 @@ const NonWorkingDaysTab = ({ vehicle }: NonWorkingDaysTabProps) => {
                       }}
                       modifiersClassNames={{
                         selected: "bg-primary/50 text-primary-foreground"
-                      }}
-                      DayComponent={(props) => {
-                        const date = props.date;
-                        const isSelected = isDateSelected(date);
-                        return (
-                          <div
-                            onClick={() => handleDateSelect(date)}
-                            className={cn(
-                              props.className,
-                              isSelected && "bg-primary text-primary-foreground",
-                              "relative"
-                            )}
-                          >
-                            {format(date, "d")}
-                            {isSelected && (
-                              <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-primary-foreground"></div>
-                            )}
-                          </div>
-                        );
                       }}
                       initialFocus
                       locale={es}

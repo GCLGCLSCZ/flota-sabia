@@ -1,19 +1,19 @@
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "./components/theme-provider";
-import { Toaster } from "./components/ui/toaster";
-import Layout from "./components/layout/Layout";
-import DashboardPage from "./pages/Dashboard";
-import VehiclesPage from "./pages/Vehicles";
-import DriversPage from "./pages/Drivers";
-import InvestorsPage from "./pages/Investors";
-import PaymentsPage from "./pages/Payments";
-import SettingsPage from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import Index from "./pages/Index";
-import { AppProvider } from "./context/AppContext";
-import { AuthProvider } from "./context/AuthContext";
-import InvestorSettlement from "./pages/Investors/components/InvestorSettlement";
+import { ThemeProvider } from "@/components/ui/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
+import Layout from "@/components/layout/Layout";
+import DashboardPage from "@/pages/Dashboard";
+import VehiclesPage from "@/pages/Vehicles";
+import DriversPage from "@/pages/Drivers";
+import InvestorsPage from "@/pages/Investors";
+import PaymentsPage from "@/pages/Payments";
+import SettingsPage from "@/pages/Settings";
+import NotFound from "@/pages/NotFound";
+import Index from "@/pages/Index";
+import { AppProvider } from "@/context/AppContext";
+import { AuthProvider } from "@/context/AuthContext";
+import InvestorSettlement from "@/pages/Investors/components/InvestorSettlement";
 
 function App() {
   return (
