@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare, Loader2, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare, Loader2, Trash2, ArrowDown, ArrowUp } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useApp } from "@/context/AppContext";
@@ -200,6 +200,11 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
     }
   };
 
+  // Determinar si un pago es a un inversionista
+  const isInvestorPayment = (payment: Payment) => {
+    return payment.concept.toLowerCase().includes("inversionista");
+  };
+
   // Si está cargando, mostrar indicador de carga
   if (loading) {
     return (
@@ -252,9 +257,16 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                 const vehiclePayments = payments.filter(
                   (p) => p.vehicleId === vehicle.id
                 );
-                const totalPaid = vehiclePayments
-                  .filter((p) => p.status === "completed")
+                
+                // Separar ingresos y egresos (pagos a inversores)
+                const completedIncomes = vehiclePayments
+                  .filter((p) => p.status === "completed" && !isInvestorPayment(p))
                   .reduce((sum, p) => sum + p.amount, 0);
+                  
+                const completedExpenses = vehiclePayments
+                  .filter((p) => p.status === "completed" && isInvestorPayment(p))
+                  .reduce((sum, p) => sum + p.amount, 0);
+                  
                 const pendingPayments = vehiclePayments.filter(
                   (p) => p.status === "pending"
                 ).length;
@@ -274,7 +286,14 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                       <p>Conductor: {vehicle.driverName}</p>
                       <p>Teléfono: {vehicle.driverPhone}</p>
                       <p>Tarifa diaria: ${vehicle.dailyRate}</p>
-                      <p>Total pagado: ${totalPaid}</p>
+                      <div className="flex items-center text-green-600">
+                        <ArrowUp className="h-3 w-3 mr-1" />
+                        <span>Ingresos: ${completedIncomes}</span>
+                      </div>
+                      <div className="flex items-center text-red-600">
+                        <ArrowDown className="h-3 w-3 mr-1" />
+                        <span>Egresos (inversores): ${completedExpenses}</span>
+                      </div>
                       <p>Pagos pendientes: {pendingPayments}</p>
                     </div>
                   </div>
@@ -304,10 +323,14 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
               <div className="space-y-4">
                 {payments.map((payment) => {
                   const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
+                  const isToInvestor = isInvestorPayment(payment);
+                  
                   return (
                     <div
                       key={payment.id}
-                      className="flex items-center justify-between p-4 rounded-lg border"
+                      className={`flex items-center justify-between p-4 rounded-lg border ${
+                        isToInvestor ? "border-red-200 bg-red-50" : ""
+                      }`}
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -315,6 +338,11 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                           <span className="font-medium">
                             {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Vehículo no encontrado"}
                           </span>
+                          {isToInvestor && (
+                            <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                              Pago a inversionista
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {payment.concept}
@@ -328,7 +356,11 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                         </p>
                       </div>
                       <div className="text-right space-y-2">
-                        <p className="font-medium">${payment.amount}</p>
+                        <p className={`font-medium ${isToInvestor ? "text-red-600" : ""}`}>
+                          ${payment.amount}
+                          {isToInvestor && <ArrowDown className="h-3 w-3 ml-1 inline" />}
+                          {!isToInvestor && <ArrowUp className="h-3 w-3 ml-1 inline text-green-600" />}
+                        </p>
                         <span
                           className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusColor(
                             payment.status

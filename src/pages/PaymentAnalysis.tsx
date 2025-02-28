@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { 
   ArrowDownRight, ArrowUpRight, CheckCircle, DollarSign, 
   HelpCircle, Loader2, RefreshCcw, Search, AlertTriangle,
-  Trash2
+  Trash2, ArrowDown, ArrowUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,6 +49,11 @@ const PaymentAnalysis = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
 
+  // Determinar si un pago es a un inversionista
+  const isInvestorPayment = (payment: Payment) => {
+    return payment.concept.toLowerCase().includes("inversionista");
+  };
+
   // Filtrar pagos
   const filteredPayments = payments.filter(payment => {
     const vehicle = vehicles.find(v => v.id === payment.vehicleId);
@@ -64,13 +69,18 @@ const PaymentAnalysis = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Calcular estadísticas
+  // Calcular estadísticas distinguiendo entre ingresos y egresos
   const stats = {
     total: payments.length,
     completed: payments.filter(p => p.status === "completed").length,
     pending: payments.filter(p => p.status === "pending").length,
     analysing: payments.filter(p => p.status === "analysing").length,
-    amount: payments.reduce((sum, p) => sum + p.amount, 0)
+    incomeAmount: payments
+      .filter(p => p.status === "completed" && !isInvestorPayment(p))
+      .reduce((sum, p) => sum + p.amount, 0),
+    expenseAmount: payments
+      .filter(p => p.status === "completed" && isInvestorPayment(p))
+      .reduce((sum, p) => sum + p.amount, 0)
   };
 
   const handleUpdateStatus = async () => {
@@ -188,14 +198,29 @@ const PaymentAnalysis = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pagos completados
+              Ingresos completados
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{stats.completed}</div>
+              <div className="text-2xl font-bold text-green-600">${stats.incomeAmount.toLocaleString()}</div>
               <div className="p-2 bg-green-100 rounded-full">
                 <ArrowUpRight className="h-4 w-4 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Egresos a inversionistas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-red-600">${stats.expenseAmount.toLocaleString()}</div>
+              <div className="p-2 bg-red-100 rounded-full">
+                <ArrowDownRight className="h-4 w-4 text-red-600" />
               </div>
             </div>
           </CardContent>
@@ -211,21 +236,6 @@ const PaymentAnalysis = () => {
               <div className="text-2xl font-bold">{stats.pending + stats.analysing}</div>
               <div className="p-2 bg-yellow-100 rounded-full">
                 <HelpCircle className="h-4 w-4 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total recaudado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">${stats.amount.toLocaleString()}</div>
-              <div className="p-2 bg-blue-100 rounded-full">
-                <ArrowDownRight className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -295,6 +305,7 @@ const PaymentAnalysis = () => {
                   <TableHead>Fecha</TableHead>
                   <TableHead>Vehículo</TableHead>
                   <TableHead>Concepto</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Método</TableHead>
@@ -304,8 +315,10 @@ const PaymentAnalysis = () => {
               <TableBody>
                 {filteredPayments.map((payment) => {
                   const vehicle = getVehicleDetails(payment.vehicleId);
+                  const isToInvestor = isInvestorPayment(payment);
+                  
                   return (
-                    <TableRow key={payment.id}>
+                    <TableRow key={payment.id} className={isToInvestor ? "bg-red-50" : ""}>
                       <TableCell>
                         {format(new Date(payment.date), "dd MMM yyyy", { locale: es })}
                       </TableCell>
@@ -315,7 +328,20 @@ const PaymentAnalysis = () => {
                       <TableCell className="max-w-[200px] truncate">
                         {payment.concept}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
+                        {isToInvestor ? (
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            <ArrowDown className="h-3 w-3 mr-1" />
+                            Egreso
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                            <ArrowUp className="h-3 w-3 mr-1" />
+                            Ingreso
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className={`text-right ${isToInvestor ? "text-red-600" : "text-green-600"}`}>
                         ${payment.amount.toLocaleString()}
                       </TableCell>
                       <TableCell>
@@ -377,7 +403,10 @@ const PaymentAnalysis = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Monto</p>
-                  <p className="font-medium">${selectedPayment.amount.toLocaleString()}</p>
+                  <p className={`font-medium ${isInvestorPayment(selectedPayment) ? "text-red-600" : "text-green-600"}`}>
+                    ${selectedPayment.amount.toLocaleString()}
+                    {isInvestorPayment(selectedPayment) ? " (Egreso)" : " (Ingreso)"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Vehículo</p>
