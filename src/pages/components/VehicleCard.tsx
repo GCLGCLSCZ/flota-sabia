@@ -59,8 +59,13 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     if (isAfter(startDate, today)) return 0;
     
     // Obtener días no laborables específicos para este vehículo
+    // Nos aseguramos de que daysNotWorked exista y sea un array
     const nonWorkingDays = vehicle.daysNotWorked || [];
-    const nonWorkingDatesSet = new Set(nonWorkingDays.map(day => day.split('T')[0]));
+    const nonWorkingDatesSet = new Set(
+      Array.isArray(nonWorkingDays) 
+        ? nonWorkingDays.map(day => typeof day === 'string' ? day.split('T')[0] : '')
+        : []
+    );
     
     // Calcular días transcurridos excluyendo domingos y días no laborables
     let dayCount = 0;

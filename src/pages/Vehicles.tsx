@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Vehicle, Maintenance, InsurancePolicy, InsurancePayment } from "@/types";
+import { Vehicle, Maintenance } from "@/types";
 import { VehiclesHeader } from "./components/VehiclesHeader";
 import { VehicleList } from "./components/VehicleList";
 import AddVehicleDialog from "./components/AddVehicleDialog";
@@ -13,6 +13,8 @@ import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
 const VehiclesPage = () => {
   const { updateVehicle, vehicles } = useApp();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null);
@@ -68,14 +70,28 @@ const VehiclesPage = () => {
     });
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handleFilterChange = (status: string) => {
+    setFilterStatus(status);
+  };
+
   return (
     <div className="w-full py-3 space-y-4 zoom-safe custom-scrollbar">
-      <VehiclesHeader onAddClick={() => setShowAddDialog(true)} />
+      <VehiclesHeader 
+        onAddClick={() => setShowAddDialog(true)}
+        onSearch={handleSearch}
+        onFilterChange={handleFilterChange}
+      />
       
       <VehicleList
         onEdit={setEditingVehicle}
         onDelete={setDeletingVehicle}
         onShowDetails={setSelectedVehicle}
+        searchQuery={searchQuery}
+        filterStatus={filterStatus}
       />
 
       <AddVehicleDialog
