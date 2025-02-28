@@ -2,7 +2,7 @@
 import { LucideIcon, Home, Car, CreditCard, Users, Clipboard, Settings, ReceiptText, CalendarOff } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useIsMobile, useMobileOpen } from "@/hooks/use-mobile";
+import { useMobileOpen } from "@/hooks/use-mobile";
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -18,8 +18,8 @@ const SidebarItem = ({ icon: Icon, label, href, active, onClick }: SidebarItemPr
       to={href}
       className={({ isActive }) =>
         cn(
-          "flex items-center gap-x-2 text-slate-500 font-medium pl-6 transition-all hover:text-slate-600 hover:bg-slate-300/20",
-          (isActive || active) && "text-slate-700 bg-slate-200/50 hover:bg-slate-200/50 hover:text-slate-700",
+          "flex items-center gap-x-2 text-slate-500 font-medium pl-6 transition-all hover:text-slate-600 hover:bg-slate-300/20 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700/30",
+          (isActive || active) && "text-slate-700 bg-slate-200/50 hover:bg-slate-200/50 hover:text-slate-700 dark:text-white dark:bg-gray-700/50 dark:hover:bg-gray-700/50 dark:hover:text-white",
         )
       }
       onClick={onClick}
@@ -28,8 +28,8 @@ const SidebarItem = ({ icon: Icon, label, href, active, onClick }: SidebarItemPr
         <Icon
           size={22}
           className={cn(
-            "text-slate-500",
-            (active) && "text-slate-700"
+            "text-slate-500 dark:text-gray-400",
+            (active) && "text-slate-700 dark:text-white"
           )}
         />
         {label}
