@@ -18,8 +18,10 @@ const SidebarItem = ({ icon: Icon, label, href, active, onClick }: SidebarItemPr
       to={href}
       className={({ isActive }) =>
         cn(
-          "flex items-center gap-x-2 text-slate-500 font-medium pl-6 transition-all hover:text-slate-600 hover:bg-slate-300/20 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700/30",
-          (isActive || active) && "text-slate-700 bg-slate-200/50 hover:bg-slate-200/50 hover:text-slate-700 dark:text-white dark:bg-gray-700/50 dark:hover:bg-gray-700/50 dark:hover:text-white",
+          "flex items-center gap-x-2 text-slate-500 font-medium pl-6 transition-all hover:text-slate-600 hover:bg-slate-300/20",
+          (isActive || active) && "text-slate-700 bg-slate-200/50 hover:bg-slate-200/50 hover:text-slate-700",
+          "dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700/30",
+          (isActive || active) && "dark:text-white dark:bg-gray-700/50 dark:hover:bg-gray-700/50 dark:hover:text-white"
         )
       }
       onClick={onClick}
@@ -102,8 +104,10 @@ export const Sidebar = () => {
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-white shadow-sm border-r dark:bg-gray-800 dark:border-gray-700">
       <div className="p-6 flex items-center justify-center border-b dark:border-gray-700">
-        <ReceiptText className="text-sky-500 h-10 w-10" />
-        <h1 className="text-2xl font-bold ml-2 dark:text-white">AutoFin</h1>
+        <NavLink to="/" className="flex items-center">
+          <ReceiptText className="text-sky-500 h-10 w-10" />
+          <h1 className="text-2xl font-bold ml-2 dark:text-white">AutoFin</h1>
+        </NavLink>
       </div>
       <div className="flex flex-col w-full mt-4">
         {routes.map((route) => (
