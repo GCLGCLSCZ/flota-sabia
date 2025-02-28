@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, DollarSign, Loader2 } from "lucide-react";
+import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
@@ -59,7 +59,7 @@ const InvestorSettlement = () => {
   }
 
   // Obtener la tarifa mensual de GPS
-  const gpsMonthlyFee = settings?.gpsMonthlyFee || 0;
+  const gpsMonthlyFee = settings?.gpsMonthlyFee || 120; // Asegurarse de usar 120 como valor por defecto
   
   // Filtrar vehículos del inversionista
   const investorVehicles = vehicles.filter(
@@ -114,10 +114,11 @@ const InvestorSettlement = () => {
       // Calcular días del período
       const periodDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       
-      // Calcular meses completos en el período (para GPS)
-      const months = periodDays / 30;
+      // Usar SIEMPRE el monto completo mensual de GPS (120 Bs o el configurado)
+      // Calcular cuántos meses completos hay en el período
+      const months = Math.ceil(periodDays / 30); // Redondeamos hacia arriba para asegurar el cobro completo
       
-      // Calcular descuento de GPS para el período - SIEMPRE el monto completo mensual
+      // Calcular descuento de GPS para el período - SIEMPRE el monto completo mensual (120 Bs)
       // Independientemente de si el vehículo trabajó o no
       const gpsDiscount = gpsMonthlyFee * months;
       
@@ -281,6 +282,46 @@ const InvestorSettlement = () => {
       setIsSubmitting(false);
     }
   };
+  
+  // Función para enviar la liquidación por WhatsApp
+  const handleWhatsAppShare = () => {
+    if (!investor.contact) {
+      toast({
+        title: "No se puede enviar",
+        description: "El inversionista no tiene un número de contacto registrado",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Crear el texto de la liquidación
+    const message = `*LIQUIDACIÓN DE INVERSIONISTA*
+*Período:* ${format(new Date(startDate), "dd/MM/yyyy")} - ${format(new Date(endDate), "dd/MM/yyyy")}
+*Inversionista:* ${investor.name}
+
+*RESUMEN:*
+Ingresos totales: Bs ${totals.income.toFixed(2)}
+Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
+- Mantenimiento: Bs ${totals.maintenanceDiscounts.toFixed(2)}
+- GPS: Bs ${totals.gpsDiscounts.toFixed(2)}
+Corresponde al inversionista: Bs ${totals.investorAmount.toFixed(2)}
+Pagado en período: Bs ${totals.paid.toFixed(2)}
+*Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
+
+*DETALLE POR VEHÍCULO:*
+${vehicleData.map(data => 
+  `${data.vehicle.plate} - ${data.vehicle.model}
+  Ingresos: Bs ${data.periodIncome.toFixed(2)}
+  Descuentos: Bs ${data.totalDiscounts.toFixed(2)}
+  Corresponde: Bs ${data.investorAmount.toFixed(2)}
+  Pagado: Bs ${data.periodPayments.toFixed(2)}
+  Saldo: Bs ${data.balanceDue.toFixed(2)}`
+).join('\n\n')}`;
+
+    // Crear enlace de WhatsApp
+    const whatsappUrl = `https://wa.me/${investor.contact.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   return (
     <div className="space-y-6 max-w-[1000px] mx-auto pb-10" id="settlement-print">
@@ -293,7 +334,16 @@ const InvestorSettlement = () => {
         </Link>
         <div className="flex gap-2">
           <Button 
-            variant="default" 
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-1"
+            onClick={handleWhatsAppShare}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Enviar por WhatsApp
+          </Button>
+          <Button 
+            variant="outline" 
             size="sm" 
             className="h-8 gap-1"
             onClick={() => window.print()}
