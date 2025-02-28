@@ -1,689 +1,494 @@
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRange } from "react-day-picker";
-import { Payment, Vehicle } from "@/types";
+import { Input } from "@/components/ui/input";
+import { 
+  ArrowDownRight, ArrowUpRight, CheckCircle, DollarSign, 
+  HelpCircle, Loader2, RefreshCcw, Search, AlertTriangle,
+  Trash2
+} from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Filter, CalendarRange, List, Car, PieChart, BarChart } from "lucide-react";
-
-type GroupBy = "vehicle" | "date" | "paymentMethod" | "none";
-type ViewMode = "daily" | "weekly" | "monthly" | "custom";
-
-interface PaymentsByVehicle {
-  vehicleId: string;
-  vehiclePlate: string;
-  vehicleModel: string;
-  totalAmount: number;
-  count: number;
-  payments: Payment[];
-  companyEarnings: number;
-  paidInstallments: number;
-}
-
-interface PaymentsByDate {
-  date: string;
-  formattedDate: string;
-  totalAmount: number;
-  count: number;
-  payments: Payment[];
-  companyEarnings: number;
-  paidInstallments: number;
-}
-
-interface PaymentsByMethod {
-  method: "cash" | "transfer";
-  totalAmount: number;
-  count: number;
-  payments: Payment[];
-  companyEarnings: number;
-  paidInstallments: number;
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Vehicle, Payment } from "@/types";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const PaymentAnalysis = () => {
-  const { payments, vehicles } = useApp();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date()
+  const { payments, vehicles, updatePayment, removePayment, loading } = useApp();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [newStatus, setNewStatus] = useState<Payment["status"]>("completed");
+  
+  // Estado para el diálogo de confirmación de eliminación
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
+
+  // Filtrar pagos
+  const filteredPayments = payments.filter(payment => {
+    const vehicle = vehicles.find(v => v.id === payment.vehicleId);
+    const matchesSearch = 
+      payment.concept.toLowerCase().includes(search.toLowerCase()) ||
+      vehicle?.plate?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.transferNumber?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.bankName?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.id.toLowerCase().includes(search.toLowerCase());
+      
+    const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
-  const [viewMode, setViewMode] = useState<ViewMode>("monthly");
-  const [groupBy, setGroupBy] = useState<GroupBy>("vehicle");
-  const [selectedVehicle, setSelectedVehicle] = useState<string>("all");
 
-  // Update date range based on view mode
-  const updateDateRangeByViewMode = (mode: ViewMode) => {
-    const today = new Date();
+  // Calcular estadísticas
+  const stats = {
+    total: payments.length,
+    completed: payments.filter(p => p.status === "completed").length,
+    pending: payments.filter(p => p.status === "pending").length,
+    analysing: payments.filter(p => p.status === "analysing").length,
+    amount: payments.reduce((sum, p) => sum + p.amount, 0)
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedPayment) return;
     
-    switch (mode) {
-      case "daily":
-        setDateRange({ from: today, to: today });
-        break;
-      case "weekly":
-        setDateRange({
-          from: startOfWeek(today, { weekStartsOn: 1 }),
-          to: endOfWeek(today, { weekStartsOn: 1 })
+    setUpdating(true);
+    
+    try {
+      await updatePayment(selectedPayment.id, { status: newStatus });
+      
+      toast({
+        title: "Estado actualizado",
+        description: `El pago se ha marcado como "${
+          newStatus === "completed" ? "Completado" :
+          newStatus === "pending" ? "Pendiente" :
+          newStatus === "analysing" ? "En análisis" : "Cancelado"
+        }"`,
+      });
+      
+      setOpenDetailsDialog(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del pago",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+  
+  // Funciones para eliminar pagos
+  const handleDeleteClick = (paymentId: string) => {
+    setPaymentToDelete(paymentId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (paymentToDelete) {
+      const success = await removePayment(paymentToDelete);
+      
+      if (success) {
+        toast({
+          title: "Pago eliminado",
+          description: "El pago ha sido eliminado exitosamente",
         });
-        break;
-      case "monthly":
-        setDateRange({
-          from: startOfMonth(today),
-          to: endOfMonth(today)
-        });
-        break;
-      case "custom":
-        // Keep current date range
-        break;
+      }
+      
+      setPaymentToDelete(null);
+      setIsDeleteDialogOpen(false);
     }
   };
 
-  // Filter payments based on date range and selected vehicle
-  const filteredPayments = useMemo(() => {
-    if (!payments.length) return [];
-
-    return payments.filter((payment) => {
-      const paymentDate = parseISO(payment.date);
-      const inDateRange = dateRange?.from && dateRange?.to 
-        ? isWithinInterval(paymentDate, {
-            start: startOfDay(dateRange.from),
-            end: endOfDay(dateRange.to || dateRange.from)
-          })
-        : true;
-      
-      const matchesVehicle = selectedVehicle === "all" || payment.vehicleId === selectedVehicle;
-      
-      return inDateRange && matchesVehicle;
-    });
-  }, [payments, dateRange, selectedVehicle]);
-
-  // Calculate totals
-  const totalAmount = useMemo(() => {
-    return filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  }, [filteredPayments]);
-
-  // Calcular ganancias totales de la empresa y cuotas pagadas
-  const { totalCompanyEarnings, totalPaidInstallments } = useMemo(() => {
-    const vehiclePayments = new Map<string, number>();
-    
-    // Sumar los pagos por vehículo
-    filteredPayments.forEach((payment) => {
-      if (payment.status === "completed") {
-        const currentTotal = vehiclePayments.get(payment.vehicleId) || 0;
-        vehiclePayments.set(payment.vehicleId, currentTotal + payment.amount);
-      }
-    });
-    
-    // Calcular cuotas pagadas y ganancias de la empresa
-    let totalEarnings = 0;
-    let totalInstallments = 0;
-    
-    vehiclePayments.forEach((totalPaid, vehicleId) => {
-      const vehicle = vehicles.find(v => v.id === vehicleId);
-      if (vehicle && vehicle.installmentAmount > 0) {
-        const paidInstallments = totalPaid / vehicle.installmentAmount;
-        totalInstallments += paidInstallments;
-        totalEarnings += vehicle.dailyRate * paidInstallments;
-      }
-    });
-    
-    return {
-      totalCompanyEarnings: Number(totalEarnings.toFixed(2)),
-      totalPaidInstallments: Number(totalInstallments.toFixed(2))
-    };
-  }, [filteredPayments, vehicles]);
-
-  // Group payments by vehicle
-  const paymentsByVehicle = useMemo(() => {
-    const groups: PaymentsByVehicle[] = [];
-    
-    filteredPayments.forEach((payment) => {
-      const vehicle = vehicles.find(v => v.id === payment.vehicleId);
-      if (!vehicle) return;
-      
-      const existingGroup = groups.find(g => g.vehicleId === payment.vehicleId);
-      if (existingGroup) {
-        existingGroup.totalAmount += payment.amount;
-        existingGroup.count += 1;
-        existingGroup.payments.push(payment);
-      } else {
-        groups.push({
-          vehicleId: payment.vehicleId,
-          vehiclePlate: vehicle.plate,
-          vehicleModel: vehicle.model,
-          totalAmount: payment.amount,
-          count: 1,
-          payments: [payment],
-          companyEarnings: 0,
-          paidInstallments: 0
-        });
-      }
-    });
-    
-    // Calcular cuotas pagadas y ganancias de la empresa por vehículo
-    groups.forEach(group => {
-      const vehicle = vehicles.find(v => v.id === group.vehicleId);
-      if (vehicle && vehicle.installmentAmount > 0) {
-        const paidInstallments = group.totalAmount / vehicle.installmentAmount;
-        group.paidInstallments = Number(paidInstallments.toFixed(2));
-        group.companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
-      }
-    });
-    
-    return groups.sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [filteredPayments, vehicles]);
-
-  // Group payments by date
-  const paymentsByDate = useMemo(() => {
-    const groups: PaymentsByDate[] = [];
-    
-    filteredPayments.forEach((payment) => {
-      const date = payment.date.split('T')[0];
-      const paymentDate = parseISO(payment.date);
-      
-      const existingGroup = groups.find(g => g.date === date);
-      if (existingGroup) {
-        existingGroup.totalAmount += payment.amount;
-        existingGroup.count += 1;
-        existingGroup.payments.push(payment);
-      } else {
-        groups.push({
-          date,
-          formattedDate: format(paymentDate, "dd 'de' MMMM, yyyy", { locale: es }),
-          totalAmount: payment.amount,
-          count: 1,
-          payments: [payment],
-          companyEarnings: 0,
-          paidInstallments: 0
-        });
-      }
-    });
-    
-    // Calcular cuotas pagadas y ganancias por fecha
-    groups.forEach(group => {
-      let dailyEarnings = 0;
-      let dailyInstallments = 0;
-      
-      // Agrupar pagos por vehículo en cada fecha
-      const vehicleDailyPayments = new Map<string, number>();
-      
-      group.payments.forEach(payment => {
-        if (payment.status === "completed") {
-          const currentAmount = vehicleDailyPayments.get(payment.vehicleId) || 0;
-          vehicleDailyPayments.set(payment.vehicleId, currentAmount + payment.amount);
-        }
-      });
-      
-      // Calcular ganancias por vehículo en cada fecha
-      vehicleDailyPayments.forEach((amount, vehicleId) => {
-        const vehicle = vehicles.find(v => v.id === vehicleId);
-        if (vehicle && vehicle.installmentAmount > 0) {
-          const installments = amount / vehicle.installmentAmount;
-          dailyInstallments += installments;
-          dailyEarnings += vehicle.dailyRate * installments;
-        }
-      });
-      
-      group.companyEarnings = Number(dailyEarnings.toFixed(2));
-      group.paidInstallments = Number(dailyInstallments.toFixed(2));
-    });
-    
-    return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredPayments, vehicles]);
-
-  // Group payments by method
-  const paymentsByMethod = useMemo(() => {
-    const groups: PaymentsByMethod[] = [];
-    
-    const cashPayments = filteredPayments.filter(p => p.paymentMethod === "cash");
-    const transferPayments = filteredPayments.filter(p => p.paymentMethod === "transfer");
-    
-    if (cashPayments.length) {
-      groups.push({
-        method: "cash",
-        totalAmount: cashPayments.reduce((sum, p) => sum + p.amount, 0),
-        count: cashPayments.length,
-        payments: cashPayments,
-        companyEarnings: 0,
-        paidInstallments: 0
-      });
-    }
-    
-    if (transferPayments.length) {
-      groups.push({
-        method: "transfer",
-        totalAmount: transferPayments.reduce((sum, p) => sum + p.amount, 0),
-        count: transferPayments.length,
-        payments: transferPayments,
-        companyEarnings: 0,
-        paidInstallments: 0
-      });
-    }
-    
-    // Calcular ganancias por método de pago
-    groups.forEach(group => {
-      const vehicleMethodPayments = new Map<string, number>();
-      
-      group.payments.forEach(payment => {
-        if (payment.status === "completed") {
-          const currentAmount = vehicleMethodPayments.get(payment.vehicleId) || 0;
-          vehicleMethodPayments.set(payment.vehicleId, currentAmount + payment.amount);
-        }
-      });
-      
-      let methodEarnings = 0;
-      let methodInstallments = 0;
-      
-      vehicleMethodPayments.forEach((amount, vehicleId) => {
-        const vehicle = vehicles.find(v => v.id === vehicleId);
-        if (vehicle && vehicle.installmentAmount > 0) {
-          const installments = amount / vehicle.installmentAmount;
-          methodInstallments += installments;
-          methodEarnings += vehicle.dailyRate * installments;
-        }
-      });
-      
-      group.companyEarnings = Number(methodEarnings.toFixed(2));
-      group.paidInstallments = Number(methodInstallments.toFixed(2));
-    });
-    
-    return groups;
-  }, [filteredPayments, vehicles]);
-
-  const getPaymentMethodLabel = (method: "cash" | "transfer") => {
-    return method === "cash" ? "Efectivo" : "Transferencia";
+  const getVehicleDetails = (vehicleId: string): Vehicle | undefined => {
+    return vehicles.find(v => v.id === vehicleId);
   };
 
-  const getPaymentStatusLabel = (status: Payment["status"]) => {
+  const getStatusBadge = (status: Payment["status"]) => {
     switch (status) {
       case "completed":
-        return "Completado";
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Completado</Badge>;
       case "pending":
-        return "Pendiente";
+        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Pendiente</Badge>;
       case "cancelled":
-        return "Cancelado";
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">Cancelado</Badge>;
+      case "analysing":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">En análisis</Badge>;
       default:
-        return "";
+        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200">Desconocido</Badge>;
     }
   };
 
-  const getStatusBadgeColor = (status: Payment["status"]) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "";
-    }
-  };
+  // Si está cargando, mostrar indicador de carga
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+        <h2 className="text-xl font-medium">Cargando datos de pagos...</h2>
+        <p className="text-muted-foreground mt-2">Por favor espera mientras se cargan los datos.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Análisis de Pagos</h1>
-          <p className="text-muted-foreground mt-1">
-            Analiza y filtra los pagos de los vehículos por diferentes criterios
-          </p>
+          <p className="text-muted-foreground">Analiza y verifica el estado de los pagos</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex items-center">
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Actualizar
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total de pagos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="p-2 bg-primary/10 rounded-full">
+                <DollarSign className="h-4 w-4 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pagos completados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.completed}</div>
+              <div className="p-2 bg-green-100 rounded-full">
+                <ArrowUpRight className="h-4 w-4 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pagos pendientes/análisis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.pending + stats.analysing}</div>
+              <div className="p-2 bg-yellow-100 rounded-full">
+                <HelpCircle className="h-4 w-4 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total recaudado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">${stats.amount.toLocaleString()}</div>
+              <div className="p-2 bg-blue-100 rounded-full">
+                <ArrowDownRight className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col sm:flex-row justify-between gap-4 items-center mb-6">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar pagos..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="w-full sm:w-auto">
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="completed">Completados</SelectItem>
+              <SelectItem value="pending">Pendientes</SelectItem>
+              <SelectItem value="analysing">En análisis</SelectItem>
+              <SelectItem value="cancelled">Cancelados</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros
-          </CardTitle>
+          <CardTitle>Listado de Pagos</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Vista</label>
-              <Tabs 
-                defaultValue={viewMode} 
-                className="w-full" 
-                onValueChange={(value) => {
-                  setViewMode(value as ViewMode);
-                  updateDateRangeByViewMode(value as ViewMode);
-                }}
-              >
-                <TabsList className="grid grid-cols-4 w-full">
-                  <TabsTrigger value="daily">Día</TabsTrigger>
-                  <TabsTrigger value="weekly">Semana</TabsTrigger>
-                  <TabsTrigger value="monthly">Mes</TabsTrigger>
-                  <TabsTrigger value="custom">Personalizado</TabsTrigger>
-                </TabsList>
-              </Tabs>
+          {payments.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="mx-auto h-12 w-12 text-orange-500 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No hay pagos registrados</h3>
+              <p className="text-muted-foreground mb-4">
+                No se encontraron registros de pagos en el sistema.
+              </p>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Rango de fechas</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarRange className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "dd/MM/yyyy")} -{" "}
-                          {format(dateRange.to, "dd/MM/yyyy")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "dd/MM/yyyy")
-                      )
-                    ) : (
-                      <span>Selecciona un rango de fechas</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
+          ) : filteredPayments.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="mx-auto h-12 w-12 text-orange-500 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Sin resultados</h3>
+              <p className="text-muted-foreground mb-4">
+                No se encontraron pagos que coincidan con los criterios de búsqueda.
+              </p>
+              <Button variant="outline" onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+              }}>
+                Limpiar filtros
+              </Button>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Vehículo</label>
-              <Select
-                value={selectedVehicle}
-                onValueChange={setSelectedVehicle}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos los vehículos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los vehículos</SelectItem>
-                  {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        <span>{vehicle.plate} - {vehicle.model}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-muted/50">
-              <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground">Total pagado</div>
-                <div className="text-2xl font-bold">{totalAmount.toFixed(2)} Bs</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-muted/50">
-              <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground">Cuotas pagadas</div>
-                <div className="text-2xl font-bold">{totalPaidInstallments}</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-green-50 dark:bg-green-900/20">
-              <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground dark:text-gray-300">Ganancia de la empresa</div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalCompanyEarnings} Bs</div>
-              </CardContent>
-            </Card>
-          </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Vehículo</TableHead>
+                  <TableHead>Concepto</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Método</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPayments.map((payment) => {
+                  const vehicle = getVehicleDetails(payment.vehicleId);
+                  return (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        {format(new Date(payment.date), "dd MMM yyyy", { locale: es })}
+                      </TableCell>
+                      <TableCell>
+                        {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "N/A"}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {payment.concept}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ${payment.amount.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(payment.status)}
+                      </TableCell>
+                      <TableCell>
+                        {payment.paymentMethod === "cash" ? "Efectivo" : 
+                          `Transferencia ${payment.bankName || ""} ${payment.transferNumber ? "#" + payment.transferNumber : ""}`}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedPayment(payment);
+                              setNewStatus(payment.status);
+                              setOpenDetailsDialog(true);
+                            }}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteClick(payment.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="by-vehicle" className="w-full">
-        <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
-          <TabsTrigger value="by-vehicle" onClick={() => setGroupBy("vehicle")}>
-            <Car className="h-4 w-4 mr-2" />
-            Por Vehículo
-          </TabsTrigger>
-          <TabsTrigger value="by-date" onClick={() => setGroupBy("date")}>
-            <CalendarIcon className="h-4 w-4 mr-2" />
-            Por Fecha
-          </TabsTrigger>
-          <TabsTrigger value="by-method" onClick={() => setGroupBy("paymentMethod")}>
-            <List className="h-4 w-4 mr-2" />
-            Por Método
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="by-vehicle">
-          {paymentsByVehicle.length > 0 ? (
+      <Dialog open={openDetailsDialog} onOpenChange={setOpenDetailsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalles del Pago</DialogTitle>
+            <DialogDescription>
+              Revisa y actualiza el estado del pago
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPayment && (
             <div className="space-y-4">
-              {paymentsByVehicle.map((group) => (
-                <Card key={group.vehicleId}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Car className="h-5 w-5" />
-                        <span>{group.vehiclePlate} - {group.vehicleModel}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Fecha</p>
+                  <p className="font-medium">
+                    {format(new Date(selectedPayment.date), "dd MMMM yyyy", { locale: es })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Monto</p>
+                  <p className="font-medium">${selectedPayment.amount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Vehículo</p>
+                  <p className="font-medium">
+                    {(() => {
+                      const vehicle = getVehicleDetails(selectedPayment.vehicleId);
+                      return vehicle ? `${vehicle.plate} - ${vehicle.model}` : "N/A";
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Método de pago</p>
+                  <p className="font-medium">
+                    {selectedPayment.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}
+                    {selectedPayment.paymentMethod === "transfer" && selectedPayment.bankName && ` (${selectedPayment.bankName})`}
+                  </p>
+                </div>
+                {selectedPayment.paymentMethod === "transfer" && selectedPayment.transferNumber && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Nº Transferencia</p>
+                    <p className="font-medium">{selectedPayment.transferNumber}</p>
+                  </div>
+                )}
+                {selectedPayment.receiptNumber && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Nº Recibo</p>
+                    <p className="font-medium">{selectedPayment.receiptNumber}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Concepto</p>
+                <p className="font-medium">{selectedPayment.concept}</p>
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-2">Cambiar estado del pago</p>
+                <Select
+                  value={newStatus}
+                  onValueChange={(value: Payment["status"]) => setNewStatus(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="completed">
+                      <div className="flex items-center">
+                        <div className="h-2 w-2 rounded-full bg-green-500 mr-2"></div>
+                        Completado
                       </div>
-                      <div className="flex gap-4">
-                        <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
-                        </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
-                        </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
-                        </Badge>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center">
+                        <div className="h-2 w-2 rounded-full bg-yellow-500 mr-2"></div>
+                        Pendiente
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead>Concepto</TableHead>
-                          <TableHead>Método</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy")}</TableCell>
-                            <TableCell>{payment.concept}</TableCell>
-                            <TableCell>{getPaymentMethodLabel(payment.paymentMethod)}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusBadgeColor(payment.status)}>
-                                {getPaymentStatusLabel(payment.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {payment.amount.toFixed(2)} Bs
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              ))}
+                    </SelectItem>
+                    <SelectItem value="analysing">
+                      <div className="flex items-center">
+                        <div className="h-2 w-2 rounded-full bg-blue-500 mr-2"></div>
+                        En análisis
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cancelled">
+                      <div className="flex items-center">
+                        <div className="h-2 w-2 rounded-full bg-red-500 mr-2"></div>
+                        Cancelado
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end mt-4">
+                  <Button onClick={handleUpdateStatus} disabled={updating}>
+                    {updating ? 
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Actualizando...
+                      </> : 
+                      "Actualizar estado"
+                    }
+                  </Button>
+                </div>
+              </div>
             </div>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
-              </CardContent>
-            </Card>
           )}
-        </TabsContent>
+        </DialogContent>
+      </Dialog>
 
-        <TabsContent value="by-date">
-          {paymentsByDate.length > 0 ? (
-            <div className="space-y-4">
-              {paymentsByDate.map((group) => (
-                <Card key={group.date}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-5 w-5" />
-                        <span>{group.formattedDate}</span>
-                      </div>
-                      <div className="flex gap-4">
-                        <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
-                        </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
-                        </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
-                        </Badge>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Vehículo</TableHead>
-                          <TableHead>Concepto</TableHead>
-                          <TableHead>Método</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.payments.map((payment) => {
-                          const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
-                          return (
-                            <TableRow key={payment.id}>
-                              <TableCell>
-                                {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Desconocido"}
-                              </TableCell>
-                              <TableCell>{payment.concept}</TableCell>
-                              <TableCell>{getPaymentMethodLabel(payment.paymentMethod)}</TableCell>
-                              <TableCell>
-                                <Badge className={getStatusBadgeColor(payment.status)}>
-                                  {getPaymentStatusLabel(payment.status)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {payment.amount.toFixed(2)} Bs
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="by-method">
-          {paymentsByMethod.length > 0 ? (
-            <div className="space-y-4">
-              {paymentsByMethod.map((group) => (
-                <Card key={group.method}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <List className="h-5 w-5" />
-                        <span>{getPaymentMethodLabel(group.method)}</span>
-                      </div>
-                      <div className="flex gap-4">
-                        <Badge variant="outline" className="text-base font-normal">
-                          Cuotas: {group.paidInstallments}
-                        </Badge>
-                        <Badge variant="outline" className="text-base font-normal text-green-600">
-                          Ganancia: {group.companyEarnings} Bs
-                        </Badge>
-                        <Badge variant="secondary" className="text-base font-normal">
-                          {group.totalAmount.toFixed(2)} Bs
-                        </Badge>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {group.count} pagos registrados
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead>Vehículo</TableHead>
-                          <TableHead>Concepto</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.payments.map((payment) => {
-                          const vehicle = vehicles.find((v) => v.id === payment.vehicleId);
-                          return (
-                            <TableRow key={payment.id}>
-                              <TableCell>{format(parseISO(payment.date), "dd/MM/yyyy")}</TableCell>
-                              <TableCell>
-                                {vehicle ? `${vehicle.plate} - ${vehicle.model}` : "Desconocido"}
-                              </TableCell>
-                              <TableCell>{payment.concept}</TableCell>
-                              <TableCell>
-                                <Badge className={getStatusBadgeColor(payment.status)}>
-                                  {getPaymentStatusLabel(payment.status)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {payment.amount.toFixed(2)} Bs
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No hay pagos que coincidan con los filtros seleccionados.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+      {/* Diálogo de confirmación para eliminar pago */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. ¿Realmente deseas eliminar este pago?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

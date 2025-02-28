@@ -18,9 +18,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Car, DollarSign, Printer, MessageSquare, Loader2, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useApp } from "@/context/AppContext";
@@ -39,8 +49,12 @@ const Payments = () => {
   const [customBank, setCustomBank] = useState("");
   const [showCustomBank, setShowCustomBank] = useState(false);
   
+  // Estado para el diálogo de confirmación de eliminación
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
+  
   // Usar el contexto de la aplicación para obtener los vehículos y pagos
-  const { vehicles, payments, addPayment, loading } = useApp();
+  const { vehicles, payments, addPayment, removePayment, loading } = useApp();
 
   const generateReceiptNumber = () => {
     if (!payments.length) return "REC-001";
@@ -134,6 +148,28 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
     window.open(whatsappUrl, "_blank");
   };
 
+  // Funciones para eliminar pagos
+  const handleDeleteClick = (paymentId: string) => {
+    setPaymentToDelete(paymentId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (paymentToDelete) {
+      const success = await removePayment(paymentToDelete);
+      
+      if (success) {
+        toast({
+          title: "Pago eliminado",
+          description: "El pago ha sido eliminado exitosamente",
+        });
+      }
+      
+      setPaymentToDelete(null);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const getStatusColor = (status: Payment["status"]) => {
     switch (status) {
       case "completed":
@@ -142,6 +178,8 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
         return "bg-yellow-100 text-yellow-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
+      case "analysing":
+        return "bg-blue-100 text-blue-800";
       default:
         return "";
     }
@@ -155,6 +193,8 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
         return "Pendiente";
       case "cancelled":
         return "Cancelado";
+      case "analysing":
+        return "En análisis";
       default:
         return "";
     }
@@ -313,6 +353,14 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
                               <MessageSquare className="h-4 w-4" />
                             </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteClick(payment.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -323,6 +371,29 @@ ${payment.transferNumber ? `🔢 N° Transferencia: ${payment.transferNumber}` :
           </CardContent>
         </Card>
       </div>
+
+      {/* Diálogo de confirmación para eliminar pago */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. ¿Realmente deseas eliminar este pago?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
         <DialogContent>
