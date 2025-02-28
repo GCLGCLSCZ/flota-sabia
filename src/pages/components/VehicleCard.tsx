@@ -82,6 +82,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     const expectedInstallments = dayCount;
     
     // Cuotas atrasadas = esperadas - pagadas (permitimos decimales en el resultado)
+    // Si el resultado es negativo, hay 0 cuotas atrasadas
     return Math.max(0, expectedInstallments - paidInstallments);
   };
   
@@ -204,6 +205,13 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
             </p>
           </div>
         </div>
+        
+        {(vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0) && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-muted-foreground dark:text-gray-400">Días no trabajados</p>
+            <p className="font-medium">{vehicle.daysNotWorked.length} días</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between p-4 pt-0 gap-2">
         <Button

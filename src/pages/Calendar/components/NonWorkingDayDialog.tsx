@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { NonWorkingDayDialogProps, NonWorkingDay } from "../types";
+import { es } from "date-fns/locale";
 
 const NonWorkingDayDialog = ({
   open,
@@ -24,35 +25,88 @@ const NonWorkingDayDialog = ({
 }: NonWorkingDayDialogProps) => {
   
   const handleAddNonWorkingDays = () => {
-    if (!selectedDates?.from || !selectedDates?.to || (!selectedVehicle && !applyToAllVehicles)) return;
+    if (!selectedDates?.from || !selectedDates?.to || (!selectedVehicle && !applyToAllVehicles)) {
+      toast.toast({
+        title: "Error",
+        description: "Debes seleccionar un rango de fechas y un vehículo, o marcar la opción de aplicar a todos los vehículos",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const daysToAdd = {
-      date: selectedDates.from,
-      ...newNonWorkingDay,
+    // Función para generar un rango de días
+    const getDatesInRange = (start: Date, end: Date) => {
+      const dates = [];
+      const currentDate = new Date(start);
+      
+      // Establecer hora a inicio del día para comparaciones correctas
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      currentDate.setHours(0, 0, 0, 0);
+      
+      // Incluir el día final en el rango
+      while (currentDate <= end) {
+        dates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      return dates;
     };
 
+    // Obtener todas las fechas en el rango seleccionado
+    const dateRange = getDatesInRange(selectedDates.from, selectedDates.to);
+    
     if (applyToAllVehicles) {
+      // Aplicar a todos los vehículos activos
       vehicles.forEach((vehicle) => {
-        const currentDaysOff = vehicle.daysNotWorked || [];
-        updateVehicle(vehicle.id, {
-          daysNotWorked: [...currentDaysOff, selectedDates.from.toISOString()]
-        });
+        if (vehicle.status === "active") {
+          const currentDaysOff = vehicle.daysNotWorked || [];
+          const updatedDaysOff = [...currentDaysOff];
+          
+          // Agregar cada fecha del rango si no existe ya
+          dateRange.forEach(date => {
+            const dateStr = date.toISOString();
+            if (!currentDaysOff.includes(dateStr)) {
+              updatedDaysOff.push(dateStr);
+            }
+          });
+          
+          updateVehicle(vehicle.id, {
+            daysNotWorked: updatedDaysOff
+          });
+        }
       });
-    } else {
+      
+      toast.toast({
+        title: "Días no laborables registrados",
+        description: `Se han registrado los días del ${format(selectedDates.from, "dd/MM/yyyy", { locale: es })} al ${format(selectedDates.to, "dd/MM/yyyy", { locale: es })} como no laborables por ${newNonWorkingDay.reason} para todos los vehículos activos`,
+      });
+    } else if (selectedVehicle) {
+      // Aplicar solo al vehículo seleccionado
       const vehicle = vehicles.find(v => v.id === selectedVehicle);
       if (vehicle) {
         const currentDaysOff = vehicle.daysNotWorked || [];
+        const updatedDaysOff = [...currentDaysOff];
+        
+        // Agregar cada fecha del rango si no existe ya
+        dateRange.forEach(date => {
+          const dateStr = date.toISOString();
+          if (!currentDaysOff.includes(dateStr)) {
+            updatedDaysOff.push(dateStr);
+          }
+        });
+        
         updateVehicle(vehicle.id, {
-          daysNotWorked: [...currentDaysOff, selectedDates.from.toISOString()]
+          daysNotWorked: updatedDaysOff
+        });
+        
+        toast.toast({
+          title: "Días no laborables registrados",
+          description: `Se han registrado los días del ${format(selectedDates.from, "dd/MM/yyyy", { locale: es })} al ${format(selectedDates.to, "dd/MM/yyyy", { locale: es })} como no laborables por ${newNonWorkingDay.reason} para el vehículo ${vehicle.plate}`,
         });
       }
     }
 
-    toast.toast({
-      title: "Días no laborables registrados",
-      description: `Se han registrado los días del ${format(selectedDates.from, "dd/MM/yyyy")} al ${format(selectedDates.to, "dd/MM/yyyy")} como no laborables por ${newNonWorkingDay.reason} ${applyToAllVehicles ? "para todos los vehículos" : ""}`,
-    });
-
+    // Limpiar el formulario
     onOpenChange(false);
     setSelectedDates(undefined);
     setNewNonWorkingDay({
@@ -62,6 +116,7 @@ const NonWorkingDayDialog = ({
       description: "",
     });
     setApplyToAllVehicles(false);
+    setSelectedVehicle("");
   };
 
   const typeLabels = {
@@ -79,7 +134,7 @@ const NonWorkingDayDialog = ({
           <DialogTitle>Registrar Días No Laborables</DialogTitle>
           <DialogDescription>
             {selectedDates?.from && selectedDates?.to ? (
-              `Periodo seleccionado: del ${format(selectedDates.from, "dd/MM/yyyy")} al ${format(selectedDates.to, "dd/MM/yyyy")}`
+              `Periodo seleccionado: del ${format(selectedDates.from, "dd/MM/yyyy", { locale: es })} al ${format(selectedDates.to, "dd/MM/yyyy", { locale: es })}`
             ) : (
               "Selecciona el tipo y motivo de los días no laborables"
             )}
@@ -99,8 +154,33 @@ const NonWorkingDayDialog = ({
               }}
               className="rounded border-gray-300 text-primary focus:ring-primary"
             />
-            <Label htmlFor="applyToAll">Aplicar a todos los vehículos</Label>
+            <Label htmlFor="applyToAll">Aplicar a todos los vehículos activos</Label>
           </div>
+
+          {!applyToAllVehicles && (
+            <div className="space-y-2">
+              <Label>Vehículo</Label>
+              <Select
+                value={selectedVehicle}
+                onValueChange={setSelectedVehicle}
+                disabled={applyToAllVehicles}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un vehículo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles
+                    .filter(v => v.status === "active")
+                    .map(vehicle => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.plate} - {vehicle.model}
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Tipo</Label>
