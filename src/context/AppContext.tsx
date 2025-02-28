@@ -1,6 +1,6 @@
 
 import { createContext, useContext, ReactNode, useEffect, useState } from "react";
-import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount, Settlement } from "@/types";
+import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount } from "@/types";
 import { STORAGE_KEYS } from "./storage";
 import { validateVehicleData, validateInvestorData, validateDriverData } from "./validators";
 import { useCRUD } from "./hooks/useCRUD";
@@ -12,8 +12,7 @@ import {
   settingsToDb, settingsFromDb,
   maintenanceToDb, maintenanceFromDb,
   cardexToDb, cardexFromDb,
-  discountToDb, discountFromDb,
-  settlementToDb, settlementFromDb
+  discountToDb, discountFromDb
 } from "@/lib/transformers";
 import { supabase } from "@/lib/supabase";
 
@@ -26,8 +25,6 @@ interface AppContextType {
   setInvestors: (investors: Investor[]) => void;
   drivers: Driver[];
   setDrivers: (drivers: Driver[]) => void;
-  settlements: Settlement[];
-  setSettlements: (settlements: Settlement[]) => void;
   settings: SystemSettings;
   updateSettings: (settings: Partial<SystemSettings>) => void;
   addVehicle: (vehicle: Omit<Vehicle, "id">) => Promise<boolean>;
@@ -39,9 +36,6 @@ interface AppContextType {
   updateInvestor: (id: string, investor: Partial<Investor>) => Promise<boolean>;
   addDriver: (driver: Omit<Driver, "id">) => Promise<boolean>;
   updateDriver: (id: string, driver: Partial<Driver>) => Promise<boolean>;
-  addSettlement: (settlement: Omit<Settlement, "id">) => Promise<boolean>;
-  updateSettlement: (id: string, settlement: Partial<Settlement>) => Promise<boolean>;
-  removeSettlement: (id: string) => Promise<boolean>;
   validateVehicleData: (vehicle: Partial<Vehicle>) => { isValid: boolean; errors: string[] };
   validateInvestorData: (investor: Partial<Investor>) => { isValid: boolean; errors: string[] };
   validateDriverData: (driver: Partial<Driver>) => { isValid: boolean; errors: string[] };
@@ -56,8 +50,7 @@ const DEFAULT_SETTINGS: Omit<SystemSettings, "id"> = {
   gpsMonthlyFee: 120,
   currency: "bs",
   dateFormat: "dd/MM/yyyy",
-  timezone: "la_paz",
-  investorPercentage: 0.7 // 70% por defecto para el inversionista
+  timezone: "la_paz"
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -129,23 +122,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useSupabase,
     transformToDb: driverToDb,
     transformFromDb: driverFromDb
-  });
-
-  // Para las rendiciones
-  const {
-    items: settlements,
-    setItems: setSettlements,
-    add: addSettlementBase,
-    update: updateSettlementBase,
-    remove: removeSettlementBase,
-    loading: settlementsLoading,
-    refresh: refreshSettlements
-  } = useCRUD<Settlement>({
-    storageKey: 'settlements',
-    tableName: 'settlements',
-    useSupabase,
-    transformToDb: settlementToDb,
-    transformFromDb: settlementFromDb
   });
 
   // Gestión de la configuración del sistema
@@ -304,11 +280,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } as SystemSettings);
     }
   };
-
-  // Exponer funciones para las rendiciones 
-  const addSettlement = addSettlementBase;
-  const updateSettlement = updateSettlementBase;
-  const removeSettlement = removeSettlementBase;
 
   // Funciones para agregar o actualizar vehículos con relaciones
   const addVehicle = async (vehicleData: Omit<Vehicle, "id">) => {
@@ -487,7 +458,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           refreshMaintenance(),
           refreshCardex(),
           refreshDiscounts(),
-          refreshSettlements(),
           (async () => {
             const { data } = await supabase.from('days_not_worked').select('*');
             if (data) setDaysNotWorked(data);
@@ -511,8 +481,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       settingsLoading ||
       maintenanceLoading ||
       cardexLoading ||
-      discountsLoading ||
-      settlementsLoading
+      discountsLoading
     );
   }, [
     vehiclesLoading,
@@ -522,8 +491,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settingsLoading,
     maintenanceLoading,
     cardexLoading,
-    discountsLoading,
-    settlementsLoading
+    discountsLoading
   ]);
 
   // Refrescar datos al inicio si usamos Supabase
@@ -544,8 +512,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setInvestors,
         drivers,
         setDrivers,
-        settlements,
-        setSettlements,
         settings,
         updateSettings,
         addVehicle,
@@ -557,9 +523,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateInvestor: updateInvestorBase,
         addDriver: addDriverBase,
         updateDriver: updateDriverBase,
-        addSettlement,
-        updateSettlement,
-        removeSettlement,
         validateVehicleData,
         validateInvestorData,
         validateDriverData,

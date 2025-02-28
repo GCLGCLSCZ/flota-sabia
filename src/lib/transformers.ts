@@ -1,5 +1,5 @@
 
-import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount, Settlement } from "@/types";
+import { Vehicle, Payment, Investor, Driver, SystemSettings, Maintenance, CardexItem, Discount } from "@/types";
 
 // Transformaciones para Vehicle
 export const vehicleToDb = (vehicle: Partial<Vehicle>) => ({
@@ -136,33 +136,6 @@ export const driverFromDb = (dbDriver: any): Partial<Driver> => ({
   vehicleId: dbDriver.vehicle_id,
 });
 
-// Transformaciones para Settlement
-export const settlementToDb = (settlement: Partial<Settlement>) => ({
-  id: settlement.id,
-  investor_id: settlement.investorId,
-  start_date: settlement.startDate,
-  end_date: settlement.endDate,
-  created_at: settlement.createdAt,
-  total_amount: settlement.totalAmount,
-  paid_amount: settlement.paidAmount,
-  balance: settlement.balance,
-  status: settlement.status,
-  vehicle_data: settlement.vehicleData ? JSON.stringify(settlement.vehicleData) : null,
-});
-
-export const settlementFromDb = (dbSettlement: any): Partial<Settlement> => ({
-  id: dbSettlement.id,
-  investorId: dbSettlement.investor_id,
-  startDate: dbSettlement.start_date,
-  endDate: dbSettlement.end_date,
-  createdAt: dbSettlement.created_at,
-  totalAmount: dbSettlement.total_amount,
-  paidAmount: dbSettlement.paid_amount,
-  balance: dbSettlement.balance,
-  status: dbSettlement.status,
-  vehicleData: dbSettlement.vehicle_data ? JSON.parse(dbSettlement.vehicle_data) : undefined,
-});
-
 // Transformaciones para Maintenance
 export const maintenanceToDb = (maintenance: Partial<Maintenance>) => ({
   id: maintenance.id,
@@ -253,7 +226,6 @@ export const settingsToDb = (settings: Partial<SystemSettings>) => ({
   currency: settings.currency,
   date_format: settings.dateFormat,
   timezone: settings.timezone,
-  investor_percentage: settings.investorPercentage
 });
 
 export const settingsFromDb = (dbSettings: any): Partial<SystemSettings> => ({
@@ -262,5 +234,4 @@ export const settingsFromDb = (dbSettings: any): Partial<SystemSettings> => ({
   currency: dbSettings.currency,
   dateFormat: dbSettings.date_format,
   timezone: dbSettings.timezone,
-  investorPercentage: dbSettings.investor_percentage
 });

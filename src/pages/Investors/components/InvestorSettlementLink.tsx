@@ -9,15 +9,16 @@ interface InvestorSettlementLinkProps {
 
 const InvestorSettlementLink = ({ investorId }: InvestorSettlementLinkProps) => {
   return (
-    <Link to={`/investors/${investorId}/settlements`}>
-      <Button
-        variant="ghost"
-        size="icon"
-        title="Ver rendiciones"
-      >
-        <FileText className="h-4 w-4" />
-      </Button>
-    </Link>
+    <Button 
+      variant="outline"
+      size="sm"
+      asChild
+    >
+      <Link to={`/investors/${investorId}/settlement`}>
+        <FileText className="h-4 w-4 mr-2" />
+        Rendición
+      </Link>
+    </Button>
   );
 };
 

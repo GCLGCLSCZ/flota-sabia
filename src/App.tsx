@@ -1,93 +1,51 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate
-} from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import Vehicles from "./pages/Vehicles";
-import Payments from "./pages/Payments";
-import Investors from "./pages/Investors";
-import Drivers from "./pages/Drivers";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import { AppProvider } from "./context/AppContext";
-import Calendar from "./pages/Calendar";
-import PaymentAnalysis from "./pages/PaymentAnalysis";
-import InvestorSettlementHistory from "./pages/Investors/components/InvestorSettlementHistory";
-import InvestorSettlement from "./pages/Investors/components/InvestorSettlement";
 
-const routes = [
-  {
-    index: true,
-    path: "/",
-    element: <Navigate to="/dashboard" replace />
-  },
-  {
-    path: "/dashboard",
-    element: <Dashboard />
-  },
-  {
-    path: "/vehicles",
-    element: <Vehicles />
-  },
-  {
-    path: "/payments",
-    element: <Payments />
-  },
-  {
-    path: "/payment-analysis",
-    element: <PaymentAnalysis />
-  },
-  {
-    path: "/investors",
-    element: <Investors />
-  },
-  {
-    path: "/investors/:id/settlements",
-    element: <InvestorSettlementHistory />
-  },
-  {
-    path: "/investors/:id/settlement/new",
-    element: <InvestorSettlement />
-  },
-  {
-    path: "/investors/:id/settlement/:settlementId",
-    element: <InvestorSettlement />
-  },
-  {
-    path: "/drivers",
-    element: <Drivers />
-  },
-  {
-    path: "/settings",
-    element: <Settings />
-  },
-  {
-    path: "/calendar",
-    element: <Calendar />
-  },
-  {
-    path: "*",
-    element: <NotFound />
-  }
-];
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "@/components/layout/Layout";
+import Dashboard from "@/pages/Dashboard";
+import Vehicles from "@/pages/Vehicles";
+import Payments from "@/pages/Payments";
+import PaymentAnalysis from "@/pages/PaymentAnalysis";
+import Calendar from "@/pages/Calendar";
+import Investors from "@/pages/Investors";
+import Settings from "@/pages/Settings";
+import NotFound from "@/pages/NotFound";
+import Index from "@/pages/Index";
+import { AppProvider } from "@/context/AppContext";
+import { Toaster } from "@/components/ui/toaster";
+import { useEffect } from "react";
+import "./App.css";
+
+// Importamos la página de Drivers
+import Drivers from "@/pages/Drivers";
+// Importamos el componente de rendición de inversionistas
+import InvestorSettlement from "@/pages/Investors/components/InvestorSettlement";
 
 function App() {
+  // Establecer el título de la aplicación
+  useEffect(() => {
+    document.title = "Sistema de Gestión de Flota";
+  }, []);
+
   return (
     <AppProvider>
       <BrowserRouter>
         <Routes>
-          {routes.map((route, index) => (
-            <Route
-              key={index}
-              path={route.path}
-              element={route.element}
-              index={route.index}
-            />
-          ))}
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Index />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="vehicles" element={<Vehicles />} />
+            <Route path="payments" element={<Payments />} />
+            <Route path="payment-analysis" element={<PaymentAnalysis />} />
+            <Route path="calendar" element={<Calendar />} />
+            <Route path="investors" element={<Investors />} />
+            <Route path="investors/:id/settlement" element={<InvestorSettlement />} />
+            <Route path="drivers" element={<Drivers />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </AppProvider>
   );
 }

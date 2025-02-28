@@ -1,35 +1,24 @@
 
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
-import { format, isMonday, isSunday, parseISO } from "date-fns";
+import { format, isMonday, isSunday } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
-import { Investor, Payment, Settlement } from "@/types";
+import { Investor, Payment } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "./settlement-print.css";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 const InvestorSettlement = () => {
-  const { id, settlementId } = useParams<{ id: string; settlementId: string }>();
-  const navigate = useNavigate();
-  const { 
-    investors, 
-    vehicles, 
-    payments, 
-    addPayment, 
-    updateInvestor, 
-    settings, 
-    settlements,
-    addSettlement,
-    updateSettlement 
-  } = useApp();
+  const { id } = useParams<{ id: string }>();
+  const { investors, vehicles, payments, addPayment, updateInvestor, settings } = useApp();
   const { toast } = useToast();
   const [investor, setInvestor] = useState<Investor | null>(null);
   const [startDate, setStartDate] = useState("");
@@ -41,29 +30,6 @@ const InvestorSettlement = () => {
   const [transferNumber, setTransferNumber] = useState("");
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingSettlement, setExistingSettlement] = useState<Settlement | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  // Si es un registro nuevo, establecer fechas por defecto
-  useEffect(() => {
-    if (settlementId !== 'new') {
-      const found = settlements.find(s => s.id === settlementId);
-      if (found) {
-        setExistingSettlement(found);
-        setStartDate(found.startDate);
-        setEndDate(found.endDate);
-      }
-    } else {
-      // Establecer fechas por defecto: mes anterior
-      const today = new Date();
-      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const firstDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
-      const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
-      
-      setStartDate(firstDayOfPrevMonth.toISOString().split('T')[0]);
-      setEndDate(lastDayOfPrevMonth.toISOString().split('T')[0]);
-    }
-  }, [settlementId, settlements]);
 
   useEffect(() => {
     if (id) {
@@ -73,6 +39,17 @@ const InvestorSettlement = () => {
       }
     }
   }, [id, investors]);
+
+  useEffect(() => {
+    // Establecer fechas por defecto: mes anterior
+    const today = new Date();
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const firstDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+    const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
+    
+    setStartDate(firstDayOfPrevMonth.toISOString().split('T')[0]);
+    setEndDate(lastDayOfPrevMonth.toISOString().split('T')[0]);
+  }, []);
 
   if (!investor) {
     return (
@@ -85,9 +62,6 @@ const InvestorSettlement = () => {
   // Obtener la tarifa mensual de GPS
   const gpsMonthlyFee = settings?.gpsMonthlyFee || 120; // Asegurarse de usar 120 como valor por defecto
   
-  // Obtener el porcentaje del inversionista (70% por defecto)
-  const investorPercentage = settings?.investorPercentage || 0.7;
-  
   // Filtrar vehículos del inversionista
   const investorVehicles = vehicles.filter(
     (vehicle) => vehicle.investor === investor.name && vehicle.status === "active"
@@ -97,7 +71,7 @@ const InvestorSettlement = () => {
   const countWorkingDays = (start: Date, end: Date, daysNotWorked: string[] = []) => {
     let count = 0;
     const currentDate = new Date(start);
-    const daysOffDates = new Set(daysNotWorked.map(d => new Date(d).toDateString()));
+    const daysOffDates = daysNotWorked.map(d => new Date(d).toDateString());
     
     // Asegurarse de que las fechas estén al inicio del día para comparaciones correctas
     currentDate.setHours(0, 0, 0, 0);
@@ -107,7 +81,7 @@ const InvestorSettlement = () => {
     // Iterar por cada día del período
     while (currentDate <= endDate) {
       // Excluir domingos y días marcados como no trabajados
-      if (!isSunday(currentDate) && !daysOffDates.has(currentDate.toDateString())) {
+      if (!isSunday(currentDate) && !daysOffDates.includes(currentDate.toDateString())) {
         count++;
       }
       // Avanzar al siguiente día
@@ -172,23 +146,14 @@ const InvestorSettlement = () => {
       // Usar el GPS mensual - 1 GPS por mes
       const gpsDiscount = gpsMonthlyFee;
       
-      // Valor de renta diaria
-      const dailyRentAmount = vehicle.installmentAmount || 0;
-      
-      // Comisión diaria de la empresa
-      const dailyCommission = vehicle.dailyRate || 0;
-      
-      // Calcular ingresos reales basados en días trabajados y tarifa diaria
-      const expectedIncome = workingDays * dailyRentAmount;
-      
-      // Descuentos por comisión de la empresa (días trabajados * comisión diaria)
-      const commissionDiscount = workingDays * dailyCommission;
-      
       // Descuentos totales
-      const totalDiscounts = maintenanceDiscounts + gpsDiscount + commissionDiscount;
+      const totalDiscounts = maintenanceDiscounts + gpsDiscount;
 
-      // Monto que corresponde al inversionista (ingresos - descuentos)
-      const investorAmount = Math.max(0, (expectedIncome - totalDiscounts));
+      // Cálculo del porcentaje del inversionista (70% por defecto si no se especifica)
+      const investorPercentage = 0.7; // Asumimos 70% para el inversionista
+
+      // Monto que corresponde al inversionista (ingresos menos descuentos)
+      const investorAmount = (periodIncome - totalDiscounts) * investorPercentage;
 
       // Saldo por pagar al inversionista
       const balanceDue = investorAmount - periodPayments;
@@ -211,16 +176,21 @@ const InvestorSettlement = () => {
         ? vehicleAllPayments
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
         : null;
+      
+      // Calcular promedio de ingresos mensuales
+      const contractStartDate = vehicle.contractStartDate ? new Date(vehicle.contractStartDate) : null;
+      const monthsSinceStart = contractStartDate 
+        ? Math.max(1, Math.ceil((new Date().getTime() - contractStartDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+        : 1;
+        
+      const monthlyAverage = totalPaid / monthsSinceStart;
 
       return {
-        vehicleId: vehicle.id,
         vehicle,
         periodIncome,
-        expectedIncome,
         periodPayments,
         maintenanceDiscounts,
         gpsDiscount,
-        commissionDiscount,
         totalDiscounts,
         investorAmount,
         balanceDue,
@@ -230,9 +200,8 @@ const InvestorSettlement = () => {
         installmentAmount,
         totalInstallments,
         lastPayment,
-        workingDays,
-        dailyRentAmount,
-        dailyCommission
+        monthlyAverage,
+        workingDays
       };
     });
   };
@@ -243,31 +212,17 @@ const InvestorSettlement = () => {
   const totals = vehicleData.reduce(
     (acc, data) => {
       acc.income += data.periodIncome;
-      acc.expectedIncome += data.expectedIncome;
       acc.investorAmount += data.investorAmount;
       acc.paid += data.periodPayments;
       acc.balance += data.balanceDue;
       acc.maintenanceDiscounts += data.maintenanceDiscounts;
       acc.gpsDiscounts += data.gpsDiscount;
-      acc.commissionDiscounts += data.commissionDiscount;
       acc.totalDiscounts += data.totalDiscounts;
       acc.totalPaid += data.totalPaid;
       acc.workingDays += data.workingDays;
       return acc;
     },
-    { 
-      income: 0, 
-      expectedIncome: 0,
-      investorAmount: 0, 
-      paid: 0, 
-      balance: 0, 
-      maintenanceDiscounts: 0, 
-      gpsDiscounts: 0, 
-      commissionDiscounts: 0,
-      totalDiscounts: 0, 
-      totalPaid: 0, 
-      workingDays: 0 
-    }
+    { income: 0, investorAmount: 0, paid: 0, balance: 0, maintenanceDiscounts: 0, gpsDiscounts: 0, totalDiscounts: 0, totalPaid: 0, workingDays: 0 }
   );
 
   // Calcular pagos totales históricos al inversionista
@@ -286,68 +241,6 @@ const InvestorSettlement = () => {
       p.status === "completed"
     )
     .reduce((sum, p) => sum + p.amount, 0);
-
-  // Guardar o actualizar la rendición
-  const saveSettlement = async () => {
-    setSaving(true);
-    try {
-      // Preparar los datos de vehículos para guardar
-      const vehiclesForSettlement = vehicleData.map(data => ({
-        vehicleId: data.vehicle.id,
-        workingDays: data.workingDays,
-        income: data.expectedIncome,
-        discounts: {
-          maintenance: data.maintenanceDiscounts,
-          gps: data.gpsDiscount,
-          commission: data.commissionDiscount,
-          total: data.totalDiscounts
-        },
-        investorAmount: data.investorAmount,
-        paid: data.periodPayments,
-        balance: data.balanceDue
-      }));
-
-      // Datos para la rendición
-      const settlementData: Omit<Settlement, "id"> = {
-        investorId: investor.id,
-        startDate,
-        endDate,
-        createdAt: new Date().toISOString(),
-        totalAmount: totals.investorAmount,
-        paidAmount: totals.paid,
-        balance: totals.balance,
-        status: totals.balance <= 0 ? 'completed' : 'pending',
-        vehicleData: vehiclesForSettlement
-      };
-
-      let success;
-      if (existingSettlement) {
-        // Actualizar rendición existente
-        success = await updateSettlement(existingSettlement.id, settlementData);
-      } else {
-        // Crear nueva rendición
-        success = await addSettlement(settlementData);
-      }
-
-      if (success) {
-        toast({
-          title: existingSettlement ? "Rendición actualizada" : "Rendición guardada",
-          description: `La rendición ha sido ${existingSettlement ? 'actualizada' : 'guardada'} correctamente.`
-        });
-        
-        // Redirigir al listado de rendiciones
-        navigate(`/investors/${investor.id}/settlements`);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la rendición",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   // Función para registrar un pago al inversionista
   const handlePayment = async () => {
@@ -407,7 +300,7 @@ const InvestorSettlement = () => {
               vehicleId: data.vehicle.id,
               amount: vehiclePayAmount,
               date: new Date().toISOString().split('T')[0],
-              concept: `Pago a inversionista: ${investor.name} - Rendición de ${getPeriodMonthName()}`,
+              concept: `Pago a inversionista: ${investor.name} - Liquidación`,
               status: "completed",
               paymentMethod,
               ...(paymentMethod === "transfer" && {
@@ -430,15 +323,6 @@ const InvestorSettlement = () => {
         lastPayment: new Date().toISOString().split('T')[0]
       });
 
-      // Si es una rendición existente, actualizar su estado
-      if (existingSettlement) {
-        await updateSettlement(existingSettlement.id, {
-          paidAmount: existingSettlement.paidAmount + parseFloat(payAmount),
-          balance: Math.max(0, existingSettlement.balance - parseFloat(payAmount)),
-          status: (existingSettlement.balance - parseFloat(payAmount) <= 0) ? 'completed' : 'pending'
-        });
-      }
-
       toast({
         title: "Pago registrado",
         description: `Se ha registrado un pago de Bs ${parseFloat(payAmount).toFixed(2)} al inversionista ${investor.name}`,
@@ -449,9 +333,6 @@ const InvestorSettlement = () => {
       setPaymentMethod("cash");
       setBankName("");
       setTransferNumber("");
-      
-      // Navegar de vuelta al listado de rendiciones
-      navigate(`/investors/${investor.id}/settlements`);
     } catch (error) {
       toast({
         title: "Error al procesar el pago",
@@ -480,11 +361,10 @@ const InvestorSettlement = () => {
 *Inversionista:* ${investor.name}
 
 *RESUMEN:*
-Ingresos totales (esperados): Bs ${totals.expectedIncome.toFixed(2)}
+Ingresos totales: Bs ${totals.income.toFixed(2)}
 Descuentos totales: Bs ${totals.totalDiscounts.toFixed(2)}
 - Mantenimiento: Bs ${totals.maintenanceDiscounts.toFixed(2)}
 - GPS: Bs ${totals.gpsDiscounts.toFixed(2)}
-- Comisión diaria: Bs ${totals.commissionDiscounts.toFixed(2)}
 Corresponde al inversionista: Bs ${totals.investorAmount.toFixed(2)}
 Pagado en período: Bs ${totals.paid.toFixed(2)}
 *Saldo por pagar: Bs ${totals.balance.toFixed(2)}*
@@ -492,17 +372,14 @@ Pagado en período: Bs ${totals.paid.toFixed(2)}
 *DETALLE POR VEHÍCULO:*
 ${vehicleData.map(data => 
   `${data.vehicle.plate} - ${data.vehicle.model}
-  Días trabajados: ${data.workingDays}
-  Ingresos esperados: Bs ${data.expectedIncome.toFixed(2)}
+  Ingresos: Bs ${data.periodIncome.toFixed(2)}
   Descuentos: Bs ${data.totalDiscounts.toFixed(2)}
-   - Mantenimiento: Bs ${data.maintenanceDiscounts.toFixed(2)}
-   - GPS: Bs ${data.gpsDiscount.toFixed(2)}
-   - Comisión: Bs ${data.commissionDiscount.toFixed(2)}
   Corresponde: Bs ${data.investorAmount.toFixed(2)}
   Pagado: Bs ${data.periodPayments.toFixed(2)}
   Saldo: Bs ${data.balanceDue.toFixed(2)}
+  Días trabajados: ${data.workingDays}
   
-  Cuotas pagadas: ${data.paidInstallments} de ${data.totalInstallments}
+  Cuotas: ${data.paidInstallments} de ${data.totalInstallments}
   Total pagado histórico: Bs ${data.totalPaid.toFixed(2)}`
 ).join('\n\n')}`;
 
@@ -521,7 +398,7 @@ ${vehicleData.map(data =>
   return (
     <div className="space-y-6 max-w-[1000px] mx-auto pb-10" id="settlement-print">
       <div className="flex items-center justify-between mb-4 print:hidden">
-        <Link to={`/investors/${id}/settlements`}>
+        <Link to={`/investors`}>
           <Button variant="outline" size="sm" className="h-8 gap-1">
             <ArrowLeft className="h-4 w-4" />
             Volver
@@ -545,16 +422,6 @@ ${vehicleData.map(data =>
           >
             <Printer className="h-4 w-4" />
             Imprimir
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 gap-1"
-            onClick={saveSettlement}
-            disabled={saving}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {existingSettlement ? "Actualizar" : "Guardar"} Rendición
           </Button>
           <Button 
             variant="default" 
@@ -643,14 +510,11 @@ ${vehicleData.map(data =>
                           <div className="text-xs text-muted-foreground mt-1">
                             Días trabajados: {data.workingDays}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            Tarifa diaria: Bs {data.dailyRentAmount}
-                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right align-top">
                         <div>
-                          <div>Bs {data.expectedIncome.toFixed(2)}</div>
+                          <div>Bs {data.periodIncome.toFixed(2)}</div>
                           <div className="text-xs text-muted-foreground mt-1">
                             <div className="flex items-center justify-end gap-1">
                               <Calendar className="h-3 w-3" />
@@ -669,7 +533,6 @@ ${vehicleData.map(data =>
                           <div className="text-xs text-muted-foreground">
                             <div>Mant: Bs {data.maintenanceDiscounts.toFixed(2)}</div>
                             <div>GPS: Bs {data.gpsDiscount.toFixed(2)}</div>
-                            <div>Comisión: Bs {data.commissionDiscount.toFixed(2)}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -687,8 +550,8 @@ ${vehicleData.map(data =>
             <div className="flex justify-end mt-4">
               <div className="w-full max-w-xs space-y-2">
                 <div className="flex justify-between py-1 border-b">
-                  <span className="font-medium">Ingresos esperados:</span>
-                  <span>Bs {totals.expectedIncome.toFixed(2)}</span>
+                  <span className="font-medium">Ingresos totales:</span>
+                  <span>Bs {totals.income.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Descuentos totales:</span>
@@ -701,10 +564,6 @@ ${vehicleData.map(data =>
                 <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
                   <span>GPS:</span>
                   <span>Bs {totals.gpsDiscounts.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b text-xs text-muted-foreground">
-                  <span>Comisión diaria:</span>
-                  <span>Bs {totals.commissionDiscounts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="font-medium">Corresponde al inversionista:</span>
