@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Pencil, Trash2, AlertCircle, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VehicleDetailsDialogProps {
@@ -22,7 +22,7 @@ interface VehicleDetailsDialogProps {
 
 const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
   const [tab, setTab] = useState("details");
-  const { payments, updateVehicle } = useApp();
+  const { payments, updateVehicle, investors, drivers } = useApp();
   const { toast } = useToast();
   const [editingMaintenanceId, setEditingMaintenanceId] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<Omit<Maintenance, "id" | "status">>({
@@ -57,7 +57,33 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     frequency: "monthly"
   });
 
+  // Estado para manejar la edición de información general
+  const [isEditingGeneral, setIsEditingGeneral] = useState(false);
+  const [editedVehicle, setEditedVehicle] = useState<Vehicle | null>(null);
+  
+  // Estado para manejar la edición del contrato
+  const [isEditingContract, setIsEditingContract] = useState(false);
+  const [editedContract, setEditedContract] = useState<{
+    contractStartDate?: string;
+    totalInstallments?: number;
+    installmentAmount?: number;
+  } | null>(null);
+
   if (!vehicle) return null;
+
+  // Inicializar editedVehicle si no está configurado y estamos editando
+  if (isEditingGeneral && !editedVehicle) {
+    setEditedVehicle({ ...vehicle });
+  }
+
+  // Inicializar editedContract si no está configurado y estamos editando
+  if (isEditingContract && !editedContract) {
+    setEditedContract({
+      contractStartDate: vehicle.contractStartDate,
+      totalInstallments: vehicle.totalInstallments,
+      installmentAmount: vehicle.installmentAmount,
+    });
+  }
 
   // Filtramos pagos correspondientes a este vehículo
   const vehiclePayments = payments.filter(p => p.vehicleId === vehicle.id && p.status === "completed");
@@ -277,6 +303,80 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     }
   };
 
+  // Guardar cambios en la información general del vehículo
+  const handleSaveGeneralInfo = async () => {
+    if (!editedVehicle) return;
+    
+    try {
+      const success = await updateVehicle(vehicle.id, {
+        plate: editedVehicle.plate,
+        brand: editedVehicle.brand,
+        model: editedVehicle.model,
+        year: editedVehicle.year,
+        status: editedVehicle.status,
+        investor: editedVehicle.investor,
+        driverName: editedVehicle.driverName,
+        driverPhone: editedVehicle.driverPhone,
+        dailyRate: editedVehicle.dailyRate
+      });
+      
+      if (success) {
+        toast({
+          title: "Información actualizada",
+          description: "Los datos generales del vehículo han sido actualizados exitosamente.",
+        });
+        setIsEditingGeneral(false);
+        setEditedVehicle(null);
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudieron actualizar los datos del vehículo.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al actualizar los datos.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Guardar cambios en la información del contrato
+  const handleSaveContractInfo = async () => {
+    if (!editedContract) return;
+    
+    try {
+      const success = await updateVehicle(vehicle.id, {
+        contractStartDate: editedContract.contractStartDate,
+        totalInstallments: editedContract.totalInstallments,
+        installmentAmount: editedContract.installmentAmount
+      });
+      
+      if (success) {
+        toast({
+          title: "Contrato actualizado",
+          description: "Los datos del contrato han sido actualizados exitosamente.",
+        });
+        setIsEditingContract(false);
+        setEditedContract(null);
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudieron actualizar los datos del contrato.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al actualizar los datos del contrato.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-3xl">
@@ -296,46 +396,290 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
           <TabsContent value="details" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-semibold">Información del Vehículo</h3>
-                <div className="text-sm mt-2 space-y-1">
-                  <p><span className="font-medium">Placa:</span> {vehicle.plate}</p>
-                  <p><span className="font-medium">Marca:</span> {vehicle.brand}</p>
-                  <p><span className="font-medium">Modelo:</span> {vehicle.model}</p>
-                  <p><span className="font-medium">Año:</span> {vehicle.year}</p>
-                  <p><span className="font-medium">Estado:</span> {
-                    vehicle.status === "active" ? "Activo" : 
-                    vehicle.status === "maintenance" ? "En Mantenimiento" : "Inactivo"
-                  }</p>
-                  <p><span className="font-medium">Tarifa diaria:</span> Bs {vehicle.dailyRate}</p>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-semibold">Información del Vehículo</h3>
+                  {!isEditingGeneral ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setIsEditingGeneral(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Editar
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        setIsEditingGeneral(false);
+                        setEditedVehicle(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
                 </div>
+                
+                {!isEditingGeneral ? (
+                  <div className="text-sm mt-2 space-y-1">
+                    <p><span className="font-medium">Placa:</span> {vehicle.plate}</p>
+                    <p><span className="font-medium">Marca:</span> {vehicle.brand}</p>
+                    <p><span className="font-medium">Modelo:</span> {vehicle.model}</p>
+                    <p><span className="font-medium">Año:</span> {vehicle.year}</p>
+                    <p><span className="font-medium">Estado:</span> {
+                      vehicle.status === "active" ? "Activo" : 
+                      vehicle.status === "maintenance" ? "En Mantenimiento" : "Inactivo"
+                    }</p>
+                    <p><span className="font-medium">Tarifa diaria:</span> Bs {vehicle.dailyRate}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="plate" className="text-xs">Placa</Label>
+                      <Input 
+                        id="plate" 
+                        value={editedVehicle?.plate || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, plate: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="brand" className="text-xs">Marca</Label>
+                      <Input 
+                        id="brand" 
+                        value={editedVehicle?.brand || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, brand: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="model" className="text-xs">Modelo</Label>
+                      <Input 
+                        id="model" 
+                        value={editedVehicle?.model || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, model: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="year" className="text-xs">Año</Label>
+                      <Input 
+                        id="year" 
+                        value={editedVehicle?.year || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, year: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="status" className="text-xs">Estado</Label>
+                      <Select 
+                        value={editedVehicle?.status || 'active'} 
+                        onValueChange={(value: 'active' | 'maintenance' | 'inactive') => 
+                          setEditedVehicle(prev => prev ? {...prev, status: value} : null)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Activo</SelectItem>
+                          <SelectItem value="maintenance">En Mantenimiento</SelectItem>
+                          <SelectItem value="inactive">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="dailyRate" className="text-xs">Tarifa diaria (Bs)</Label>
+                      <Input 
+                        id="dailyRate" 
+                        type="number"
+                        value={editedVehicle?.dailyRate || 0} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? 
+                          {...prev, dailyRate: Number(e.target.value)} : null
+                        )}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <Button 
+                      className="w-full mt-2 text-xs" 
+                      size="sm"
+                      onClick={handleSaveGeneralInfo}
+                    >
+                      <Save className="h-3.5 w-3.5 mr-1" />
+                      Guardar cambios
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <div>
-                <h3 className="text-sm font-semibold">Información de Operación</h3>
-                <div className="text-sm mt-2 space-y-1">
-                  <p><span className="font-medium">Inversionista:</span> {vehicle.investor || "No asignado"}</p>
-                  <p><span className="font-medium">Conductor:</span> {vehicle.driverName || "No asignado"}</p>
-                  {vehicle.driverPhone && (
-                    <p><span className="font-medium">Teléfono del conductor:</span> {vehicle.driverPhone}</p>
-                  )}
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-semibold">Información de Operación</h3>
+                  {!isEditingGeneral ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setIsEditingGeneral(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Editar
+                    </Button>
+                  ) : null}
                 </div>
+                
+                {!isEditingGeneral ? (
+                  <div className="text-sm mt-2 space-y-1">
+                    <p><span className="font-medium">Inversionista:</span> {vehicle.investor || "No asignado"}</p>
+                    <p><span className="font-medium">Conductor:</span> {vehicle.driverName || "No asignado"}</p>
+                    {vehicle.driverPhone && (
+                      <p><span className="font-medium">Teléfono del conductor:</span> {vehicle.driverPhone}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="investor" className="text-xs">Inversionista</Label>
+                      <Select 
+                        value={editedVehicle?.investor || ''} 
+                        onValueChange={(value) => 
+                          setEditedVehicle(prev => prev ? {...prev, investor: value} : null)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Selecciona un inversionista" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {investors.map(investor => (
+                            <SelectItem key={investor.id} value={investor.name}>
+                              {investor.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="driverName" className="text-xs">Nombre del conductor</Label>
+                      <Input 
+                        id="driverName" 
+                        value={editedVehicle?.driverName || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, driverName: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="driverPhone" className="text-xs">Teléfono del conductor</Label>
+                      <Input 
+                        id="driverPhone" 
+                        value={editedVehicle?.driverPhone || ''} 
+                        onChange={(e) => setEditedVehicle(prev => prev ? {...prev, driverPhone: e.target.value} : null)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="contract" className="space-y-4">
             <div className="bg-muted/30 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold mb-3">Información del Contrato</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <p><span className="font-medium">Fecha de inicio:</span> {
-                  vehicle.contractStartDate ? 
-                  format(new Date(vehicle.contractStartDate), "dd MMM yyyy", { locale: es }) : 
-                  "No registrado"
-                }</p>
-                <p><span className="font-medium">Total de cuotas:</span> {vehicle.totalInstallments || 0}</p>
-                <p><span className="font-medium">Monto por cuota:</span> Bs {vehicle.installmentAmount || 0}</p>
-                <p><span className="font-medium">Monto total del contrato:</span> Bs {(vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0)}</p>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-semibold">Información del Contrato</h3>
+                {!isEditingContract ? (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setIsEditingContract(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    Editar
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      setIsEditingContract(false);
+                      setEditedContract(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                )}
               </div>
+              
+              {!isEditingContract ? (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <p><span className="font-medium">Fecha de inicio:</span> {
+                    vehicle.contractStartDate ? 
+                    format(new Date(vehicle.contractStartDate), "dd MMM yyyy", { locale: es }) : 
+                    "No registrado"
+                  }</p>
+                  <p><span className="font-medium">Total de cuotas:</span> {vehicle.totalInstallments || 0}</p>
+                  <p><span className="font-medium">Monto por cuota:</span> Bs {vehicle.installmentAmount || 0}</p>
+                  <p><span className="font-medium">Monto total del contrato:</span> Bs {(vehicle.installmentAmount || 0) * (vehicle.totalInstallments || 0)}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="contractStartDate" className="text-xs">Fecha de inicio</Label>
+                      <Input 
+                        id="contractStartDate" 
+                        type="date"
+                        value={editedContract?.contractStartDate?.split('T')[0] || ''} 
+                        onChange={(e) => setEditedContract(prev => prev ? 
+                          {...prev, contractStartDate: e.target.value} : null
+                        )}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="totalInstallments" className="text-xs">Total de cuotas</Label>
+                      <Input 
+                        id="totalInstallments" 
+                        type="number"
+                        value={editedContract?.totalInstallments || 0} 
+                        onChange={(e) => setEditedContract(prev => prev ? 
+                          {...prev, totalInstallments: Number(e.target.value)} : null
+                        )}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="installmentAmount" className="text-xs">Monto por cuota (Bs)</Label>
+                      <Input 
+                        id="installmentAmount" 
+                        type="number"
+                        value={editedContract?.installmentAmount || 0} 
+                        onChange={(e) => setEditedContract(prev => prev ? 
+                          {...prev, installmentAmount: Number(e.target.value)} : null
+                        )}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="self-end">
+                      <p className="text-xs font-medium">
+                        Monto total: Bs {((editedContract?.installmentAmount || 0) * (editedContract?.totalInstallments || 0)).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    className="w-full mt-2 text-xs" 
+                    size="sm"
+                    onClick={handleSaveContractInfo}
+                  >
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    Guardar cambios del contrato
+                  </Button>
+                </div>
+              )}
             </div>
             
             <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
