@@ -45,7 +45,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   // La comisión diaria es por cuota pagada, no un acumulado arbitrario
   const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
   
-  // Calcular cuotas atrasadas (excluyendo domingos y días no laborables específicos)
+  // Calcular cuotas atrasadas (excluyendo domingos)
   const calculateOverdueInstallments = () => {
     if (!vehicle.contractStartDate) return 0;
     
@@ -58,20 +58,13 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     // Si la fecha de inicio es posterior a hoy, no hay cuotas atrasadas
     if (isAfter(startDate, today)) return 0;
     
-    // Obtener días no laborables específicos para este vehículo
-    const nonWorkingDays = vehicle.daysNotWorked || [];
-    const nonWorkingDatesSet = new Set(nonWorkingDays.map(day => day.split('T')[0]));
-    
-    // Calcular días transcurridos excluyendo domingos y días no laborables
+    // Calcular días transcurridos excluyendo domingos
     let dayCount = 0;
     let currentDate = new Date(startDate);
     
     while (currentDate <= today) {
-      // Convertir la fecha actual a formato YYYY-MM-DD para comparar con daysNotWorked
-      const currentDateStr = currentDate.toISOString().split('T')[0];
-      
-      // Si no es domingo y no está en la lista de días no laborables
-      if (!isSunday(currentDate) && !nonWorkingDatesSet.has(currentDateStr)) {
+      // Si no es domingo
+      if (!isSunday(currentDate)) {
         dayCount++;
       }
       
@@ -205,13 +198,6 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
             </p>
           </div>
         </div>
-        
-        {(vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0) && (
-          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-muted-foreground dark:text-gray-400">Días no trabajados</p>
-            <p className="font-medium">{vehicle.daysNotWorked.length} días</p>
-          </div>
-        )}
       </CardContent>
       <CardFooter className="flex justify-between p-4 pt-0 gap-2">
         <Button
