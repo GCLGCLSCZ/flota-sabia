@@ -11,7 +11,7 @@ import DeleteVehicleDialog from "./components/DeleteVehicleDialog";
 import VehicleDetailsDialog from "./components/VehicleDetailsDialog";
 
 const VehiclesPage = () => {
-  const { updateVehicle, vehicles } = useApp();
+  const { updateVehicle, vehicles, refreshData } = useApp();
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -19,13 +19,24 @@ const VehiclesPage = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   const handleDelete = (vehicleId: string) => {
-    updateVehicle(vehicleId, { status: "inactive" });
-    setDeletingVehicle(null);
-    toast({
-      title: "Vehículo eliminado",
-      description: "El vehículo ha sido eliminado exitosamente",
-      variant: "destructive",
-    });
+    updateVehicle(vehicleId, { status: "inactive" })
+      .then(() => {
+        setDeletingVehicle(null);
+        toast({
+          title: "Vehículo eliminado",
+          description: "El vehículo ha sido eliminado exitosamente",
+          variant: "destructive",
+        });
+        refreshData(); // Refrescar datos después de la eliminación
+      })
+      .catch(err => {
+        toast({
+          title: "Error al eliminar",
+          description: "No se pudo eliminar el vehículo",
+          variant: "destructive",
+        });
+        console.error("Error al eliminar vehículo:", err);
+      });
   };
 
   const handleAddMaintenance = (
@@ -50,22 +61,52 @@ const VehiclesPage = () => {
     
     updateVehicle(vehicleId, {
       maintenanceHistory: updatedMaintenance,
+    })
+    .then(() => {
+      setSelectedVehicle((prev) => {
+        if (prev?.id === vehicleId) {
+          return {
+            ...prev,
+            maintenanceHistory: updatedMaintenance,
+          };
+        }
+        return prev;
+      });
+      
+      toast({
+        title: "Mantenimiento agregado",
+        description: "Se ha agregado un nuevo registro de mantenimiento.",
+      });
+      
+      refreshData(); // Refrescar datos después de agregar mantenimiento
+    })
+    .catch(err => {
+      toast({
+        title: "Error al agregar mantenimiento",
+        description: "No se pudo agregar el mantenimiento",
+        variant: "destructive",
+      });
+      console.error("Error al agregar mantenimiento:", err);
     });
-    
-    setSelectedVehicle((prev) => {
-      if (prev?.id === vehicleId) {
-        return {
-          ...prev,
-          maintenanceHistory: updatedMaintenance,
-        };
-      }
-      return prev;
-    });
-    
-    toast({
-      title: "Mantenimiento agregado",
-      description: "Se ha agregado un nuevo registro de mantenimiento.",
-    });
+  };
+
+  const handleUpdateDaysNotWorked = (vehicleId: string, daysNotWorked: string[]) => {
+    return updateVehicle(vehicleId, { daysNotWorked })
+      .then(() => {
+        // Después de actualizar, refrescar los datos
+        return refreshData().then(() => {
+          // Actualizar el vehículo seleccionado después de que los datos han sido refrescados
+          const updatedVehicle = vehicles.find(v => v.id === vehicleId);
+          if (updatedVehicle) {
+            setSelectedVehicle(updatedVehicle);
+          }
+          return true;
+        });
+      })
+      .catch(err => {
+        console.error("Error al actualizar días no trabajados:", err);
+        return Promise.reject(err);
+      });
   };
 
   return (
@@ -98,6 +139,7 @@ const VehiclesPage = () => {
         vehicle={selectedVehicle}
         onClose={() => setSelectedVehicle(null)}
         onAddMaintenance={handleAddMaintenance}
+        onUpdateDaysNotWorked={handleUpdateDaysNotWorked}
       />
     </div>
   );

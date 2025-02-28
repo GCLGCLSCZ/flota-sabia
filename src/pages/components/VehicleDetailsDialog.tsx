@@ -35,9 +35,10 @@ interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
   onClose: () => void;
   onAddMaintenance: (vehicleId: string, maintenance: any) => void;
+  onUpdateDaysNotWorked: (vehicleId: string, daysNotWorked: string[]) => Promise<boolean>;
 }
 
-const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
+const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance, onUpdateDaysNotWorked }: VehicleDetailsDialogProps) => {
   const [activeTab, setActiveTab] = useState("info");
   const { toast } = useToast();
   const { updateVehicle } = useApp();
@@ -188,26 +189,26 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setNonWorkDaysData(updatedDaysNotWorked);
     
     // Actualizar el vehículo - solo enviar las fechas
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDaysNotWorked.map(day => day.date)
-    }).then(() => {
-      toast({
-        title: "Día registrado",
-        description: "Se ha agregado un nuevo día no trabajado"
+    onUpdateDaysNotWorked(vehicle.id, updatedDaysNotWorked.map(day => day.date))
+      .then(() => {
+        toast({
+          title: "Día registrado",
+          description: "Se ha agregado un nuevo día no trabajado"
+        });
+        // Resetear el campo de fecha y razón
+        setNewNonWorkDay({ 
+          date: new Date().toISOString().split('T')[0],
+          reason: ""
+        });
+      })
+      .catch(err => {
+        toast({
+          title: "Error",
+          description: "No se pudo agregar el día no trabajado",
+          variant: "destructive"
+        });
+        console.error("Error al agregar día no trabajado:", err);
       });
-      // Resetear el campo de fecha y razón
-      setNewNonWorkDay({ 
-        date: new Date().toISOString().split('T')[0],
-        reason: ""
-      });
-    }).catch(err => {
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el día no trabajado",
-        variant: "destructive"
-      });
-      console.error("Error al agregar día no trabajado:", err);
-    });
   };
   
   const handleToggleSelectNonWorkDay = (index: number) => {
@@ -236,21 +237,21 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setNonWorkDayToEdit(null);
     
     // Actualizar en base de datos - solo enviar las fechas
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDays.map(day => day.date)
-    }).then(() => {
-      toast({
-        title: "Día actualizado",
-        description: "Se ha actualizado la información del día no trabajado"
+    onUpdateDaysNotWorked(vehicle.id, updatedDays.map(day => day.date))
+      .then(() => {
+        toast({
+          title: "Día actualizado",
+          description: "Se ha actualizado la información del día no trabajado"
+        });
+      })
+      .catch(err => {
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar la información",
+          variant: "destructive"
+        });
+        console.error("Error al actualizar día no trabajado:", err);
       });
-    }).catch(err => {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la información",
-        variant: "destructive"
-      });
-      console.error("Error al actualizar día no trabajado:", err);
-    });
   };
   
   const handleRemoveSelectedNonWorkDays = () => {
@@ -268,21 +269,21 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setNonWorkDaysData(updatedDays);
     
     // Actualizar en base de datos - solo enviar las fechas
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDays.map(day => day.date)
-    }).then(() => {
-      toast({
-        title: "Días eliminados",
-        description: `Se han eliminado ${selectedDays.length} día(s) no trabajado(s)`
+    onUpdateDaysNotWorked(vehicle.id, updatedDays.map(day => day.date))
+      .then(() => {
+        toast({
+          title: "Días eliminados",
+          description: `Se han eliminado ${selectedDays.length} día(s) no trabajado(s)`
+        });
+      })
+      .catch(err => {
+        toast({
+          title: "Error",
+          description: "No se pudieron eliminar los días seleccionados",
+          variant: "destructive"
+        });
+        console.error("Error al eliminar días no trabajados:", err);
       });
-    }).catch(err => {
-      toast({
-        title: "Error",
-        description: "No se pudieron eliminar los días seleccionados",
-        variant: "destructive"
-      });
-      console.error("Error al eliminar días no trabajados:", err);
-    });
   };
   
   const handleRemoveNonWorkDay = (dateToRemove: string) => {
@@ -291,21 +292,21 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     setNonWorkDaysData(updatedDaysNotWorked);
     
     // Actualizar en base de datos - solo enviar las fechas
-    updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDaysNotWorked.map(day => day.date)
-    }).then(() => {
-      toast({
-        title: "Día eliminado",
-        description: "Se ha eliminado el día no trabajado"
+    onUpdateDaysNotWorked(vehicle.id, updatedDaysNotWorked.map(day => day.date))
+      .then(() => {
+        toast({
+          title: "Día eliminado",
+          description: "Se ha eliminado el día no trabajado"
+        });
+      })
+      .catch(err => {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el día no trabajado",
+          variant: "destructive"
+        });
+        console.error("Error al eliminar día no trabajado:", err);
       });
-    }).catch(err => {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el día no trabajado",
-        variant: "destructive"
-      });
-      console.error("Error al eliminar día no trabajado:", err);
-    });
   };
   
   const handleCalendarSelect = (date: Date | undefined) => {
