@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Building } from "lucide-react";
-import { format, isSunday, addMonths, subMonths } from "date-fns";
+import { format, isSunday, addMonths, subMonths, getMonth, getYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Investor, Payment } from "@/types";
@@ -467,8 +467,12 @@ ${vehicleData.map(data =>
   // Obtener el nombre del mes de la rendición
   const getPeriodMonthName = () => {
     if (!startDate) return "";
-    const date = new Date(startDate);
-    return format(date, "MMMM yyyy", { locale: es });
+    
+    // Para mostrar el mes del FINAL del rango de fechas, no del inicio
+    // Esto asegura que si el rango es por ejemplo del 31 de diciembre al 31 de enero,
+    // se muestre "enero" como el mes de la rendición
+    const endDateObj = new Date(endDate);
+    return format(endDateObj, "MMMM yyyy", { locale: es });
   };
 
   // Capitalizar primera letra del mes
@@ -718,6 +722,17 @@ ${vehicleData.map(data =>
                     <span>{totals.workingDays}</span>
                   </div>
                 </div>
+              </div>
+              
+              <div className="flex items-end justify-end mt-4 md:mt-0">
+                <Button
+                  onClick={() => setShowPayDialog(true)}
+                  className="w-full md:w-auto"
+                  size="lg"
+                >
+                  <DollarSign className="mr-2 h-5 w-5" />
+                  Registrar Pago
+                </Button>
               </div>
             </div>
 
