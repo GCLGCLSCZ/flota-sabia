@@ -1,7 +1,7 @@
 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertCircle, Ban, Calendar, Tools } from "lucide-react";
+import { AlertCircle, Ban, Calendar, Wrench } from "lucide-react";
 import { VehicleDetailsProps } from "../types";
 
 const VehicleDetails = ({ selectedVehicleId, vehicles }: VehicleDetailsProps) => {
@@ -62,7 +62,7 @@ const VehicleDetails = ({ selectedVehicleId, vehicles }: VehicleDetailsProps) =>
 
       <div className="space-y-2 mt-6">
         <h3 className="font-medium flex items-center gap-1">
-          <Tools className="h-4 w-4 text-warning" />
+          <Wrench className="h-4 w-4 text-warning" />
           Mantenimientos ({sortedMaintenance.length})
         </h3>
         
