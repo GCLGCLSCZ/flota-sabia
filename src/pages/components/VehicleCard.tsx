@@ -88,7 +88,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   const overdueInstallments = calculateOverdueInstallments();
   
   // Calcular la deuda total (cuotas atrasadas * monto de cuota)
-  const totalDebt = (overdueInstallments * installmentAmount);
+  const totalDebt = Math.round(overdueInstallments * installmentAmount);
 
   // Obtener fecha del último pago
   const lastPayment = vehiclePayments.length > 0 
@@ -171,7 +171,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
               Deuda actual
             </p>
             <p className={`font-medium ${totalDebt > 0 ? "text-destructive" : ""}`}>
-              {totalDebt.toFixed(0)} Bs
+              {totalDebt} Bs
             </p>
           </div>
           <div>

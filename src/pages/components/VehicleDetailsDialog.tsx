@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { X, Calendar as CalendarIcon, PlusCircle, Trash2 } from "lucide-react";
+import { X, PlusCircle, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/AppContext";
 import { Vehicle, Maintenance, MaintenanceType } from "@/types";
@@ -42,8 +39,7 @@ const VehicleDetailsDialog = ({
     isInsuranceCovered: false,
   });
   
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [newFreeDay, setNewFreeDay] = useState<Date | undefined>(undefined);
+  const [newFreeDay, setNewFreeDay] = useState("");
   const [addingFreeDay, setAddingFreeDay] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,18 +48,10 @@ const VehicleDetailsDialog = ({
   // Verificar si freeDays es un array válido
   const safeFreeDays = Array.isArray(vehicle.freeDays) ? vehicle.freeDays : [];
   
-  // Convertir los días libres a objetos Date, asegurando que cada día sea válido
-  const freeDayDates = safeFreeDays
-    .filter(day => day && typeof day === 'string')
-    .map(day => {
-      try {
-        return parseISO(day);
-      } catch (e) {
-        console.error("Error parseando fecha:", day, e);
-        return null;
-      }
-    })
-    .filter(Boolean) as Date[];
+  // Ordenar días libres por fecha (más recientes primero)
+  const sortedFreeDays = [...safeFreeDays].sort((a, b) => {
+    return new Date(b).getTime() - new Date(a).getTime();
+  });
 
   const handleMaintenanceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,27 +103,51 @@ const VehicleDetailsDialog = ({
   const handleAddFreeDay = async () => {
     if (!newFreeDay || !vehicle || isSubmitting) return;
     
+    // Validar formato de fecha
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(newFreeDay)) {
+      toast({
+        title: "Formato incorrecto",
+        description: "La fecha debe tener el formato YYYY-MM-DD (ej: 2023-05-15)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validar que la fecha sea válida
+    try {
+      const testDate = new Date(newFreeDay);
+      if (isNaN(testDate.getTime())) {
+        throw new Error("Fecha inválida");
+      }
+    } catch (error) {
+      toast({
+        title: "Fecha inválida",
+        description: "La fecha ingresada no es válida",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // Formatear la fecha al formato ISO (YYYY-MM-DD)
-      const formattedDate = newFreeDay.toISOString().split('T')[0];
-      
       // Usar la función específica para añadir días libres
-      const success = await addFreeDay(vehicle.id, formattedDate);
+      const success = await addFreeDay(vehicle.id, newFreeDay);
       
       if (success) {
         // Actualizar UI y mostrar mensaje de éxito
+        const formattedDate = format(parseISO(newFreeDay), "d 'de' MMMM 'de' yyyy", { locale: es });
         toast({
           title: "Jornada libre agregada",
-          description: `Se ha registrado el ${format(newFreeDay, "d 'de' MMMM 'de' yyyy", { locale: es })} como jornada libre.`,
+          description: `Se ha registrado el ${formattedDate} como jornada libre.`,
         });
         
         // Refrescar los datos para actualizar la UI
         await refreshData();
         
         // Restablecer el estado
-        setNewFreeDay(undefined);
+        setNewFreeDay("");
         setAddingFreeDay(false);
       } else {
         toast({
@@ -156,23 +168,21 @@ const VehicleDetailsDialog = ({
     }
   };
 
-  const handleRemoveFreeDay = async (dateToRemove: Date) => {
+  const handleRemoveFreeDay = async (dateToRemove: string) => {
     if (!vehicle || isSubmitting) return;
     
     setIsSubmitting(true);
     
     try {
-      // Formatear la fecha a eliminar
-      const formattedDateToRemove = dateToRemove.toISOString().split('T')[0];
-      
       // Usar la función específica para eliminar días libres
-      const success = await removeFreeDay(vehicle.id, formattedDateToRemove);
+      const success = await removeFreeDay(vehicle.id, dateToRemove);
       
       if (success) {
         // Mostrar mensaje de éxito
+        const formattedDate = format(parseISO(dateToRemove), "d 'de' MMMM 'de' yyyy", { locale: es });
         toast({
           title: "Jornada libre eliminada",
-          description: `Se ha eliminado el ${format(dateToRemove, "d 'de' MMMM 'de' yyyy", { locale: es })} de las jornadas libres.`,
+          description: `Se ha eliminado el ${formattedDate} de las jornadas libres.`,
         });
         
         // Refrescar los datos para actualizar la UI
@@ -496,32 +506,43 @@ const VehicleDetailsDialog = ({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Lista de jornadas libres */}
-                  {freeDayDates.length > 0 ? (
+                  {sortedFreeDays.length > 0 ? (
                     <div className="space-y-2">
-                      <Label>Jornadas libres registradas ({freeDayDates.length})</Label>
+                      <Label>Jornadas libres registradas ({sortedFreeDays.length})</Label>
                       <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {freeDayDates.map((day, index) => (
-                            <div 
-                              key={index} 
-                              className="flex justify-between items-center border p-2 rounded bg-muted/30"
-                            >
-                              <span>{format(day, "dd/MM/yyyy")}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleRemoveFreeDay(day)}
-                                className="h-8 w-8 text-destructive"
-                                disabled={isSubmitting}
+                          {sortedFreeDays.map((day, index) => {
+                            // Convertir a formato legible
+                            let displayDate;
+                            try {
+                              displayDate = format(parseISO(day), "dd/MM/yyyy");
+                            } catch (e) {
+                              displayDate = "Fecha inválida";
+                              console.error("Error al formatear fecha:", day);
+                            }
+                            
+                            return (
+                              <div 
+                                key={index} 
+                                className="flex justify-between items-center border p-2 rounded bg-muted/30"
                               >
-                                {isSubmitting ? (
-                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                          ))}
+                                <span>{displayDate}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleRemoveFreeDay(day)}
+                                  className="h-8 w-8 text-destructive"
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -539,43 +560,29 @@ const VehicleDetailsDialog = ({
                     
                     {addingFreeDay ? (
                       <div className="space-y-4">
-                        <div className="flex flex-col space-y-2">
-                          <Label htmlFor="freeDate">Selecciona la fecha</Label>
-                          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !newFreeDay && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {newFreeDay ? (
-                                  format(newFreeDay, "PPP", { locale: es })
-                                ) : (
-                                  <span>Seleccionar fecha</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={newFreeDay}
-                                onSelect={(date) => {
-                                  setNewFreeDay(date);
-                                  setCalendarOpen(false);
-                                }}
-                                disabled={(date) => {
-                                  // Deshabilitar fechas futuras lejanas (más de 1 mes)
-                                  const oneMonthFromNow = new Date();
-                                  oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
-                                  return date > oneMonthFromNow;
-                                }}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                        <div className="space-y-2">
+                          <Label htmlFor="freeDate">Fecha (YYYY-MM-DD)</Label>
+                          <div className="flex space-x-2">
+                            <Input
+                              id="freeDate"
+                              type="text"
+                              placeholder="Ej: 2023-05-15"
+                              value={newFreeDay}
+                              onChange={(e) => setNewFreeDay(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline"
+                              onClick={() => setNewFreeDay(new Date().toISOString().split('T')[0])}
+                              title="Usar fecha actual"
+                            >
+                              Hoy
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Ingresa la fecha en formato YYYY-MM-DD. No hay restricciones en las fechas que puedes elegir.
+                          </p>
                         </div>
                         
                         <div className="flex justify-end space-x-2">
@@ -583,7 +590,7 @@ const VehicleDetailsDialog = ({
                             variant="outline" 
                             onClick={() => {
                               setAddingFreeDay(false);
-                              setNewFreeDay(undefined);
+                              setNewFreeDay("");
                             }}
                             disabled={isSubmitting}
                           >
