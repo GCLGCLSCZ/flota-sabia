@@ -6,14 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard } from "lucide-react";
+import { ArrowLeft, Printer, DollarSign, Loader2, MessageSquare, Calendar, CreditCard, Bank } from "lucide-react";
 import { format, isSunday, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useApp } from "@/context/AppContext";
 import { Investor, Payment } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "./settlement-print.css";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 const InvestorSettlement = () => {
@@ -29,10 +29,10 @@ const InvestorSettlement = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
   const [bankName, setBankName] = useState("");
   const [transferNumber, setTransferNumber] = useState("");
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableMonths, setAvailableMonths] = useState<{value: number, label: string}[]>([]);
-  const [investorPercentage, setInvestorPercentage] = useState<number>(1); // 100% por defecto
 
   useEffect(() => {
     if (id) {
@@ -89,6 +89,9 @@ const InvestorSettlement = () => {
   // Establece mes anterior por defecto al inicio
   useEffect(() => {
     setSelectedMonth(-1);
+    
+    // Establecer la fecha de pago como la fecha actual
+    setPaymentDate(format(new Date(), "yyyy-MM-dd"));
   }, []);
 
   if (!investor) {
@@ -367,7 +370,7 @@ const InvestorSettlement = () => {
             const paymentData: Omit<Payment, "id"> = {
               vehicleId: data.vehicle.id,
               amount: vehiclePayAmount,
-              date: new Date().toISOString().split('T')[0],
+              date: paymentDate, // Usar la fecha seleccionada por el usuario
               concept: `Pago a inversionista: ${investor.name} - Rendición de ${getPeriodMonthName()}`,
               status: "completed",
               paymentMethod,
@@ -388,7 +391,7 @@ const InvestorSettlement = () => {
       
       // Actualizar la fecha del último pago del inversionista
       await updateInvestor(investor.id, {
-        lastPayment: new Date().toISOString().split('T')[0]
+        lastPayment: paymentDate
       });
 
       toast({
@@ -401,6 +404,7 @@ const InvestorSettlement = () => {
       setPaymentMethod("cash");
       setBankName("");
       setTransferNumber("");
+      setPaymentDate(format(new Date(), "yyyy-MM-dd"));
     } catch (error) {
       toast({
         title: "Error al procesar el pago",
@@ -580,23 +584,6 @@ ${vehicleData.map(data =>
                       />
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Porcentaje del inversionista</Label>
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="100" 
-                        value={(investorPercentage * 100).toString()}
-                        onChange={(e) => setInvestorPercentage(Number(e.target.value) / 100)}
-                        className="h-8"
-                      />
-                      <span className="text-sm">%</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Por defecto es 100% para el inversionista
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -770,6 +757,15 @@ ${vehicleData.map(data =>
             </div>
 
             <div className="space-y-2">
+              <Label>Fecha de pago</Label>
+              <Input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label>Método de pago</Label>
               <Select
                 value={paymentMethod}
@@ -792,11 +788,15 @@ ${vehicleData.map(data =>
               <>
                 <div className="space-y-2">
                   <Label>Banco</Label>
-                  <Input
-                    placeholder="Nombre del banco"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Bank className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Nombre del banco"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Nº Transferencia</Label>
@@ -808,20 +808,22 @@ ${vehicleData.map(data =>
                 </div>
               </>
             )}
-
-            <div className="flex justify-end mt-4">
-              <Button onClick={handlePayment} disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  "Registrar Pago"
-                )}
-              </Button>
-            </div>
           </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={handlePayment} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Registrar Pago
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
