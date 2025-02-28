@@ -11,8 +11,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, AlertCircle, Save } from "lucide-react";
+import { Pencil, Trash2, AlertCircle, Save, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// Definir la interfaz para la póliza de seguro
+interface InsurancePolicy {
+  id: string;
+  policyNumber: string;
+  company: string;
+  contact: string;
+  amount: number;
+  startDate: string;
+  endDate: string;
+  isInvestorPaying: boolean;
+  payments: InsurancePayment[];
+}
+
+interface InsurancePayment {
+  id: string;
+  date: string;
+  amount: number;
+  description: string;
+}
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -56,6 +76,27 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     recurring: false,
     frequency: "monthly"
   });
+
+  // Estado para seguros
+  const [newInsurancePolicy, setNewInsurancePolicy] = useState<Omit<InsurancePolicy, "id" | "payments">>({
+    policyNumber: "",
+    company: "",
+    contact: "",
+    amount: 0,
+    startDate: format(new Date(), "yyyy-MM-dd"),
+    endDate: format(addMonths(new Date(), 12), "yyyy-MM-dd"),
+    isInvestorPaying: false
+  });
+
+  // Estado para nuevos pagos de seguros
+  const [newInsurancePayment, setNewInsurancePayment] = useState<Omit<InsurancePayment, "id">>({
+    date: format(new Date(), "yyyy-MM-dd"),
+    amount: 0,
+    description: "Pago de seguro"
+  });
+
+  // Estado para edición de póliza
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
 
   // Estado para manejar la edición de información general
   const [isEditingGeneral, setIsEditingGeneral] = useState(false);
@@ -107,6 +148,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     const totalCost = calculateTotalCost();
     return maintenance.salePrice - totalCost;
   };
+
+  // Obtener pólizas de seguro del vehículo
+  const insurancePolicies = vehicle.insurancePolicies || [];
 
   const handleSubmitMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,20 +421,195 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     }
   };
 
+  // Manejar envío de póliza
+  const handleSubmitInsurancePolicy = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (editingPolicyId) {
+      // Actualizar póliza existente
+      if (!vehicle.insurancePolicies) return;
+      
+      const updatedPolicies = vehicle.insurancePolicies.map(policy => 
+        policy.id === editingPolicyId ? 
+        { 
+          ...policy, 
+          policyNumber: newInsurancePolicy.policyNumber,
+          company: newInsurancePolicy.company,
+          contact: newInsurancePolicy.contact,
+          amount: newInsurancePolicy.amount,
+          startDate: newInsurancePolicy.startDate,
+          endDate: newInsurancePolicy.endDate,
+          isInvestorPaying: newInsurancePolicy.isInvestorPaying
+        } : 
+        policy
+      );
+      
+      updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
+      
+      toast({
+        title: "Póliza actualizada",
+        description: "La póliza de seguro ha sido actualizada exitosamente.",
+      });
+      
+      setEditingPolicyId(null);
+    } else {
+      // Agregar nueva póliza
+      const newPolicy: InsurancePolicy = {
+        id: Date.now().toString(),
+        ...newInsurancePolicy,
+        payments: []
+      };
+      
+      const updatedPolicies = [...(vehicle.insurancePolicies || []), newPolicy];
+      updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
+      
+      toast({
+        title: "Póliza agregada",
+        description: "La póliza de seguro ha sido agregada exitosamente.",
+      });
+    }
+    
+    // Reset form
+    setNewInsurancePolicy({
+      policyNumber: "",
+      company: "",
+      contact: "",
+      amount: 0,
+      startDate: format(new Date(), "yyyy-MM-dd"),
+      endDate: format(addMonths(new Date(), 12), "yyyy-MM-dd"),
+      isInvestorPaying: false
+    });
+  };
+
+  // Manejar edición de póliza
+  const handleEditPolicy = (policy: InsurancePolicy) => {
+    setEditingPolicyId(policy.id);
+    setNewInsurancePolicy({
+      policyNumber: policy.policyNumber,
+      company: policy.company,
+      contact: policy.contact,
+      amount: policy.amount,
+      startDate: policy.startDate,
+      endDate: policy.endDate,
+      isInvestorPaying: policy.isInvestorPaying
+    });
+  };
+
+  // Manejar eliminación de póliza
+  const handleDeletePolicy = (id: string) => {
+    if (!vehicle.insurancePolicies) return;
+    
+    const updatedPolicies = vehicle.insurancePolicies.filter(policy => policy.id !== id);
+    updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
+    
+    toast({
+      title: "Póliza eliminada",
+      description: "La póliza de seguro ha sido eliminada exitosamente.",
+      variant: "destructive"
+    });
+    
+    if (editingPolicyId === id) {
+      setEditingPolicyId(null);
+      setNewInsurancePolicy({
+        policyNumber: "",
+        company: "",
+        contact: "",
+        amount: 0,
+        startDate: format(new Date(), "yyyy-MM-dd"),
+        endDate: format(addMonths(new Date(), 12), "yyyy-MM-dd"),
+        isInvestorPaying: false
+      });
+    }
+  };
+
+  // Manejar envío de pago de seguro
+  const handleSubmitInsurancePayment = (e: React.FormEvent, policyId: string) => {
+    e.preventDefault();
+    
+    if (!vehicle.insurancePolicies) return;
+    
+    const paymentToAdd: InsurancePayment = {
+      id: Date.now().toString(),
+      ...newInsurancePayment
+    };
+    
+    const updatedPolicies = vehicle.insurancePolicies.map(policy => {
+      if (policy.id === policyId) {
+        return {
+          ...policy,
+          payments: [...(policy.payments || []), paymentToAdd]
+        };
+      }
+      return policy;
+    });
+    
+    updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
+    
+    toast({
+      title: "Pago registrado",
+      description: "El pago de seguro ha sido registrado exitosamente.",
+    });
+    
+    // Reset form
+    setNewInsurancePayment({
+      date: format(new Date(), "yyyy-MM-dd"),
+      amount: 0,
+      description: "Pago de seguro"
+    });
+  };
+
+  // Manejar eliminación de pago de seguro
+  const handleDeleteInsurancePayment = (policyId: string, paymentId: string) => {
+    if (!vehicle.insurancePolicies) return;
+    
+    const updatedPolicies = vehicle.insurancePolicies.map(policy => {
+      if (policy.id === policyId) {
+        return {
+          ...policy,
+          payments: policy.payments.filter(payment => payment.id !== paymentId)
+        };
+      }
+      return policy;
+    });
+    
+    updateVehicle(vehicle.id, { insurancePolicies: updatedPolicies });
+    
+    toast({
+      title: "Pago eliminado",
+      description: "El pago de seguro ha sido eliminado exitosamente.",
+      variant: "destructive"
+    });
+  };
+
+  // Cancelar edición de póliza
+  const handleCancelEditPolicy = () => {
+    setEditingPolicyId(null);
+    setNewInsurancePolicy({
+      policyNumber: "",
+      company: "",
+      contact: "",
+      amount: 0,
+      startDate: format(new Date(), "yyyy-MM-dd"),
+      endDate: format(addMonths(new Date(), 12), "yyyy-MM-dd"),
+      isInvestorPaying: false
+    });
+  };
+
   return (
     <Dialog open={!!vehicle} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-3xl">
+      <DialogContent className="max-w-[95vw] h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalles del Vehículo: {vehicle.plate}</DialogTitle>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-2">
-          <TabsList className="grid grid-cols-5 mb-4">
+          <TabsList className="grid grid-cols-6 mb-4">
             <TabsTrigger value="details">Información General</TabsTrigger>
             <TabsTrigger value="contract">Contrato</TabsTrigger>
             <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
             <TabsTrigger value="cardex">Cardex</TabsTrigger>
             <TabsTrigger value="discounts">Descuentos</TabsTrigger>
+            <TabsTrigger value="insurance">Seguros</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -730,9 +949,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
             <div>
               <h3 className="text-sm font-semibold mb-2">Historial de Mantenimiento</h3>
               {vehicle.maintenanceHistory && vehicle.maintenanceHistory.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
                         <th className="p-2 text-left">Fecha</th>
                         <th className="p-2 text-left">Tipo</th>
@@ -952,9 +1171,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
             <div>
               <h3 className="text-sm font-semibold mb-2">Cardex de Mantenimiento</h3>
               {vehicle.cardex && vehicle.cardex.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
                         <th className="p-2 text-left">Servicio</th>
                         <th className="p-2 text-left">Fecha</th>
@@ -1106,9 +1325,9 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
             <div>
               <h3 className="text-sm font-semibold mb-2">Descuentos Registrados</h3>
               {vehicle.discounts && vehicle.discounts.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
                         <th className="p-2 text-left">Descripción</th>
                         <th className="p-2 text-left">Tipo</th>
@@ -1268,6 +1487,257 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 </div>
                 <div className="text-right">
                   <Button type="submit" size="sm">Agregar Descuento</Button>
+                </div>
+              </form>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="insurance" className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-1 mb-3">
+                <Shield className="h-4 w-4 text-primary" />
+                Pólizas de Seguro
+              </h3>
+              {insurancePolicies && insurancePolicies.length > 0 ? (
+                <div className="space-y-6">
+                  {insurancePolicies.map((policy) => (
+                    <div key={policy.id} className="border rounded-lg overflow-hidden">
+                      <div className="bg-muted/30 p-3 flex justify-between items-center">
+                        <div>
+                          <h4 className="font-medium">Póliza: {policy.policyNumber}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {policy.company} • Contacto: {policy.contact}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPolicy(policy)}
+                            className="h-7 text-xs"
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive hover:text-destructive"
+                            onClick={() => handleDeletePolicy(policy.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="p-3 border-t">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Monto de la póliza</p>
+                            <p className="font-medium">Bs {policy.amount}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Fecha inicio</p>
+                            <p className="font-medium">{format(new Date(policy.startDate), "dd/MM/yyyy")}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Fecha fin</p>
+                            <p className="font-medium">{format(new Date(policy.endDate), "dd/MM/yyyy")}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Pagado por</p>
+                            <p className="font-medium">{policy.isInvestorPaying ? "Inversionista" : "Empresa"}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <h5 className="text-sm font-medium mb-2">Historial de pagos</h5>
+                          {policy.payments && policy.payments.length > 0 ? (
+                            <div className="border rounded-lg overflow-hidden">
+                              <table className="w-full text-sm">
+                                <thead className="bg-muted/50">
+                                  <tr>
+                                    <th className="p-2 text-left">Fecha</th>
+                                    <th className="p-2 text-left">Monto</th>
+                                    <th className="p-2 text-left">Descripción</th>
+                                    <th className="p-2 text-left">Acciones</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {policy.payments.map(payment => (
+                                    <tr key={payment.id} className="border-t">
+                                      <td className="p-2">{format(new Date(payment.date), "dd/MM/yyyy")}</td>
+                                      <td className="p-2">Bs {payment.amount}</td>
+                                      <td className="p-2">{payment.description}</td>
+                                      <td className="p-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 text-xs text-destructive hover:text-destructive"
+                                          onClick={() => handleDeleteInsurancePayment(policy.id, payment.id)}
+                                        >
+                                          Eliminar
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">No hay pagos registrados</p>
+                          )}
+                        </div>
+
+                        {!policy.isInvestorPaying && (
+                          <div className="mt-4">
+                            <h5 className="text-sm font-medium mb-2">Registrar nuevo pago</h5>
+                            <form onSubmit={(e) => handleSubmitInsurancePayment(e, policy.id)} className="grid grid-cols-3 gap-3">
+                              <div>
+                                <Label className="text-xs">Fecha</Label>
+                                <Input
+                                  type="date"
+                                  value={newInsurancePayment.date}
+                                  onChange={(e) => setNewInsurancePayment({...newInsurancePayment, date: e.target.value})}
+                                  className="h-8 text-sm"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Monto (Bs)</Label>
+                                <Input
+                                  type="number"
+                                  value={newInsurancePayment.amount}
+                                  onChange={(e) => setNewInsurancePayment({...newInsurancePayment, amount: Number(e.target.value)})}
+                                  className="h-8 text-sm"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Descripción</Label>
+                                <Input
+                                  type="text"
+                                  value={newInsurancePayment.description}
+                                  onChange={(e) => setNewInsurancePayment({...newInsurancePayment, description: e.target.value})}
+                                  className="h-8 text-sm"
+                                  required
+                                />
+                              </div>
+                              <div className="col-span-3 text-right">
+                                <Button type="submit" size="sm" className="text-xs">
+                                  Registrar Pago
+                                </Button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No hay pólizas de seguro registradas</p>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold mb-3">
+                {editingPolicyId ? "Editar Póliza de Seguro" : "Registrar Nueva Póliza de Seguro"}
+                {editingPolicyId && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCancelEditPolicy}
+                    className="ml-2 text-xs"
+                  >
+                    Cancelar edición
+                  </Button>
+                )}
+              </h3>
+              <form onSubmit={handleSubmitInsurancePolicy} className="border rounded-lg p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <Label className="text-xs">Número de Póliza</Label>
+                    <Input 
+                      value={newInsurancePolicy.policyNumber}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, policyNumber: e.target.value})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <Label className="text-xs">Compañía Aseguradora</Label>
+                    <Input 
+                      value={newInsurancePolicy.company}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, company: e.target.value})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <Label className="text-xs">Contacto</Label>
+                    <Input 
+                      value={newInsurancePolicy.contact}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, contact: e.target.value})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <Label className="text-xs">Monto de la Póliza (Bs)</Label>
+                    <Input 
+                      type="number"
+                      value={newInsurancePolicy.amount}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, amount: Number(e.target.value)})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha de Inicio</Label>
+                    <Input 
+                      type="date"
+                      value={newInsurancePolicy.startDate}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, startDate: e.target.value})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha de Fin</Label>
+                    <Input 
+                      type="date"
+                      value={newInsurancePolicy.endDate}
+                      onChange={(e) => setNewInsurancePolicy({...newInsurancePolicy, endDate: e.target.value})}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Checkbox 
+                        id="isInvestorPaying"
+                        checked={newInsurancePolicy.isInvestorPaying}
+                        onCheckedChange={(checked) => 
+                          setNewInsurancePolicy({...newInsurancePolicy, isInvestorPaying: !!checked})
+                        }
+                      />
+                      <label 
+                        htmlFor="isInvestorPaying" 
+                        className="text-sm font-medium leading-none"
+                      >
+                        El inversionista paga este seguro
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Si el inversionista paga, se deshabilitará la opción de registrar pagos.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Button type="submit" size="sm">
+                    {editingPolicyId ? "Actualizar Póliza" : "Registrar Póliza"}
+                  </Button>
                 </div>
               </form>
             </div>

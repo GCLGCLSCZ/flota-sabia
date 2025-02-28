@@ -1,83 +1,84 @@
 
+// Tipos de estado para vehículos
+export type VehicleStatus = "active" | "maintenance" | "inactive";
+
+// Tipos de pago
+export type PaymentMethod = "cash" | "transfer";
+export type PaymentStatus = "completed" | "pending" | "cancelled" | "analysing";
+
+// Tipos de mantenimiento
+export type MaintenanceType = "mechanical" | "body_paint";
+export type MaintenanceStatus = "pending" | "completed" | "cancelled";
+
+// Tipos de descuento
+export type DiscountType = "insurance" | "repair" | "maintenance" | "other";
+export type DiscountFrequency = "monthly" | "quarterly" | "biannual" | "annual";
+
+// Tipos de cardex
+export type CardexType = "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
+
+// Tipo para pólizas de seguro
+export interface InsurancePolicy {
+  id: string;
+  policyNumber: string;
+  company: string;
+  contact: string;
+  amount: number;
+  startDate: string;
+  endDate: string;
+  isInvestorPaying: boolean;
+  payments: InsurancePayment[];
+}
+
+export interface InsurancePayment {
+  id: string;
+  date: string;
+  amount: number;
+  description: string;
+}
+
+// Definición de vehículo
 export interface Vehicle {
   id: string;
   plate: string;
   brand: string;
   model: string;
   year: string;
-  status: "active" | "maintenance" | "inactive";
+  status: VehicleStatus;
   investor: string;
   dailyRate: number;
   driverName: string;
   driverPhone: string;
   driverId?: string;
   contractStartDate?: string;
-  maintenanceHistory?: Maintenance[];
-  daysNotWorked?: string[];
   totalInstallments?: number;
   paidInstallments?: number;
   installmentAmount?: number;
   totalPaid?: number;
   nextMaintenance?: string;
   monthlyEarnings?: number;
+  maintenanceHistory?: Maintenance[];
   cardex?: CardexItem[];
   discounts?: Discount[];
-  vehicleId?: string; // Para relaciones
+  daysNotWorked?: string[];
+  insurancePolicies?: InsurancePolicy[];
 }
 
-export interface Maintenance {
-  id: string;
-  date: string;
-  description: string;
-  cost: number;
-  costMaterials: number;
-  costLabor: number;
-  salePrice: number;
-  status: "pending" | "completed" | "cancelled";
-  type?: "mechanical" | "body_paint";
-  proformaNumber?: string;
-  isInsuranceCovered?: boolean;
-  vehicleId?: string; // Para relaciones
-}
-
-export interface CardexItem {
-  id: string;
-  type: "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
-  date: string;
-  description: string;
-  nextScheduledDate?: string;
-  kilometersAtService?: number;
-  nextServiceKilometers?: number;
-  cost: number;
-  complete: boolean;
-  vehicleId?: string; // Para relaciones
-}
-
-export interface Discount {
-  id: string;
-  type: "insurance" | "repair" | "maintenance" | "other";
-  description: string;
-  amount: number;
-  date: string;
-  applyToMonths: string[]; // Lista de meses en formato 'YYYY-MM' a los que se aplica
-  recurring: boolean;
-  frequency?: "monthly" | "quarterly" | "biannual" | "annual";
-  vehicleId?: string; // Para relaciones
-}
-
+// Definición de pago
 export interface Payment {
   id: string;
   date: string;
   amount: number;
   concept: string;
-  paymentMethod: "cash" | "transfer";
-  status: "completed" | "pending" | "cancelled" | "analysing";
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
   vehicleId: string;
   receiptNumber?: string;
   bankName?: string;
   transferNumber?: string;
 }
 
+// Definición de inversor
 export interface Investor {
   id: string;
   name: string;
@@ -88,11 +89,11 @@ export interface Investor {
   bankName?: string;
   bankAccount?: string;
   lastPayment: string;
-  vehicles?: Vehicle[];
   firstName?: string;
   lastName?: string;
 }
 
+// Definición de chofer
 export interface Driver {
   id: string;
   name: string;
@@ -103,13 +104,13 @@ export interface Driver {
   licenseNumber?: string;
   licenseExpiry?: string;
   status?: "active" | "inactive";
-  vehicles?: Vehicle[];
   documentId?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
   vehicleId?: string;
 }
 
+// Definición de configuración de sistema
 export interface SystemSettings {
   id: string;
   gpsMonthlyFee: number;
@@ -118,24 +119,43 @@ export interface SystemSettings {
   timezone: string;
 }
 
-export interface User {
+// Definición de mantenimiento
+export interface Maintenance {
   id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  permissions: UserPermissions[];
+  vehicleId: string;
+  date: string;
+  description: string;
+  cost: number;
+  costMaterials: number;
+  costLabor: number;
+  salePrice: number;
+  status: MaintenanceStatus;
+  type?: MaintenanceType;
+  proformaNumber?: string;
+  isInsuranceCovered?: boolean;
 }
 
-export type UserRole = "admin" | "manager" | "user";
+// Definición de item de cardex
+export interface CardexItem {
+  id: string;
+  type: CardexType;
+  date: string;
+  description: string;
+  nextScheduledDate?: string;
+  kilometersAtService?: number;
+  nextServiceKilometers?: number;
+  cost: number;
+  complete: boolean;
+}
 
-export type UserPermissions = 
-  | "read:vehicles" 
-  | "write:vehicles" 
-  | "read:payments" 
-  | "write:payments"
-  | "read:investors"
-  | "write:investors"
-  | "read:drivers"
-  | "write:drivers"
-  | "read:settings"
-  | "write:settings";
+// Definición de descuento
+export interface Discount {
+  id: string;
+  type: DiscountType;
+  description: string;
+  amount: number;
+  date: string;
+  applyToMonths: string[];
+  recurring: boolean;
+  frequency?: DiscountFrequency;
+}
