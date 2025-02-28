@@ -114,8 +114,12 @@ const InvestorSettlement = () => {
       // Calcular días del período
       const periodDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       
-      // Calcular descuento de GPS para el período
-      const gpsDiscount = (gpsMonthlyFee * periodDays) / 30;
+      // Calcular meses completos en el período (para GPS)
+      const months = periodDays / 30;
+      
+      // Calcular descuento de GPS para el período - SIEMPRE el monto completo mensual
+      // Independientemente de si el vehículo trabajó o no
+      const gpsDiscount = gpsMonthlyFee * months;
       
       // Descuentos totales
       const totalDiscounts = maintenanceDiscounts + gpsDiscount;
