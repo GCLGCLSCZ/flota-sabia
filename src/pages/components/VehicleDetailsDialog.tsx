@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vehicle, Maintenance, CardexItem, Discount } from "@/types";
+import { Vehicle, Maintenance, CardexItem, Discount, InsurancePolicy, InsurancePayment } from "@/types";
 import { useState } from "react";
 import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -13,26 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Trash2, AlertCircle, Save, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Definir la interfaz para la póliza de seguro
-interface InsurancePolicy {
-  id: string;
-  policyNumber: string;
-  company: string;
-  contact: string;
-  amount: number;
-  startDate: string;
-  endDate: string;
-  isInvestorPaying: boolean;
-  payments: InsurancePayment[];
-}
-
-interface InsurancePayment {
-  id: string;
-  date: string;
-  amount: number;
-  description: string;
-}
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -46,6 +26,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const { toast } = useToast();
   const [editingMaintenanceId, setEditingMaintenanceId] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<Omit<Maintenance, "id" | "status">>({
+    vehicleId: "", // Inicializamos con un valor vacío
     date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cost: 0,
@@ -58,6 +39,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   });
   
   const [newCardexItem, setNewCardexItem] = useState<Omit<CardexItem, "id" | "complete">>({
+    vehicleId: "", // Inicializamos con un valor vacío
     type: "oil_change",
     date: format(new Date(), "yyyy-MM-dd"),
     description: "Cambio de aceite",
@@ -68,6 +50,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   });
   
   const [newDiscount, setNewDiscount] = useState<Omit<Discount, "id">>({
+    vehicleId: "", // Inicializamos con un valor vacío
     type: "maintenance",
     description: "",
     amount: 0,
@@ -111,6 +94,28 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   } | null>(null);
 
   if (!vehicle) return null;
+
+  // Actualizamos los IDs del vehículo en los estados cuando se carga el vehículo
+  if (maintenance.vehicleId === "" && vehicle) {
+    setMaintenance(prevState => ({
+      ...prevState,
+      vehicleId: vehicle.id
+    }));
+  }
+  
+  if (newCardexItem.vehicleId === "" && vehicle) {
+    setNewCardexItem(prevState => ({
+      ...prevState,
+      vehicleId: vehicle.id
+    }));
+  }
+  
+  if (newDiscount.vehicleId === "" && vehicle) {
+    setNewDiscount(prevState => ({
+      ...prevState,
+      vehicleId: vehicle.id
+    }));
+  }
 
   // Inicializar editedVehicle si no está configurado y estamos editando
   if (isEditingGeneral && !editedVehicle) {
@@ -180,6 +185,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     
     // Reset form
     setMaintenance({
+      vehicleId: vehicle.id,
       date: format(new Date(), "yyyy-MM-dd"),
       description: "",
       cost: 0,
@@ -195,6 +201,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const handleEditMaintenance = (item: Maintenance) => {
     setEditingMaintenanceId(item.id);
     setMaintenance({
+      vehicleId: item.vehicleId,
       date: item.date,
       description: item.description,
       cost: item.cost,
@@ -230,6 +237,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     if (editingMaintenanceId === id) {
       setEditingMaintenanceId(null);
       setMaintenance({
+        vehicleId: vehicle.id,
         date: format(new Date(), "yyyy-MM-dd"),
         description: "",
         cost: 0,
@@ -246,6 +254,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const handleCancelEdit = () => {
     setEditingMaintenanceId(null);
     setMaintenance({
+      vehicleId: vehicle.id,
       date: format(new Date(), "yyyy-MM-dd"),
       description: "",
       cost: 0,
@@ -271,6 +280,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     
     // Reset form
     setNewCardexItem({
+      vehicleId: vehicle.id,
       type: "oil_change",
       date: format(new Date(), "yyyy-MM-dd"),
       description: "Cambio de aceite",
@@ -293,6 +303,7 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     
     // Reset form
     setNewDiscount({
+      vehicleId: vehicle.id,
       type: "maintenance",
       description: "",
       amount: 0,

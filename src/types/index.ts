@@ -17,6 +17,22 @@ export type DiscountFrequency = "monthly" | "quarterly" | "biannual" | "annual";
 // Tipos de cardex
 export type CardexType = "oil_change" | "filter_change" | "spark_plugs" | "battery" | "other";
 
+// Tipo para usuarios y permisos (necesarios para AuthContext)
+export type UserRole = "admin" | "staff" | "viewer";
+export interface UserPermissions {
+  canEditVehicles: boolean;
+  canEditPayments: boolean;
+  canEditDrivers: boolean;
+  canEditInvestors: boolean;
+}
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  permissions: UserPermissions;
+}
+
 // Tipo para pólizas de seguro
 export interface InsurancePolicy {
   id: string;
@@ -91,6 +107,7 @@ export interface Investor {
   lastPayment: string;
   firstName?: string;
   lastName?: string;
+  vehicles?: Vehicle[]; // Agregar relación con vehículos
 }
 
 // Definición de chofer
@@ -146,6 +163,7 @@ export interface CardexItem {
   nextServiceKilometers?: number;
   cost: number;
   complete: boolean;
+  vehicleId: string; // Agregar para relación con vehículo
 }
 
 // Definición de descuento
@@ -158,4 +176,5 @@ export interface Discount {
   applyToMonths: string[];
   recurring: boolean;
   frequency?: DiscountFrequency;
+  vehicleId: string; // Agregar para relación con vehículo
 }
