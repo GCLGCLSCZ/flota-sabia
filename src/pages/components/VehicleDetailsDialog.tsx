@@ -17,11 +17,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/AppContext";
-import { Vehicle, Maintenance, InsurancePolicy, InsurancePayment } from "@/types";
-import { X, CalendarOff, Calendar } from "lucide-react";
+import { Vehicle, Maintenance } from "@/types";
+import { X, CalendarOff, Calendar, Trash2, Edit, Save, Check } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Definir un tipo para los días no trabajados
+interface NonWorkDay {
+  date: string;
+  reason?: string;
+  isSelected?: boolean;
+}
 
 interface VehicleDetailsDialogProps {
   vehicle: Vehicle | null;
@@ -34,6 +42,10 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const { toast } = useToast();
   const { updateVehicle } = useApp();
   
+  // Estados para edición de la información del vehículo
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editedVehicle, setEditedVehicle] = useState<Partial<Vehicle>>({});
+  
   // Estados para los campos del formulario de mantenimiento
   const [maintenanceDate, setMaintenanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [costMaterials, setCostMaterials] = useState("");
@@ -42,11 +54,66 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const [description, setDescription] = useState("");
   
   // Estado para el nuevo día no trabajado
-  const [newNonWorkDay, setNewNonWorkDay] = useState(new Date().toISOString().split('T')[0]);
+  const [newNonWorkDay, setNewNonWorkDay] = useState<NonWorkDay>({ 
+    date: new Date().toISOString().split('T')[0],
+    reason: ""
+  });
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   
+  // Estado para los días no trabajados seleccionados para eliminación
+  const [nonWorkDaysData, setNonWorkDaysData] = useState<NonWorkDay[]>([]);
+  const [nonWorkDayToEdit, setNonWorkDayToEdit] = useState<{ index: number, value: NonWorkDay } | null>(null);
+  
+  // Inicializar los datos de días no trabajados cuando cambia el vehículo
+  useState(() => {
+    if (vehicle && vehicle.daysNotWorked) {
+      // Si son solo strings, convertirlos a objetos
+      const formattedDays = vehicle.daysNotWorked.map(day => {
+        if (typeof day === 'string') {
+          return { date: day, isSelected: false };
+        }
+        return { ...day, isSelected: false };
+      });
+      setNonWorkDaysData(formattedDays);
+    } else {
+      setNonWorkDaysData([]);
+    }
+  });
+  
   if (!vehicle) return null;
+  
+  // Función para guardar cambios de edición
+  const handleSaveVehicleInfo = () => {
+    if (Object.keys(editedVehicle).length > 0) {
+      updateVehicle(vehicle.id, editedVehicle)
+        .then(() => {
+          toast({
+            title: "Información actualizada",
+            description: "La información del vehículo ha sido actualizada"
+          });
+          setIsEditingInfo(false);
+          setEditedVehicle({});
+        })
+        .catch(err => {
+          toast({
+            title: "Error",
+            description: "No se pudo actualizar la información",
+            variant: "destructive"
+          });
+          console.error("Error al actualizar información:", err);
+        });
+    } else {
+      setIsEditingInfo(false);
+    }
+  };
+  
+  const handleInputChange = (field: keyof Vehicle, value: any) => {
+    setEditedVehicle(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
   
   const handleAddMaintenance = () => {
     if (!maintenanceDate || !description) {
@@ -80,8 +147,16 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     });
   };
   
+  // Actualizar el estado de un día no trabajado con la razón
+  const handleNewNonWorkDayChange = (key: keyof NonWorkDay, value: any) => {
+    setNewNonWorkDay(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  
   const handleAddNonWorkDay = () => {
-    if (!newNonWorkDay) {
+    if (!newNonWorkDay.date) {
       toast({
         title: "Fecha requerida",
         description: "Debe seleccionar una fecha",
@@ -91,8 +166,8 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     }
     
     // Verificar si la fecha ya existe
-    const daysNotWorked = vehicle.daysNotWorked || [];
-    if (daysNotWorked.includes(newNonWorkDay)) {
+    const daysNotWorked = nonWorkDaysData || [];
+    if (daysNotWorked.some(day => day.date === newNonWorkDay.date)) {
       toast({
         title: "Fecha duplicada",
         description: "Esta fecha ya está registrada como día no trabajado",
@@ -102,17 +177,27 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     }
     
     // Agregar el nuevo día no trabajado
-    const updatedDaysNotWorked = [...daysNotWorked, newNonWorkDay];
+    const updatedDaysNotWorked = [...daysNotWorked, { 
+      date: newNonWorkDay.date, 
+      reason: newNonWorkDay.reason || "",
+      isSelected: false
+    }];
     
+    setNonWorkDaysData(updatedDaysNotWorked);
+    
+    // Actualizar el vehículo
     updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDaysNotWorked
+      daysNotWorked: updatedDaysNotWorked.map(day => day.date)
     }).then(() => {
       toast({
         title: "Día registrado",
         description: "Se ha agregado un nuevo día no trabajado"
       });
-      // Resetear el campo de fecha
-      setNewNonWorkDay(new Date().toISOString().split('T')[0]);
+      // Resetear el campo de fecha y razón
+      setNewNonWorkDay({ 
+        date: new Date().toISOString().split('T')[0],
+        reason: ""
+      });
     }).catch(err => {
       toast({
         title: "Error",
@@ -123,12 +208,88 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
     });
   };
   
+  const handleToggleSelectNonWorkDay = (index: number) => {
+    setNonWorkDaysData(prev => 
+      prev.map((day, i) => 
+        i === index ? { ...day, isSelected: !day.isSelected } : day
+      )
+    );
+  };
+  
+  const handleEditNonWorkDay = (index: number) => {
+    setNonWorkDayToEdit({
+      index,
+      value: { ...nonWorkDaysData[index] }
+    });
+  };
+  
+  const handleSaveEditedNonWorkDay = () => {
+    if (!nonWorkDayToEdit) return;
+    
+    const { index, value } = nonWorkDayToEdit;
+    const updatedDays = [...nonWorkDaysData];
+    updatedDays[index] = value;
+    
+    setNonWorkDaysData(updatedDays);
+    setNonWorkDayToEdit(null);
+    
+    // Actualizar en base de datos
+    updateVehicle(vehicle.id, {
+      daysNotWorked: updatedDays.map(day => day.date)
+    }).then(() => {
+      toast({
+        title: "Día actualizado",
+        description: "Se ha actualizado la información del día no trabajado"
+      });
+    }).catch(err => {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la información",
+        variant: "destructive"
+      });
+      console.error("Error al actualizar día no trabajado:", err);
+    });
+  };
+  
+  const handleRemoveSelectedNonWorkDays = () => {
+    const selectedDays = nonWorkDaysData.filter(day => day.isSelected);
+    if (selectedDays.length === 0) {
+      toast({
+        title: "Selección vacía",
+        description: "Debe seleccionar al menos un día para eliminar",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const updatedDays = nonWorkDaysData.filter(day => !day.isSelected);
+    setNonWorkDaysData(updatedDays);
+    
+    // Actualizar en base de datos
+    updateVehicle(vehicle.id, {
+      daysNotWorked: updatedDays.map(day => day.date)
+    }).then(() => {
+      toast({
+        title: "Días eliminados",
+        description: `Se han eliminado ${selectedDays.length} día(s) no trabajado(s)`
+      });
+    }).catch(err => {
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar los días seleccionados",
+        variant: "destructive"
+      });
+      console.error("Error al eliminar días no trabajados:", err);
+    });
+  };
+  
   const handleRemoveNonWorkDay = (dateToRemove: string) => {
-    const daysNotWorked = vehicle.daysNotWorked || [];
-    const updatedDaysNotWorked = daysNotWorked.filter(date => date !== dateToRemove);
+    const updatedDaysNotWorked = nonWorkDaysData.filter(day => day.date !== dateToRemove);
+    
+    setNonWorkDaysData(updatedDaysNotWorked);
     
     updateVehicle(vehicle.id, {
-      daysNotWorked: updatedDaysNotWorked
+      daysNotWorked: updatedDaysNotWorked.map(day => day.date)
     }).then(() => {
       toast({
         title: "Día eliminado",
@@ -147,18 +308,49 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
       const formattedDate = date.toISOString().split('T')[0];
-      setNewNonWorkDay(formattedDate);
+      setNewNonWorkDay(prev => ({
+        ...prev,
+        date: formattedDate
+      }));
       setSelectedDate(date);
       setCalendarOpen(false);
     }
   };
   
+  // Contador de días seleccionados
+  const selectedCount = nonWorkDaysData.filter(day => day.isSelected).length;
+  
   return (
     <Dialog open={!!vehicle} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">
-            {vehicle.plate} - {vehicle.model} {vehicle.year}
+          <DialogTitle className="text-xl flex justify-between items-center">
+            <span>{vehicle.plate} - {vehicle.model} {vehicle.year}</span>
+            {activeTab === "info" && (
+              <>
+                {isEditingInfo ? (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleSaveVehicleInfo}
+                    className="flex items-center gap-1"
+                  >
+                    <Save className="h-4 w-4" />
+                    Guardar
+                  </Button>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setIsEditingInfo(true)}
+                    className="flex items-center gap-1"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar
+                  </Button>
+                )}
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
         
@@ -181,20 +373,65 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-sm text-muted-foreground">Placa</Label>
-                        <p>{vehicle.plate}</p>
+                        {isEditingInfo ? (
+                          <Input
+                            value={editedVehicle.plate !== undefined ? editedVehicle.plate : vehicle.plate}
+                            onChange={(e) => handleInputChange('plate', e.target.value)}
+                            className="mt-1"
+                          />
+                        ) : (
+                          <p>{vehicle.plate}</p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Año</Label>
-                        <p>{vehicle.year}</p>
+                        {isEditingInfo ? (
+                          <Input
+                            value={editedVehicle.year !== undefined ? editedVehicle.year : vehicle.year}
+                            onChange={(e) => handleInputChange('year', e.target.value)}
+                            className="mt-1"
+                          />
+                        ) : (
+                          <p>{vehicle.year}</p>
+                        )}
                       </div>
                     </div>
                     <div>
                       <Label className="text-sm text-muted-foreground">Marca/Modelo</Label>
-                      <p>{vehicle.brand} {vehicle.model}</p>
+                      {isEditingInfo ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={editedVehicle.brand !== undefined ? editedVehicle.brand : vehicle.brand}
+                            onChange={(e) => handleInputChange('brand', e.target.value)}
+                            placeholder="Marca"
+                            className="mt-1"
+                          />
+                          <Input
+                            value={editedVehicle.model !== undefined ? editedVehicle.model : vehicle.model}
+                            onChange={(e) => handleInputChange('model', e.target.value)}
+                            placeholder="Modelo"
+                            className="mt-1"
+                          />
+                        </div>
+                      ) : (
+                        <p>{vehicle.brand} {vehicle.model}</p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm text-muted-foreground">Estado</Label>
-                      <p className="capitalize">{vehicle.status}</p>
+                      {isEditingInfo ? (
+                        <select 
+                          value={editedVehicle.status !== undefined ? editedVehicle.status : vehicle.status}
+                          onChange={(e) => handleInputChange('status', e.target.value)}
+                          className="w-full mt-1 p-2 rounded-md border border-input bg-[#F1F1F1] dark:bg-zinc-800"
+                        >
+                          <option value="active">Activo</option>
+                          <option value="maintenance">En Mantenimiento</option>
+                          <option value="inactive">Inactivo</option>
+                        </select>
+                      ) : (
+                        <p className="capitalize">{vehicle.status}</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -206,11 +443,27 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   <CardContent className="space-y-2">
                     <div>
                       <Label className="text-sm text-muted-foreground">Nombre</Label>
-                      <p>{vehicle.driverName}</p>
+                      {isEditingInfo ? (
+                        <Input
+                          value={editedVehicle.driverName !== undefined ? editedVehicle.driverName : vehicle.driverName}
+                          onChange={(e) => handleInputChange('driverName', e.target.value)}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p>{vehicle.driverName}</p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm text-muted-foreground">Teléfono</Label>
-                      <p>{vehicle.driverPhone}</p>
+                      {isEditingInfo ? (
+                        <Input
+                          value={editedVehicle.driverPhone !== undefined ? editedVehicle.driverPhone : vehicle.driverPhone}
+                          onChange={(e) => handleInputChange('driverPhone', e.target.value)}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p>{vehicle.driverPhone}</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -223,11 +476,28 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 <CardContent className="space-y-2">
                   <div>
                     <Label className="text-sm text-muted-foreground">Nombre</Label>
-                    <p>{vehicle.investor}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        value={editedVehicle.investor !== undefined ? editedVehicle.investor : vehicle.investor}
+                        onChange={(e) => handleInputChange('investor', e.target.value)}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>{vehicle.investor}</p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Tarifa diaria</Label>
-                    <p>Bs {vehicle.installmentAmount}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        type="number"
+                        value={editedVehicle.installmentAmount !== undefined ? editedVehicle.installmentAmount : vehicle.installmentAmount}
+                        onChange={(e) => handleInputChange('installmentAmount', parseFloat(e.target.value))}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>Bs {vehicle.installmentAmount}</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -364,25 +634,84 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
           <TabsContent value="financial" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Información Financiera</CardTitle>
+                <CardTitle className="text-lg flex justify-between items-center">
+                  <span>Información Financiera</span>
+                  {isEditingInfo ? (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleSaveVehicleInfo}
+                      className="flex items-center gap-1"
+                    >
+                      <Save className="h-4 w-4" />
+                      Guardar
+                    </Button>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setIsEditingInfo(true)}
+                      className="flex items-center gap-1"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Editar
+                    </Button>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm text-muted-foreground">Fecha de inicio de contrato</Label>
-                    <p>{vehicle.contractStartDate || 'No especificada'}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        type="date"
+                        value={editedVehicle.contractStartDate !== undefined ? editedVehicle.contractStartDate : (vehicle.contractStartDate || '')}
+                        onChange={(e) => handleInputChange('contractStartDate', e.target.value)}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>{vehicle.contractStartDate || 'No especificada'}</p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Valor de cuota diaria</Label>
-                    <p>Bs {vehicle.installmentAmount || 0}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        type="number"
+                        value={editedVehicle.installmentAmount !== undefined ? editedVehicle.installmentAmount : (vehicle.installmentAmount || 0)}
+                        onChange={(e) => handleInputChange('installmentAmount', parseFloat(e.target.value))}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>Bs {vehicle.installmentAmount || 0}</p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Total de cuotas</Label>
-                    <p>{vehicle.totalInstallments || 0}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        type="number"
+                        value={editedVehicle.totalInstallments !== undefined ? editedVehicle.totalInstallments : (vehicle.totalInstallments || 0)}
+                        onChange={(e) => handleInputChange('totalInstallments', parseInt(e.target.value))}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>{vehicle.totalInstallments || 0}</p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Cuotas pagadas</Label>
-                    <p>{vehicle.paidInstallments || 0}</p>
+                    {isEditingInfo ? (
+                      <Input
+                        type="number"
+                        value={editedVehicle.paidInstallments !== undefined ? editedVehicle.paidInstallments : (vehicle.paidInstallments || 0)}
+                        onChange={(e) => handleInputChange('paidInstallments', parseInt(e.target.value))}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p>{vehicle.paidInstallments || 0}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -390,12 +719,30 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 
                 <div>
                   <Label className="text-sm text-muted-foreground">Total pagado hasta la fecha</Label>
-                  <p className="text-lg font-bold">Bs {vehicle.totalPaid || 0}</p>
+                  {isEditingInfo ? (
+                    <Input
+                      type="number"
+                      value={editedVehicle.totalPaid !== undefined ? editedVehicle.totalPaid : (vehicle.totalPaid || 0)}
+                      onChange={(e) => handleInputChange('totalPaid', parseFloat(e.target.value))}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-lg font-bold">Bs {vehicle.totalPaid || 0}</p>
+                  )}
                 </div>
                 
                 <div>
                   <Label className="text-sm text-muted-foreground">Ingresos mensuales estimados</Label>
-                  <p className="text-lg">Bs {vehicle.monthlyEarnings || 0}</p>
+                  {isEditingInfo ? (
+                    <Input
+                      type="number"
+                      value={editedVehicle.monthlyEarnings !== undefined ? editedVehicle.monthlyEarnings : (vehicle.monthlyEarnings || 0)}
+                      onChange={(e) => handleInputChange('monthlyEarnings', parseFloat(e.target.value))}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-lg">Bs {vehicle.monthlyEarnings || 0}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -411,37 +758,50 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-col md:flex-row md:items-end gap-4">
-                    <div className="space-y-2 flex-1">
-                      <Label htmlFor="non-work-day">Fecha</Label>
-                      <div className="flex gap-2">
+                  <div className="flex flex-col space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="non-work-day">Fecha</Label>
+                        <div className="flex gap-2">
+                          <Input 
+                            id="non-work-day" 
+                            type="date" 
+                            value={newNonWorkDay.date}
+                            onChange={(e) => handleNewNonWorkDayChange('date', e.target.value)}
+                            className="flex-1"
+                          />
+                          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="icon">
+                                <Calendar className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <CalendarComponent
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={handleCalendarSelect}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="non-work-day-reason">Motivo</Label>
                         <Input 
-                          id="non-work-day" 
-                          type="date" 
-                          value={newNonWorkDay}
-                          onChange={(e) => setNewNonWorkDay(e.target.value)}
-                          className="flex-1"
+                          id="non-work-day-reason" 
+                          type="text" 
+                          placeholder="Ej: Feriado, Mantenimiento, etc." 
+                          value={newNonWorkDay.reason || ""}
+                          onChange={(e) => handleNewNonWorkDayChange('reason', e.target.value)}
                         />
-                        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="icon">
-                              <Calendar className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <CalendarComponent
-                              mode="single"
-                              selected={selectedDate}
-                              onSelect={handleCalendarSelect}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
                       </div>
                     </div>
                     <Button 
                       type="button"
                       onClick={handleAddNonWorkDay}
+                      className="w-full md:w-auto md:self-end"
                     >
                       Agregar Día
                     </Button>
@@ -453,42 +813,107 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg">Días No Trabajados</CardTitle>
-                    {vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {selectedCount > 0 && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={handleRemoveSelectedNonWorkDays}
+                          className="flex items-center"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Eliminar ({selectedCount})
+                        </Button>
+                      )}
                       <div className="bg-muted px-2 py-1 rounded text-sm">
-                        Total: {vehicle.daysNotWorked.length} día(s)
+                        Total: {nonWorkDaysData.length} día(s)
                       </div>
-                    )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {vehicle.daysNotWorked && vehicle.daysNotWorked.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {vehicle.daysNotWorked
-                        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-                        .map((date, index) => {
-                          try {
-                            const formattedDate = format(new Date(date), "dd/MM/yyyy");
-                            return (
-                              <div key={index} className="flex justify-between items-center p-2 border rounded-md">
-                                <div className="flex items-center">
-                                  <CalendarOff className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span>{formattedDate}</span>
+                  {nonWorkDaysData.length > 0 ? (
+                    <div className="space-y-3">
+                      {nonWorkDaysData
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((day, index) => (
+                          <div key={index} className={`p-3 border rounded-lg flex items-start ${day.isSelected ? 'bg-muted/50 border-primary' : ''}`}>
+                            <div className="mr-2 mt-1">
+                              <Checkbox 
+                                checked={day.isSelected} 
+                                onCheckedChange={() => handleToggleSelectNonWorkDay(index)} 
+                                id={`day-${index}`} 
+                                className="translate-y-1"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              {nonWorkDayToEdit && nonWorkDayToEdit.index === index ? (
+                                <div className="space-y-2">
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      type="date" 
+                                      value={nonWorkDayToEdit.value.date}
+                                      onChange={(e) => setNonWorkDayToEdit({
+                                        index,
+                                        value: { ...nonWorkDayToEdit.value, date: e.target.value }
+                                      })}
+                                      className="w-full"
+                                    />
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      onClick={handleSaveEditedNonWorkDay}
+                                      className="h-10 w-10 p-0"
+                                    >
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  </div>
+                                  <Input 
+                                    type="text" 
+                                    placeholder="Motivo" 
+                                    value={nonWorkDayToEdit.value.reason || ""}
+                                    onChange={(e) => setNonWorkDayToEdit({
+                                      index,
+                                      value: { ...nonWorkDayToEdit.value, reason: e.target.value }
+                                    })}
+                                  />
                                 </div>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleRemoveNonWorkDay(date)}
-                                  className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 p-1 h-auto"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            );
-                          } catch (err) {
-                            console.error("Error formateando fecha:", err);
-                            return null;
-                          }
-                        })}
+                              ) : (
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="font-medium flex items-center">
+                                      <CalendarOff className="h-4 w-4 mr-2 text-muted-foreground" />
+                                      <span>{format(new Date(day.date), "dd/MM/yyyy")}</span>
+                                    </div>
+                                    {day.reason && (
+                                      <p className="mt-1 text-sm text-muted-foreground">
+                                        Motivo: {day.reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => handleEditNonWorkDay(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => handleRemoveNonWorkDay(day.date)}
+                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   ) : (
                     <div className="text-center py-4 text-muted-foreground">
