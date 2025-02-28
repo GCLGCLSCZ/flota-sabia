@@ -15,6 +15,7 @@ import {
   discountToDb, discountFromDb
 } from "@/lib/transformers";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface AppContextType {
   vehicles: Vehicle[];
@@ -41,6 +42,8 @@ interface AppContextType {
   validateDriverData: (driver: Partial<Driver>) => { isValid: boolean; errors: string[] };
   loading: boolean;
   refreshData: () => Promise<void>;
+  addFreeDay: (vehicleId: string, date: string) => Promise<boolean>;
+  removeFreeDay: (vehicleId: string, date: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -56,6 +59,7 @@ const DEFAULT_SETTINGS: Omit<SystemSettings, "id"> = {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [fullVehicles, setFullVehicles] = useState<Vehicle[]>([]);
+  const { toast } = useToast();
   
   // Flag para determinar si usamos Supabase - verificamos que el cliente existe
   const useSupabase = Boolean(supabase);
@@ -185,6 +189,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     transformFromDb: discountFromDb
   });
 
+  // Para días libres
+  const [freeDays, setFreeDays] = useState<{id: string, vehicleId: string, date: string}[]>([]);
+
+  // Cargar días libres
+  useEffect(() => {
+    if (useSupabase) {
+      const fetchFreeDays = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('free_days')
+            .select('*');
+          
+          if (!error && data) {
+            setFreeDays(data);
+          }
+        } catch (err) {
+          console.error("Error fetching free days:", err);
+        }
+      };
+      
+      fetchFreeDays();
+    }
+  }, [useSupabase]);
+
   // Combinar datos relacionados con vehículos
   useEffect(() => {
     if (!useSupabase) {
@@ -213,11 +241,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .filter(d => d.vehicleId === vehicle.id)
         .map(d => ({ ...d }));
       
+      // Asignar días libres
+      const vehicleFreeDays = freeDays
+        .filter(d => d.vehicleId === vehicle.id)
+        .map(d => d.date);
+      
       return {
         ...vehicle,
         maintenanceHistory: vehicleMaintenance,
         cardex: vehicleCardex,
-        discounts: vehicleDiscounts
+        discounts: vehicleDiscounts,
+        freeDays: vehicleFreeDays
       };
     });
 
@@ -228,6 +262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     maintenanceItems, 
     cardexItems, 
     discountItems, 
+    freeDays,
     vehiclesLoading,
     maintenanceLoading,
     cardexLoading,
@@ -258,7 +293,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, cardex, discounts, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, freeDays, ...baseVehicleData } = vehicleData;
       
       // Primero agregar el vehículo base
       const success = await addVehicleBase(baseVehicleData);
@@ -307,6 +342,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           }
           
+          // Agregar días libres si existen
+          if (freeDays && freeDays.length > 0) {
+            for (const date of freeDays) {
+              await supabase.from('free_days').insert({
+                vehicle_id: vehicleId,
+                date
+              });
+            }
+          }
+          
           // Refrescar datos
           await refreshData();
         }
@@ -321,12 +366,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>) => {
     if (!useSupabase) {
-      return updateVehicleBase(id, vehicleData);
+      // Para almacenamiento local, sólo actualizamos el vehículo en el estado
+      const result = await updateVehicleBase(id, vehicleData);
+      
+      // Si estamos actualizando freeDays, también actualizamos los vehículos completos
+      if (vehicleData.freeDays !== undefined) {
+        setFullVehicles((prevVehicles) =>
+          prevVehicles.map((vehicle) =>
+            vehicle.id === id
+              ? { ...vehicle, freeDays: vehicleData.freeDays || [] }
+              : vehicle
+          )
+        );
+      }
+      
+      return result;
     }
 
     try {
       // Extraer datos relacionados
-      const { maintenanceHistory, cardex, discounts, ...baseVehicleData } = vehicleData;
+      const { maintenanceHistory, cardex, discounts, freeDays, ...baseVehicleData } = vehicleData;
       
       // Actualizar el vehículo base
       const success = await updateVehicleBase(id, baseVehicleData);
@@ -383,6 +442,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
         
+        // Actualizar días libres si se proporcionaron
+        if (freeDays !== undefined) {
+          // Primero eliminamos los existentes
+          await supabase.from('free_days').delete().eq('vehicle_id', id);
+          
+          // Luego agregamos los nuevos
+          if (freeDays.length > 0) {
+            for (const date of freeDays) {
+              await supabase.from('free_days').insert({
+                vehicle_id: id,
+                date
+              });
+            }
+          }
+          
+          // Actualizar el estado local con los nuevos días
+          setFreeDays(prev => {
+            // Eliminar los días anteriores para este vehículo
+            const filtered = prev.filter(item => item.vehicleId !== id);
+            // Añadir los nuevos días
+            const newDays = freeDays.map(date => ({
+              id: `${id}-${date}`,
+              vehicleId: id,
+              date
+            }));
+            return [...filtered, ...newDays];
+          });
+          
+          // Actualizar los vehículos completos con los nuevos días
+          setFullVehicles(prev => 
+            prev.map(vehicle => 
+              vehicle.id === id
+                ? { ...vehicle, freeDays }
+                : vehicle
+            )
+          );
+        }
+        
         // Refrescar datos solo si es necesario
         if (maintenanceHistory !== undefined || cardex !== undefined || discounts !== undefined) {
           await refreshData();
@@ -392,6 +489,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return success;
     } catch (err) {
       console.error("Error updating vehicle with relationships:", err);
+      toast({
+        title: "Error",
+        description: "Hubo un problema al actualizar el vehículo: " + (err instanceof Error ? err.message : String(err)),
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  // Añadir un día libre específico para un vehículo
+  const addFreeDay = async (vehicleId: string, date: string) => {
+    try {
+      // Buscar el vehículo
+      const vehicle = fullVehicles.find(v => v.id === vehicleId);
+      
+      if (!vehicle) {
+        console.error("Vehículo no encontrado:", vehicleId);
+        return false;
+      }
+      
+      // Verificar si el día ya existe
+      const currentDays = vehicle.freeDays || [];
+      if (currentDays.includes(date)) {
+        console.log("Este día ya está registrado como jornada libre:", date);
+        return false;
+      }
+      
+      // Actualizar el vehículo con el nuevo día
+      const updatedDays = [...currentDays, date];
+      
+      // Actualizar vehículo con la función normal
+      return await updateVehicle(vehicleId, { freeDays: updatedDays });
+      
+    } catch (err) {
+      console.error("Error al añadir día libre:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo agregar la jornada libre",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  // Eliminar un día libre específico para un vehículo
+  const removeFreeDay = async (vehicleId: string, date: string) => {
+    try {
+      // Buscar el vehículo
+      const vehicle = fullVehicles.find(v => v.id === vehicleId);
+      
+      if (!vehicle) {
+        console.error("Vehículo no encontrado:", vehicleId);
+        return false;
+      }
+      
+      // Verificar si el día existe
+      const currentDays = vehicle.freeDays || [];
+      if (!currentDays.includes(date)) {
+        console.log("Este día no está registrado como jornada libre:", date);
+        return false;
+      }
+      
+      // Filtrar para eliminar el día
+      const updatedDays = currentDays.filter(d => d !== date);
+      
+      // Actualizar vehículo con la función normal
+      return await updateVehicle(vehicleId, { freeDays: updatedDays });
+      
+    } catch (err) {
+      console.error("Error al eliminar día libre:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la jornada libre",
+        variant: "destructive"
+      });
       return false;
     }
   };
@@ -410,7 +582,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           refreshSettings(),
           refreshMaintenance(),
           refreshCardex(),
-          refreshDiscounts()
+          refreshDiscounts(),
+          (async () => {
+            const { data } = await supabase.from('free_days').select('*');
+            if (data) setFreeDays(data);
+          })()
         ]);
       } catch (err) {
         console.error("Error refreshing data:", err);
@@ -476,7 +652,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         validateInvestorData,
         validateDriverData,
         loading,
-        refreshData
+        refreshData,
+        addFreeDay,
+        removeFreeDay
       }}
     >
       {children}

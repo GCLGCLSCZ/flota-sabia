@@ -45,7 +45,7 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
   // La comisión diaria es por cuota pagada, no un acumulado arbitrario
   const companyEarnings = Number((vehicle.dailyRate * paidInstallments).toFixed(2));
   
-  // Calcular cuotas atrasadas (excluyendo domingos)
+  // Calcular cuotas atrasadas (excluyendo domingos y días de jornada libre)
   const calculateOverdueInstallments = () => {
     if (!vehicle.contractStartDate) return 0;
     
@@ -58,13 +58,19 @@ const VehicleCard = ({ vehicle, onEdit, onDelete, onShowDetails }) => {
     // Si la fecha de inicio es posterior a hoy, no hay cuotas atrasadas
     if (isAfter(startDate, today)) return 0;
     
-    // Calcular días transcurridos excluyendo domingos
+    // Obtener los días de jornada libre
+    const freeDaysArray = vehicle.freeDays || [];
+    
+    // Calcular días transcurridos excluyendo domingos y días de jornada libre
     let dayCount = 0;
     let currentDate = new Date(startDate);
     
     while (currentDate <= today) {
-      // Si no es domingo
-      if (!isSunday(currentDate)) {
+      // Convertir la fecha actual a formato ISO (solo fecha)
+      const currentDateStr = format(currentDate, "yyyy-MM-dd");
+      
+      // Si no es domingo y no es un día de jornada libre
+      if (!isSunday(currentDate) && !freeDaysArray.includes(currentDateStr)) {
         dayCount++;
       }
       

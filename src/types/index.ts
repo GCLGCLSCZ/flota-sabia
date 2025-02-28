@@ -77,6 +77,7 @@ export interface Vehicle {
   cardex?: CardexItem[];
   discounts?: Discount[];
   insurancePolicies?: InsurancePolicy[];
+  freeDays?: string[]; // Días de jornada libre
 }
 
 // Definición de pago
