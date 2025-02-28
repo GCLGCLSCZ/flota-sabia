@@ -19,3 +19,5 @@ export const VehicleList = ({ onEdit, onDelete, onShowDetails }) => {
     </div>
   );
 };
+
+export default VehicleList;
