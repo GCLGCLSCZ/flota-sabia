@@ -1,58 +1,73 @@
 
 @media print {
-  @page {
-    size: auto;
-    margin: 20mm;
-  }
-  
   body {
-    font-size: 12pt;
-    background: white;
-    color: black;
+    background-color: white;
+    margin: 0;
+    padding: 0;
   }
   
-  .print-hidden,
-  button,
+  #settlement-print {
+    padding: 20px;
+    max-width: 100%;
+  }
+  
+  .print\:block {
+    display: block !important;
+  }
+  
   .print\:hidden {
     display: none !important;
   }
   
-  /* Asegurar que las tablas ocupen el ancho completo */
-  table {
-    width: 100%;
-    border-collapse: collapse;
+  .print\:text-center {
+    text-align: center !important;
   }
   
-  /* Asegurar que los bordes de las tablas y celdas sean visibles */
-  th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+  .print\:text-lg {
+    font-size: 1.125rem !important;
   }
   
-  /* Estilos específicos para la página de rendición */
-  .space-y-6 > * + * {
-    margin-top: 1.5rem;
+  .print\:text-base {
+    font-size: 1rem !important;
   }
   
-  .card {
-    box-shadow: none;
-    border: none;
+  .print\:text-sm {
+    font-size: 0.875rem !important;
   }
   
-  /* Asegurar que todo el contenido se muestre */
-  .overflow-hidden,
-  .overflow-x-auto,
-  .overflow-y-auto {
-    overflow: visible !important;
+  .print\:text-3xl {
+    font-size: 1.875rem !important;
   }
   
-  /* Evitar saltos de página en lugares indeseados */
-  .card, h1, h2, h3, h4, h5, h6, tr {
-    page-break-inside: avoid;
+  .print\:border-none {
+    border: none !important;
   }
   
-  /* Asegurar que las líneas de firma aparezcan */
-  .border-t {
-    border-top: 1px solid black !important;
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  .print\:pb-2 {
+    padding-bottom: 0.5rem !important;
+  }
+  
+  .print\:gap-1 {
+    gap: 0.25rem !important;
+  }
+  
+  .print\:space-y-0 > * + * {
+    margin-top: 0 !important;
+  }
+  
+  .print\:space-y-2 > * + * {
+    margin-top: 0.5rem !important;
+  }
+  
+  .print\:mt-2 {
+    margin-top: 0.5rem !important;
+  }
+  
+  .print\:mt-10 {
+    margin-top: 2.5rem !important;
   }
 }

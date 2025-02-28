@@ -308,7 +308,7 @@ const InvestorSettlement = () => {
       }));
 
       // Datos para la rendición
-      const settlementData = {
+      const settlementData: Omit<Settlement, "id"> = {
         investorId: investor.id,
         startDate,
         endDate,
@@ -326,7 +326,7 @@ const InvestorSettlement = () => {
         success = await updateSettlement(existingSettlement.id, settlementData);
       } else {
         // Crear nueva rendición
-        success = await addSettlement(settlementData as any);
+        success = await addSettlement(settlementData);
       }
 
       if (success) {

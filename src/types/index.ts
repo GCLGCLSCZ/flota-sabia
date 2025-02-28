@@ -1,3 +1,4 @@
+
 export interface Vehicle {
   id: string;
   plate: string;
@@ -35,7 +36,7 @@ export interface Payment {
   amount: number;
   concept: string;
   paymentMethod: "cash" | "transfer" | "check" | "other";
-  status: "pending" | "completed" | "rejected";
+  status: "pending" | "completed" | "rejected" | "analysing" | "cancelled";
   vehicleId: string;
   receiptNumber?: string;
   bankName?: string;
@@ -89,7 +90,9 @@ export interface Maintenance {
     | "predictive"
     | "periodic"
     | "emergency"
-    | "other";
+    | "other"
+    | "mechanical"
+    | "body_paint";
   proformaNumber?: string;
   isInsuranceCovered?: boolean;
 }
@@ -107,7 +110,10 @@ export interface CardexItem {
     | "transmission_service"
     | "coolant_flush"
     | "power_steering_flush"
-    | "other";
+    | "other"
+    | "filter_change"
+    | "spark_plugs"
+    | "battery";
   date: string;
   description?: string;
   nextScheduledDate?: string;
@@ -120,13 +126,13 @@ export interface CardexItem {
 export interface Discount {
   id: string;
   vehicleId: string;
-  type: "percentage" | "fixed";
+  type: "percentage" | "fixed" | "maintenance" | "insurance" | "repair" | "other";
   description: string;
   amount: number;
   date: string;
-  applyToMonths: number;
+  applyToMonths: number | string[];
   recurring: boolean;
-  frequency: "monthly" | "quarterly" | "yearly";
+  frequency: "monthly" | "quarterly" | "yearly" | "biannual" | "annual";
 }
 
 export interface Settlement {
@@ -146,6 +152,7 @@ export interface Settlement {
     discounts: {
       maintenance: number;
       gps: number;
+      commission?: number;
       total: number;
     };
     investorAmount: number;
@@ -161,4 +168,26 @@ export interface SystemSettings {
   dateFormat: string;
   timezone: string;
   investorPercentage?: number; // Porcentaje que corresponde al inversionista (0.7 = 70%)
+}
+
+// Tipos para la autenticación
+export interface User {
+  id: string;
+  email: string;
+  displayName?: string;
+  role: UserRole;
+  permissions: UserPermissions;
+}
+
+export type UserRole = 'admin' | 'user' | 'guest';
+
+export interface UserPermissions {
+  canCreateVehicles?: boolean;
+  canEditVehicles?: boolean;
+  canDeleteVehicles?: boolean;
+  canCreatePayments?: boolean;
+  canEditPayments?: boolean;
+  canDeletePayments?: boolean;
+  canViewReports?: boolean;
+  canManageUsers?: boolean;
 }
