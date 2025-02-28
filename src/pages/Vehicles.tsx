@@ -74,6 +74,7 @@ const VehiclesPage = () => {
       ...(vehicle.maintenanceHistory || []),
       {
         id: Date.now().toString(),
+        vehicleId, // Ensure vehicleId is included here
         ...maintenance,
         cost: totalCost,
         status: "pending" as const,

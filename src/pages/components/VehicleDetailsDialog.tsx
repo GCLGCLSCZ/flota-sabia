@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, Check, X } from "lucide-react";
+import { CalendarIcon, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,7 +23,8 @@ interface VehicleDetailsDialogProps {
 const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDetailsDialogProps) => {
   const { toast } = useToast();
   const { addFreeDay, removeFreeDay } = useApp();
-  const [maintenanceData, setMaintenanceData] = useState<Omit<Maintenance, "id" | "vehicleId" | "status">>({
+  const [maintenanceData, setMaintenanceData] = useState<Omit<Maintenance, "id" | "status">>({
+    vehicleId: vehicle?.id || "",
     date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     cost: 0,
@@ -35,6 +36,14 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   if (!vehicle) return null;
+
+  // Update vehicleId when vehicle changes
+  if (maintenanceData.vehicleId !== vehicle.id) {
+    setMaintenanceData(prev => ({
+      ...prev,
+      vehicleId: vehicle.id
+    }));
+  }
 
   // Función para verificar si una fecha está en la lista de días no trabajados
   const isDateNotWorked = (date: Date) => {
@@ -71,8 +80,10 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
 
   const handleSubmitMaintenance = () => {
     if (vehicle?.id) {
+      // We're passing the full maintenanceData object, which includes vehicleId
       onAddMaintenance(vehicle.id, maintenanceData);
       setMaintenanceData({
+        vehicleId: vehicle.id,
         date: format(new Date(), "yyyy-MM-dd"),
         description: "",
         cost: 0,
@@ -404,4 +415,3 @@ const VehicleDetailsDialog = ({ vehicle, onClose, onAddMaintenance }: VehicleDet
 };
 
 export default VehicleDetailsDialog;
-
